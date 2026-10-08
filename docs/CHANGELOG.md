@@ -2,6 +2,20 @@
 
 All notable changes to the Hotel Restaurant QR E-Billing platform will be documented in this file.
 
+## [Phase 2: Customer Menu Implementation] - 2026-10-08
+
+### Added
+- **Dynamic Route `/menu/[qrToken]`**: Built responsive customer ordering route in `src/app/menu/[qrToken]/page.tsx` with layout in `src/app/menu/layout.tsx`.
+- **Polymorphic QR Context Resolution**: Automatically validates and maps Room and Table tokens to hotel metadata and synchronizes with cart session.
+- **QR Banner**: Built `QRBanner` displaying table/room number, dining mode, hotel branding, and digital e-bill indicator.
+- **Horizontal Sticky Categories Navigation**: Built `CategoryTabs` with active item counts and smooth scrolling.
+- **Menu Search & Dietary Filtering**: Implemented `MenuSearchAndFilter` with 300ms debouncing and `Veg Only`, `Non-Veg`, and `Chef's Specials` quick filters.
+- **Rich Menu Item Card**: Implemented `MenuItemCard` with Indian standard dietary flags, spice meter, preparation time, and direct quick-add / customize triggers.
+- **Modifier Modal Customization Engine**: Built `ModifierModal` supporting single-choice radio options, multi-choice add-ons, required selection enforcement, live price recalculations, and special instructions.
+- **Catalog Container**: Built `MenuCatalog` coordinating banner, filters, category tabs, and loading skeletons / empty states.
+- **Automated Verification**: Added 3 new test suites (`menuItemCard.test.tsx`, `modifierModal.test.tsx`, `categoryFiltering.test.ts`), bringing total to 29 passing assertions.
+- **Architecture Decision Record**: Authored ADR-0006 for Customer Menu & Modifier Engine architecture.
+
 ## [Phase 1: Foundation Implementation] - 2026-10-08
 
 ### Added
