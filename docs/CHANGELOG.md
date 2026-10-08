@@ -2,6 +2,18 @@
 
 All notable changes to the Hotel Restaurant QR E-Billing platform will be documented in this file.
 
+## [Phase 4: Customer Live Order Tracking & WebSocket Integration] - 2026-10-08
+
+### Added
+- **Live Order Tracking Route (`/order/[orderId]`)**: Created dynamic order tracking route in `src/app/order/[orderId]/page.tsx` with layout in `src/app/order/layout.tsx`.
+- **Live Tracking Header (`LiveTrackingHeader`)**: Displays order number, table/room dining badge, placed timestamp, and real-time WebSocket connection state indicator.
+- **5-Stage Visual Progress Timeline (`OrderStatusTimeline`)**: Built interactive lifecycle pipeline (`PLACED` ➔ `CONFIRMED` ➔ `PREPARING` ➔ `READY` ➔ `SERVED`), animated pulse for active stage, estimated preparation countdowns, and cancellation alerts.
+- **Itemized Order Review (`OrderItemsReview`)**: Displays ordered dishes, selected modifiers, chef notes, item subtotals, 5% GST, and payment preference badges.
+- **Order Cancellation Guard (`OrderCancelModal`)**: Provides structured cancellation reasons with strict kitchen guardrails (preventing mid-cooking cancellation if dishes are in preparation).
+- **Interactive Action Bar**: Direct transitions to add more dishes (`/menu/[qrToken]`), summon floor captain with toast feedback, and view digital e-bill (`/bill/[billId]`).
+- **Automated Verification**: Added 4 new test suites (`orderStatusTimeline.test.tsx`, `orderItemsReview.test.tsx`, `orderCancelModal.test.tsx`, `orderLifecycle.test.ts`), bringing total to 50 passing assertions.
+- **Architecture Decision Record**: Authored ADR-0008 for Customer Live Order Tracking & WebSocket Integration.
+
 ## [Phase 3: Cart & Checkout Implementation] - 2026-10-08
 
 ### Added
