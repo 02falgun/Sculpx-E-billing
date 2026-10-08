@@ -2,6 +2,17 @@
 
 All notable changes to the Hotel Restaurant QR E-Billing platform will be documented in this file.
 
+## [Phase 8: Active Orders Management & Settlement Billing Desk] - 2026-10-09
+
+### Added
+- **Active Orders Management Route (`/orders`)**: Dedicated operational view in `src/app/(staff)/orders/page.tsx` for waiters and shift supervisors.
+- **Orders List Component (`OrdersList`)**: Features lifecycle stage tabs (All Orders, Preparing, Food Ready, Served, Cancelled), search by order number or guest, order source tags (`CUSTOMER_QR` vs `STAFF_POS`), and live tracking link.
+- **Cashier Billing Desk Route (`/billing`)**: High-efficiency billing desk in `src/app/(staff)/billing/page.tsx` monitoring open guest accounts and settlements.
+- **Billing Desk Table Component (`BillingDeskTable`)**: Real-time KPI summary (Outstanding Due, Collected Today, Total Bills Issued), quick tab filters (Unsettled Tabs, Paid & Settled, All Invoices), and instant thermal receipt printing simulation.
+- **Custom Hook `useAllBills`**: Added paginated bill querying and real-time polling to `src/hooks/useBilling.ts`.
+- **Automated Verification**: Added 3 new test suites (`ordersList.test.tsx`, `billingDeskTable.test.tsx`, `billingDeskLedger.test.ts`), bringing total to 76 passing assertions across 28 suites.
+- **Architecture Decision Record**: Authored ADR-0012 for Active Orders & Billing Desk.
+
 ## [Phase 7: Kitchen Display System (KDS) & Real-Time KOT Workflow] - 2026-10-09
 
 ### Added
