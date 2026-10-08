@@ -2,6 +2,18 @@
 
 All notable changes to the Hotel Restaurant QR E-Billing platform will be documented in this file.
 
+## [Phase 3: Cart & Checkout Implementation] - 2026-10-08
+
+### Added
+- **Cart Review Page (`/cart`)**: Created full-page cart review in `src/app/cart/page.tsx` with layout in `src/app/cart/layout.tsx`.
+- **Cart Review List Widget (`CartReviewList`)**: Built itemized list featuring item quantities, stepper controls, modifier breakdown, clear cart action, and direct transition to checkout.
+- **Checkout Page (`/checkout`)**: Created responsive checkout route in `src/app/checkout/page.tsx` with layout in `src/app/checkout/layout.tsx`.
+- **Context-Adaptive Payment Preferences (`PaymentPreferenceSelector`)**: Dynamically offers "Post to Room Folio" for in-room hotel guests versus "Pay Later at Table" for restaurant table diners, alongside "Pay Now Online".
+- **Itemized Order Summary (`OrderSummaryCard`)**: Comprehensive breakdown with itemized subtotals, 5% estimated GST, and total calculation.
+- **Authoritative Pre-Checkout Form (`CheckoutForm`)**: Powered by React Hook Form and Zod, performing backend pre-validation (`orderApi.validateOrder`) before order creation, clearing cart upon placement, and redirecting to live order tracking.
+- **Automated Verification**: Added 3 test suites (`checkoutSchema.test.ts`, `paymentPreference.test.tsx`, `orderSummaryCard.test.tsx`), bringing total to 37 passing assertions.
+- **Architecture Decision Record**: Authored ADR-0007 for Cart Review, Checkout Form, and Payment Preferences.
+
 ## [Phase 2: Customer Menu Implementation] - 2026-10-08
 
 ### Added
