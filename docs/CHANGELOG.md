@@ -2,6 +2,20 @@
 
 All notable changes to the Hotel Restaurant QR E-Billing platform will be documented in this file.
 
+## [Phase 10: E2E Playwright Suite, PWA Service Worker & Production Hardening] - 2026-10-09
+
+### Added
+- **Progressive Web App (PWA) Infrastructure**: Configured standalone display mode, high-contrast dark theme (#0f172a), viewport restrictions, apple-mobile-web-app metadata, vector app icon (`src/app/icon.svg`), and updated manifest.
+- **Service Worker & Network Caching (`public/sw.js`)**: Built offline caching worker for static assets and HTML page fallbacks, paired with `PWARegister` component that listens for online/offline browser state changes and notifies users via toasts.
+- **Offline Recovery Route (`/offline`)**: Designed high-contrast offline fallback page offering instant connection retry and home navigation when local network drops.
+- **Playwright End-to-End Test Automation Suite (`tests/e2e/`)**:
+  - `smoke.spec.ts`: Verifies root dining selection, dynamic QR table routing, KDS board, and Admin portal loading.
+  - `customer-journey.spec.ts`: Automated full customer path (QR ➔ Search ➔ Modifier customization ➔ Cart drawer ➔ Zod-validated Checkout ➔ Live Order Tracking timeline ➔ GST Tax Invoice & Gratuity selection).
+  - `staff-operations.spec.ts`: Validates Floor table management, POS waiter ticketing, paperless KDS ticket queue, Active Orders tracking, and Central Billing Desk ledger.
+  - `admin-backoffice.spec.ts`: Automates Executive dashboard KPIs, Menu 86-ing inventory toggle, Thermal Printer fleet monitor, and table QR Tent Card generator.
+- **Configuration & Build Hardening**: Configured Vitest runner exclusion for Playwright e2e files, added `"test:e2e"` script, verified 0 lint errors, 0 type errors, 80 passing Vitest assertions across 31 suites, and 7 passing Playwright E2E suites.
+- **Architecture Decision Record**: Authored ADR-0014 for PWA, Service Worker, Playwright Automation & Production Hardening.
+
 ## [Phase 9: Admin Back-Office, Hardware Fleet & QR Provisioning] - 2026-10-09
 
 ### Added
