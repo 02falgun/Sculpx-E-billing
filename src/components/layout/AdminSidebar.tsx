@@ -23,30 +23,22 @@ export function AdminSidebar() {
 
   const sections = [
     {
+      title: "Administration",
+      links: [
+        { href: "/admin", label: "Overview", icon: LayoutDashboard },
+        { href: "/admin/menu", label: "Menu Catalogue", icon: Utensils },
+        { href: "/admin/printers", label: "Printers Fleet", icon: Printer },
+        { href: "/admin/qr", label: "QR Code Generator", icon: QrCode },
+      ],
+    },
+    {
       title: "Operations",
       links: [
-        { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/admin/menu", label: "Menu Catalogue", icon: Utensils },
-        { href: "/admin/menu/categories", label: "Categories", icon: Layers },
-        { href: "/admin/rooms", label: "Rooms", icon: BedDouble },
-        { href: "/admin/tables", label: "Tables", icon: Grid3X3 },
-        { href: "/admin/qr", label: "QR Generator", icon: QrCode },
-      ],
-    },
-    {
-      title: "Inventory & Hardware",
-      links: [
-        { href: "/admin/inventory", label: "Inventory", icon: Package },
-        { href: "/admin/printers", label: "Printers Fleet", icon: Printer },
-        { href: "/admin/print-jobs", label: "Print Queue", icon: Printer },
-      ],
-    },
-    {
-      title: "Management",
-      links: [
-        { href: "/admin/users", label: "Staff & Users", icon: Users },
-        { href: "/admin/reports", label: "Reports & GST", icon: BarChart3 },
-        { href: "/admin/settings", label: "System Settings", icon: Settings },
+        { href: "/dashboard", label: "Staff Dashboard", icon: LayoutDashboard },
+        { href: "/pos", label: "POS Terminal", icon: Utensils },
+        { href: "/kitchen", label: "Kitchen Display (KDS)", icon: Layers },
+        { href: "/tables", label: "Floor Tables", icon: Grid3X3 },
+        { href: "/billing", label: "Billing Desk", icon: BarChart3 },
       ],
     },
   ];

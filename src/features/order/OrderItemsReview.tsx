@@ -13,9 +13,9 @@ export function OrderItemsReview({ order }: OrderItemsReviewProps) {
   const isRoom = order.qrContext.type === "ROOM";
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+    <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-4">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 className="text-sm font-bold text-slate-900">Items Ordered</h3>
+        <h3 className="text-sm font-semibold text-slate-900">Items Ordered</h3>
         <span className="text-xs text-slate-500 font-medium">
           {order.items.reduce((acc, i) => acc + i.quantity, 0)} items total
         </span>

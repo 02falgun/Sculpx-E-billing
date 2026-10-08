@@ -18,16 +18,16 @@ export function CategoryTabs({
   className,
 }: CategoryTabsProps) {
   return (
-    <div className={cn("sticky top-16 z-30 bg-slate-50/95 backdrop-blur-md py-3", className)}>
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth px-1">
+    <div className={cn("sticky top-16 z-30 bg-slate-50/95 backdrop-blur-xs py-2.5 border-b border-slate-200/60", className)}>
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth px-1">
         <button
           type="button"
           onClick={() => onSelectCategory("all")}
           className={cn(
-            "flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-all active:scale-95",
+            "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer",
             activeCategoryId === "all"
-              ? "bg-amber-600 text-white shadow-sm shadow-amber-600/30"
-              : "bg-white text-slate-700 border border-slate-200/80 hover:bg-slate-100",
+              ? "bg-slate-900 text-white shadow-xs"
+              : "bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900",
           )}
         >
           <span>All Dishes</span>
@@ -41,18 +41,18 @@ export function CategoryTabs({
               type="button"
               onClick={() => onSelectCategory(category.id)}
               className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-all active:scale-95",
+                "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer",
                 isActive
-                  ? "bg-amber-600 text-white shadow-sm shadow-amber-600/30"
-                  : "bg-white text-slate-700 border border-slate-200/80 hover:bg-slate-100",
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900",
               )}
             >
               <span>{category.name}</span>
               {category.itemCount !== undefined && (
                 <span
                   className={cn(
-                    "flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-extrabold",
-                    isActive ? "bg-white text-amber-700" : "bg-slate-100 text-slate-500",
+                    "flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums",
+                    isActive ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-500",
                   )}
                 >
                   {category.itemCount}

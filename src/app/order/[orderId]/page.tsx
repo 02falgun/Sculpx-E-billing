@@ -101,8 +101,8 @@ export default function OrderTrackingPage({ params }: OrderTrackingPageProps) {
       <OrderItemsReview order={order} />
 
       {/* Customer Action Bar */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
-        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
+      <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-3">
+        <h3 className="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-2">
           Order Actions
         </h3>
 
@@ -113,7 +113,7 @@ export default function OrderTrackingPage({ params }: OrderTrackingPageProps) {
               type="button"
               variant="outline"
               size="md"
-              className="w-full font-semibold border-amber-300 text-amber-700 hover:bg-amber-50"
+              className="w-full font-semibold border-amber-300/80 text-amber-800 hover:bg-amber-50"
               leftIcon={<PlusCircle className="h-4 w-4 text-amber-600" />}
             >
               Order More Items
@@ -141,7 +141,7 @@ export default function OrderTrackingPage({ params }: OrderTrackingPageProps) {
               type="button"
               variant="primary"
               size="md"
-              className="w-full font-bold shadow-md shadow-amber-600/20"
+              className="w-full font-semibold shadow-xs"
               leftIcon={<Receipt className="h-4 w-4" />}
             >
               View Digital E-Bill & Settle

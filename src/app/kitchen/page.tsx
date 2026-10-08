@@ -9,9 +9,9 @@ export default function KitchenPage() {
   const { data: kots = [] } = useActiveKOTs();
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
       <KitchenHeader activeCount={kots.length} />
-      <main className="p-4 sm:p-6 flex-1 w-full max-w-[1920px] mx-auto">
+      <main className="p-4 sm:p-6 lg:p-8 flex-1 w-full max-w-[1920px] mx-auto">
         <KDSBoard />
       </main>
     </div>

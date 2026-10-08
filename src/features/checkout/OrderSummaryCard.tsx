@@ -19,12 +19,12 @@ export function OrderSummaryCard({
 }: OrderSummaryCardProps) {
   return (
     <div
-      className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4 ${
+      className={`rounded-xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-4 ${
         className || ""
       }`}
     >
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 className="text-sm font-bold text-slate-900">Order Summary</h3>
+        <h3 className="text-sm font-semibold text-slate-900">Order Summary</h3>
         <QRContextBadge context={context} />
       </div>
 
@@ -34,7 +34,7 @@ export function OrderSummaryCard({
           <div key={item.id} className="pt-2.5 first:pt-0">
             <div className="flex items-start justify-between text-xs">
               <div className="flex-1 pr-2">
-                <span className="font-bold text-slate-900">
+                <span className="font-semibold text-slate-900">
                   {item.quantity}x {item.item.name}
                 </span>
                 {item.selectedModifiers.length > 0 && (
@@ -68,7 +68,7 @@ export function OrderSummaryCard({
           <span>Total Amount</span>
           <CurrencyDisplay
             amount={summary.estimatedTotal}
-            className="text-amber-700 font-extrabold text-base"
+            className="text-amber-800 font-bold text-base"
           />
         </div>
       </div>

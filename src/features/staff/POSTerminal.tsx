@@ -196,17 +196,17 @@ export function POSTerminal() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-      {/* Left Column: Menu Catalog (Cols 7 or 8) */}
+      {/* Left Column: Menu Catalog (Cols 7) */}
       <div className="lg:col-span-7 space-y-4">
         {/* Context switch banner */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setContextMode("TABLE")}
-              className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
                 contextMode === "TABLE"
-                  ? "bg-amber-500 text-white shadow-sm"
+                  ? "bg-slate-900 text-white shadow-xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -215,9 +215,9 @@ export function POSTerminal() {
             <button
               type="button"
               onClick={() => setContextMode("ROOM")}
-              className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
                 contextMode === "ROOM"
-                  ? "bg-amber-500 text-white shadow-sm"
+                  ? "bg-slate-900 text-white shadow-xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -234,7 +234,7 @@ export function POSTerminal() {
                   const tbl = tables.find((t) => t.id === e.target.value) || null;
                   setSelectedTable(tbl);
                 }}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 focus:border-amber-500 focus:outline-none"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-amber-500 focus:outline-none"
               >
                 <option value="">-- Choose Table --</option>
                 {tables.map((tbl) => (
@@ -250,7 +250,7 @@ export function POSTerminal() {
                   const rm = rooms.find((r) => r.id === e.target.value) || null;
                   setSelectedRoom(rm);
                 }}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 focus:border-amber-500 focus:outline-none"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-amber-500 focus:outline-none"
               >
                 <option value="">-- Choose Room --</option>
                 {rooms.map((rm) => (
@@ -264,15 +264,15 @@ export function POSTerminal() {
         </div>
 
         {/* Category Tabs & Fast Search */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
+        <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-xs space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
               <button
                 type="button"
                 onClick={() => setActiveCategoryId("all")}
-                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
                   activeCategoryId === "all"
-                    ? "bg-slate-900 text-white"
+                    ? "bg-slate-900 text-white shadow-xs"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
@@ -283,9 +283,9 @@ export function POSTerminal() {
                   key={cat.id}
                   type="button"
                   onClick={() => setActiveCategoryId(cat.id)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
                     activeCategoryId === cat.id
-                      ? "bg-slate-900 text-white"
+                      ? "bg-slate-900 text-white shadow-xs"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
@@ -309,19 +309,19 @@ export function POSTerminal() {
           {filteredItems.map((item) => (
             <div
               key={item.id}
-              className="flex items-start justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-xs hover:border-amber-400 transition-colors"
+              className="flex items-start justify-between rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs hover:border-slate-300 transition-colors"
             >
               <div className="flex-1 pr-2">
                 <div className="flex items-center gap-1.5">
                   <DietIndicator type={item.dietaryType} />
-                  <span className="text-xs font-bold text-slate-900 line-clamp-1">
+                  <span className="text-xs font-semibold text-slate-900 line-clamp-1">
                     {item.name}
                   </span>
                 </div>
                 <div className="mt-1 flex items-center gap-2">
                   <CurrencyDisplay
                     amount={item.price}
-                    className="text-xs font-black text-amber-600"
+                    className="text-xs font-bold text-slate-900"
                   />
                   <span className="text-[10px] text-slate-400">~{item.preparationTimeMinutes}m</span>
                 </div>
@@ -331,7 +331,7 @@ export function POSTerminal() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="shrink-0 h-8 px-2.5 text-xs font-bold"
+                className="shrink-0 h-8 px-2.5 text-xs font-semibold"
                 onClick={() => handleAddItem(item)}
               >
                 <Plus className="h-3.5 w-3.5 mr-1" /> Add
@@ -342,11 +342,11 @@ export function POSTerminal() {
       </div>
 
       {/* Right Column: POS Active Order Ticket (Cols 5) */}
-      <div className="lg:col-span-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4 sticky top-20">
+      <div className="lg:col-span-5 rounded-xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-4 sticky top-20">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <UtensilsCrossed className="h-4 w-4 text-amber-600" />
-            <h2 className="text-sm font-bold text-slate-900">Current POS Ticket</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Current POS Ticket</h2>
           </div>
           {contextMode === "TABLE" && selectedTable ? (
             <span className="rounded-lg bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">
@@ -493,11 +493,11 @@ export function POSTerminal() {
           isLoading={isSubmitting}
           disabled={ticketItems.length === 0}
           onClick={handleFireOrder}
-          className="w-full font-bold shadow-md shadow-amber-600/25"
+          className="w-full font-semibold shadow-xs"
           leftIcon={<Flame className="h-4 w-4 text-white" />}
         >
           <span>Fire KOT to Kitchen • </span>
-          <CurrencyDisplay amount={grandTotal} className="text-white ml-1 font-black" />
+          <CurrencyDisplay amount={grandTotal} className="text-white ml-1 font-bold" />
         </Button>
       </div>
     </div>

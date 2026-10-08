@@ -72,13 +72,13 @@ export function CartReviewList() {
         {items.map((item) => (
           <div
             key={item.id}
-            className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all hover:shadow-sm"
+            className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-xs transition-colors"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <DietIndicator type={item.item.dietaryType} showLabel />
-                  <h3 className="text-sm font-bold text-slate-900">{item.item.name}</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">{item.item.name}</h3>
                 </div>
 
                 {/* Modifiers */}
@@ -87,7 +87,7 @@ export function CartReviewList() {
                     {item.selectedModifiers.map((mod) => (
                       <span
                         key={mod.modifierId}
-                        className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600"
+                        className="rounded-md bg-slate-100 border border-slate-200/60 px-2 py-0.5 text-[11px] font-medium text-slate-600"
                       >
                         +{mod.name} {mod.price > 0 && `(₹${mod.price})`}
                       </span>
@@ -96,7 +96,7 @@ export function CartReviewList() {
                 )}
 
                 {item.specialInstructions && (
-                  <p className="mt-1.5 text-xs italic text-slate-500 bg-slate-50 rounded-lg p-1.5 inline-block">
+                  <p className="mt-1.5 text-xs italic text-slate-500 bg-slate-50 rounded-lg p-1.5 inline-block border border-slate-200/50">
                     &quot;{item.specialInstructions}&quot;
                   </p>
                 )}
@@ -107,7 +107,7 @@ export function CartReviewList() {
                 type="button"
                 onClick={() => removeItem(item.id)}
                 aria-label={`Remove ${item.item.name}`}
-                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
+                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -115,31 +115,31 @@ export function CartReviewList() {
 
             {/* Stepper & Line Price */}
             <div className="mt-3.5 flex items-center justify-between border-t border-slate-100 pt-3">
-              <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
                 <button
                   type="button"
                   onClick={() => updateQuantity(item.id, item.quantity - 1)}
                   aria-label="Decrease quantity"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-slate-700 shadow-xs hover:bg-slate-100 active:scale-95"
+                  className="flex h-7 w-7 items-center justify-center rounded bg-white text-slate-700 shadow-2xs hover:bg-slate-100 active:scale-95 cursor-pointer"
                 >
                   <Minus className="h-3 w-3" />
                 </button>
-                <span className="w-8 text-center text-xs font-bold text-slate-900">
+                <span className="w-8 text-center text-xs font-bold text-slate-900 tabular-nums">
                   {item.quantity}
                 </span>
                 <button
                   type="button"
                   onClick={() => updateQuantity(item.id, item.quantity + 1)}
                   aria-label="Increase quantity"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-slate-700 shadow-xs hover:bg-slate-100 active:scale-95"
+                  className="flex h-7 w-7 items-center justify-center rounded bg-white text-slate-700 shadow-2xs hover:bg-slate-100 active:scale-95 cursor-pointer"
                 >
                   <Plus className="h-3 w-3" />
                 </button>
               </div>
 
               <div className="text-right">
-                <CurrencyDisplay amount={item.totalPrice} className="text-base font-extrabold text-slate-900" />
-                <span className="block text-[10px] text-slate-400">
+                <CurrencyDisplay amount={item.totalPrice} className="text-base font-bold text-slate-900" />
+                <span className="block text-[11px] text-slate-400">
                   ₹{item.unitPrice} each
                 </span>
               </div>
@@ -149,7 +149,7 @@ export function CartReviewList() {
       </div>
 
       {/* Bill Breakdown */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-2.5">
+      <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-2.5">
         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
           Estimated Charges
         </h4>
@@ -162,11 +162,11 @@ export function CartReviewList() {
           <span>Estimated Taxes (CGST 2.5% + SGST 2.5%)</span>
           <CurrencyDisplay amount={summary.estimatedTax} />
         </div>
-        <div className="flex justify-between text-base font-extrabold text-slate-900 border-t border-dashed border-slate-200 pt-3">
+        <div className="flex justify-between text-base font-bold text-slate-900 border-t border-dashed border-slate-200 pt-3">
           <span>Estimated Total</span>
           <CurrencyDisplay
             amount={summary.estimatedTotal}
-            className="text-amber-700 font-black text-lg"
+            className="text-amber-800 font-bold text-lg"
           />
         </div>
       </div>
@@ -177,11 +177,11 @@ export function CartReviewList() {
           <Button
             variant="primary"
             size="lg"
-            className="w-full font-bold shadow-lg shadow-amber-600/25"
+            className="w-full font-semibold shadow-xs"
             rightIcon={<ArrowRight className="h-4 w-4" />}
           >
             <span>Proceed to Checkout • </span>
-            <CurrencyDisplay amount={summary.estimatedTotal} className="text-white ml-1 font-black" />
+            <CurrencyDisplay amount={summary.estimatedTotal} className="text-white ml-1 font-bold" />
           </Button>
         </Link>
       </div>

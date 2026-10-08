@@ -121,9 +121,9 @@ export function CartDrawer() {
               <span>Estimated GST (5%)</span>
               <CurrencyDisplay amount={summary.estimatedTax} />
             </div>
-            <div className="flex justify-between text-sm font-bold text-slate-900 pt-1 border-t border-dashed border-slate-200">
+            <div className="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t border-dashed border-slate-200">
               <span>Total Payable</span>
-              <CurrencyDisplay amount={summary.estimatedTotal} className="text-amber-700 font-extrabold" />
+              <CurrencyDisplay amount={summary.estimatedTotal} className="text-amber-800 font-bold" />
             </div>
 
             <div className="mt-4 flex gap-2 pt-2">
@@ -143,7 +143,7 @@ export function CartDrawer() {
                 <Button
                   variant="primary"
                   size="md"
-                  className="w-full text-xs font-bold"
+                  className="w-full text-xs font-semibold shadow-xs"
                   rightIcon={<ArrowRight className="h-4 w-4" />}
                 >
                   Proceed

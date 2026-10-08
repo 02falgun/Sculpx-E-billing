@@ -57,23 +57,23 @@ export function KOTCard({ kot }: KOTCardProps) {
 
   return (
     <div
-      className={`rounded-2xl border flex flex-col justify-between p-4 shadow-lg transition-all ${
+      className={`rounded-2xl border flex flex-col justify-between p-4.5 transition-all ${
         kot.status === "READY"
-          ? "border-emerald-500/50 bg-slate-900 ring-2 ring-emerald-500/30"
+          ? "border-emerald-500/40 bg-slate-900 shadow-sm ring-1 ring-emerald-500/30"
           : kot.status === "PREPARING"
-          ? "border-amber-500/50 bg-slate-900"
-          : "border-slate-800 bg-slate-900"
+          ? "border-amber-500/40 bg-slate-900 shadow-sm"
+          : "border-slate-800 bg-slate-900/90 shadow-sm"
       }`}
     >
       {/* Top Header */}
       <div>
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-base font-black text-amber-400">
+              <span className="font-mono text-lg font-black tracking-tight text-amber-400">
                 #{kot.kotNumber}
               </span>
-              <span className="text-[11px] font-bold text-slate-400">
+              <span className="text-xs font-semibold text-slate-400">
                 ({kot.orderNumber})
               </span>
             </div>
@@ -85,12 +85,12 @@ export function KOTCard({ kot }: KOTCardProps) {
           <div className="flex flex-col items-end gap-1.5">
             <KOTTimer createdAt={kot.createdAt} />
             <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+              className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                 kot.status === "READY"
-                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                   : kot.status === "PREPARING"
-                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-                  : "bg-blue-500/20 text-blue-400 border border-blue-500/40"
+                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                  : "bg-sky-500/15 text-sky-300 border border-sky-500/30"
               }`}
             >
               {kot.status}

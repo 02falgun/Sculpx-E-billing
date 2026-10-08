@@ -19,7 +19,7 @@ export function CustomerBottomNav() {
         <button
           type="button"
           onClick={() => setCartDrawerOpen(true)}
-          className="flex w-full items-center justify-between rounded-2xl bg-amber-600 px-4 py-3.5 text-white shadow-xl shadow-amber-600/30 active:scale-[0.98] transition-all"
+          className="flex w-full items-center justify-between rounded-xl bg-amber-600 px-4 py-3 text-white shadow-lg active:scale-[0.99] transition-all cursor-pointer"
         >
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/20">

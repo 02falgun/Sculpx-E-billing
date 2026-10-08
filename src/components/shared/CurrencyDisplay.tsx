@@ -14,7 +14,7 @@ export function CurrencyDisplay({
   symbol = ENV.CURRENCY_SYMBOL,
 }: CurrencyDisplayProps) {
   return (
-    <span className={`font-semibold tracking-tight text-slate-900 ${className || ""}`}>
+    <span className={`font-semibold tracking-tight text-slate-900 tabular-nums ${className || ""}`}>
       {formatCurrency(amount, symbol)}
     </span>
   );

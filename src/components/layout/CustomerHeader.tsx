@@ -16,7 +16,7 @@ export function CustomerHeader() {
   const isConnected = wsState === "CONNECTED";
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-xs">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
         {/* Left: Context Badge */}
         <div className="flex items-center gap-3">
@@ -36,18 +36,18 @@ export function CustomerHeader() {
         <div className="flex items-center gap-2.5">
           {/* Live Sync Status indicator */}
           <div
-            className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600"
+            className="flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200/60 px-2.5 py-1 text-[11px] font-medium text-slate-600"
             title={isConnected ? "Live Connected" : "Connecting..."}
           >
             {isConnected ? (
               <>
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <Wifi className="h-3 w-3 text-emerald-600" />
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="text-[11px] font-semibold text-slate-700">Live</span>
               </>
             ) : (
               <>
                 <span className="h-2 w-2 rounded-full bg-amber-500" />
-                <WifiOff className="h-3 w-3 text-amber-600" />
+                <span className="text-[11px] font-medium text-slate-500">Connecting</span>
               </>
             )}
           </div>
@@ -57,7 +57,7 @@ export function CustomerHeader() {
             type="button"
             onClick={() => setCartDrawerOpen(true)}
             aria-label={`View shopping cart with ${summary.totalItems} items`}
-            className="relative flex h-10 items-center gap-2 rounded-xl bg-amber-600 px-3.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 active:scale-95 transition-all"
+            className="relative flex h-9.5 items-center gap-2 rounded-xl bg-amber-600 px-3.5 text-xs font-semibold text-white shadow-xs hover:bg-amber-700 active:scale-95 transition-all cursor-pointer"
           >
             <ShoppingBag className="h-4 w-4" />
             <span className="hidden sm:inline">Cart</span>

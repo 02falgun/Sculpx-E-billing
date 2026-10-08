@@ -111,9 +111,9 @@ export function CheckoutForm() {
       )}
 
       {/* Guest Information */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+      <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-4">
         <div className="border-b border-slate-100 pb-2">
-          <h3 className="text-sm font-bold text-slate-900">Guest Information</h3>
+          <h3 className="text-sm font-semibold text-slate-900">Guest Information</h3>
           <p className="text-xs text-slate-500">Optional for e-bill SMS receipts & kitchen contact</p>
         </div>
 
@@ -147,7 +147,7 @@ export function CheckoutForm() {
             id="order-instructions"
             placeholder="e.g. Serve desserts together, infant at table..."
             rows={2}
-            className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 resize-none"
+            className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 resize-none transition-colors"
             {...register("specialInstructions")}
           />
           {errors.specialInstructions && (
@@ -159,7 +159,7 @@ export function CheckoutForm() {
       </div>
 
       {/* Payment Preference Selector */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-xs">
         <Controller
           control={control}
           name="paymentPreference"
@@ -185,11 +185,11 @@ export function CheckoutForm() {
           variant="primary"
           size="lg"
           isLoading={isSubmitting}
-          className="w-full font-bold shadow-lg shadow-amber-600/25"
+          className="w-full font-semibold shadow-xs"
           rightIcon={<ArrowRight className="h-4 w-4" />}
         >
           <span>Confirm & Place Order • </span>
-          <CurrencyDisplay amount={summary.estimatedTotal} className="text-white ml-1 font-black" />
+          <CurrencyDisplay amount={summary.estimatedTotal} className="text-white ml-1 font-bold" />
         </Button>
 
         <div className="flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400">

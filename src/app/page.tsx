@@ -8,195 +8,388 @@ import {
   Receipt,
   Layers,
   ArrowRight,
+  Sparkles,
+  ExternalLink,
+  Laptop,
+  CheckCircle2,
+  Clock,
+  Printer,
+  ChevronRight,
 } from "lucide-react";
 
 export default function HomePage() {
   const customerEntryPoints = [
     {
       title: "Table 5 Dining QR",
-      desc: "Simulate scanning physical QR on restaurant dining table 5",
+      context: "Table 5 • Heritage Dining Pavilion",
+      desc: "Simulate a restaurant guest scanning a table QR code. Browse categorized digital menus, customize portion modifiers, send live orders to the kitchen, and view digital GST tax invoices.",
       href: "/menu/table-token-5",
-      type: "TABLE",
+      type: "DINE-IN TABLE",
       icon: UtensilsCrossed,
-      color: "bg-amber-500",
+      color: "bg-amber-600 text-white",
+      badgeColor: "bg-amber-50 text-amber-800 border-amber-200/80",
+      features: ["Contactless Ordering", "Instant KOT Fire", "Digital E-Bill"],
     },
     {
-      title: "Room 301 In-Room QR",
-      desc: "Simulate scanning in-room service QR in hotel guestroom 301",
+      title: "Room 301 In-Room Dining QR",
+      context: "Room 301 • Deluxe Palace Suite",
+      desc: "Simulate an in-room dining guest ordering from bed or desk. Select culinary specialties with specific chef instructions, charge food directly to the room folio, and receive order status updates.",
       href: "/menu/room-token-301",
-      type: "ROOM",
+      type: "IN-ROOM SERVICE",
       icon: BedDouble,
-      color: "bg-blue-600",
+      color: "bg-slate-900 text-amber-400",
+      badgeColor: "bg-slate-100 text-slate-800 border-slate-200/80",
+      features: ["Room Folio Charge", "Delivery Notes", "Live Order Tracking"],
     },
   ];
 
   const operationalPortals = [
     {
       title: "Staff Point of Sale (POS)",
-      desc: "Floor map, table management, walk-in orders & billing desk",
+      role: "Waitstaff & Cashiers",
+      desc: "Floor table occupancies, fast table-side order entry, fire orders to kitchen lines, and central billing settlement desk.",
       href: "/dashboard",
       icon: UtensilsCrossed,
-      role: "Captains & Cashiers",
+      badge: "Floor Operations",
+      highlight: "Table management & tickets",
     },
     {
       title: "Kitchen Display System (KDS)",
-      desc: "High-contrast touch screen for line cooks & expedite pass",
+      role: "Chefs & Expedite Line",
+      desc: "High-contrast commercial KOT board with real-time cooking timers, overdue urgency alerts, and one-tap prep progression.",
       href: "/kitchen",
       icon: ChefHat,
-      role: "Chefs & Kitchen Staff",
+      badge: "Kitchen Expedite",
+      highlight: "Wall-mount ready display",
+      targetBlank: true,
     },
     {
-      title: "Admin Back-Office",
-      desc: "Menu catalog, inventory, printers, users & analytics",
+      title: "Hotel Admin Back-Office",
+      role: "Management & Auditors",
+      desc: "Full menu catalog manager, 86 sold-out inventory toggles, thermal printer fleet diagnostics, and QR tent card generator.",
       href: "/admin",
       icon: ShieldCheck,
-      role: "Hotel Management",
+      badge: "System Administration",
+      highlight: "Hardware fleet & catalog",
+    },
+  ];
+
+  const architecturePillars = [
+    {
+      title: "Layered Clean Architecture",
+      desc: "Strict separation between UI components, TanStack Query hooks, data services, and REST/mock layer.",
+      tag: "Maintainability",
+    },
+    {
+      title: "Polymorphic QR Engine",
+      desc: "Single unified token contract adapting dynamically between Restaurant Tables and Hotel Guestrooms.",
+      tag: "Zero Redundancy",
+    },
+    {
+      title: "State Stratification",
+      desc: "Server caching with TanStack Query combined with resilient client-side Zustand cart and POS drafts.",
+      tag: "Zero Drift",
+    },
+    {
+      title: "Centralized Live WebSockets",
+      desc: "Single shared socket instance per tab with automatic exponential backoff and instant broadcast updates.",
+      tag: "Real-time Sync",
     },
   ];
 
   return (
-    <main className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between p-6 sm:p-12">
-      <div className="mx-auto max-w-5xl w-full">
-        {/* Top Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-8 border-b border-slate-800 gap-4">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between">
+      {/* Top Luxury Masthead */}
+      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-600 to-amber-400 font-black text-xl text-slate-950 shadow-lg shadow-amber-500/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 font-serif font-black text-amber-400 text-lg shadow-xs">
               R
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-white">
-                Restro E-Billing & QR Platform
-              </h1>
-              <p className="text-xs text-slate-400">
-                The Grand Royal Palace & Resort — Phase 1 Foundation Verified
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-black tracking-tight text-slate-900">
+                  Restro E-Billing
+                </span>
+                <span className="hidden sm:inline-block rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200/80">
+                  Enterprise Suite
+                </span>
+              </div>
+              <p className="text-[11px] font-medium text-slate-500">
+                The Grand Royal Palace & Resort
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-semibold text-emerald-400">
-              Service Layer Active (Mock / REST Ready)
-            </span>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden md:flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 border border-slate-200/80">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span>Live Operational System</span>
+            </div>
+
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition-colors shadow-xs"
+            >
+              <span>Staff Login</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
+      </header>
+
+      {/* Main Content Showcase */}
+      <main className="mx-auto max-w-6xl w-full px-4 sm:px-6 py-8 sm:py-12 space-y-12">
+        {/* Hero Welcome Banner */}
+        <section className="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-10 shadow-xs relative overflow-hidden">
+          <div className="max-w-2xl space-y-3 relative z-10">
+            <div className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 border border-amber-200/80">
+              <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+              <span>Hospitality Technology Suite</span>
+            </div>
+
+            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 leading-tight">
+              Contactless QR Dining, Kitchen Expedite &amp; Digital E-Billing
+            </h1>
+
+            <p className="text-sm sm:text-base text-slate-600 leading-relaxed pt-1">
+              Welcome to the unified operations portal for The Grand Royal Palace &amp; Resort. Select an active guest dining scenario or launch a staff terminal below.
+            </p>
+
+            <div className="pt-2 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+              <span className="inline-flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> QR Code Ordering
+              </span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Live Kitchen KDS
+              </span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Instant GST E-Invoice
+              </span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Thermal Printer Fleet
+              </span>
+            </div>
+          </div>
+        </section>
 
         {/* Section 1: Customer Scenarios */}
-        <div className="mt-10">
-          <div className="flex items-center gap-2 mb-4">
-            <QrCode className="h-4 w-4 text-amber-400" />
-            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-              Customer QR Scenarios (Unified Ordering Flow)
-            </h2>
+        <section className="space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
+                <QrCode className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                  Guest Digital Dining Scenarios
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Simulate contactless ordering from the guest&apos;s mobile device
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {customerEntryPoints.map((entry) => {
               const Icon = entry.icon;
               return (
                 <Link
                   key={entry.href}
                   href={entry.href}
-                  className="group relative rounded-2xl border border-slate-800 bg-slate-800/50 p-6 transition-all hover:border-amber-500/50 hover:bg-slate-800 hover:shadow-xl hover:shadow-amber-500/5"
+                  className="group rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs transition-all hover:border-amber-400 hover:shadow-md flex flex-col justify-between"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3.5">
-                      <div
-                        className={`flex h-11 w-11 items-center justify-center rounded-xl text-white ${entry.color} shadow-md`}
-                      >
-                        <Icon className="h-6 w-6" />
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`flex h-11 w-11 items-center justify-center rounded-xl ${entry.color} shadow-xs group-hover:scale-105 transition-transform`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <span
+                            className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${entry.badgeColor} mb-1`}
+                          >
+                            {entry.type}
+                          </span>
+                          <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                            {entry.title}
+                          </h3>
+                        </div>
                       </div>
-                      <div>
-                        <span className="inline-block rounded-md bg-slate-700/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-1">
-                          {entry.type} QR Context
-                        </span>
-                        <h3 className="text-base font-bold text-white group-hover:text-amber-400 transition-colors">
-                          {entry.title}
-                        </h3>
-                      </div>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                        <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                      </span>
                     </div>
-                    <ArrowRight className="h-5 w-5 text-slate-500 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
+
+                    <div className="text-xs font-semibold text-slate-500">
+                      {entry.context}
+                    </div>
+
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      {entry.desc}
+                    </p>
+
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {entry.features.map((feat) => (
+                        <span
+                          key={feat}
+                          className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700"
+                        >
+                          {feat}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <p className="mt-3 text-xs text-slate-400 leading-relaxed">{entry.desc}</p>
+
+                  <div className="pt-5 mt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-700 group-hover:text-amber-800">
+                    <span>Launch Guest Order Experience</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </div>
                 </Link>
               );
             })}
           </div>
-        </div>
+        </section>
 
-        {/* Section 2: Operations & Staff */}
-        <div className="mt-10">
-          <div className="flex items-center gap-2 mb-4">
-            <Layers className="h-4 w-4 text-amber-400" />
-            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-              Operations & Back-Office Portals
-            </h2>
+        {/* Section 2: Operational Portals */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                <Layers className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                  Hospitality Operations &amp; Management Stations
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Operational touchpoints designed for waitstaff, kitchen expeditors, and hotel managers
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {operationalPortals.map((portal) => {
               const Icon = portal.icon;
               return (
                 <Link
                   key={portal.href}
                   href={portal.href}
-                  className="group rounded-2xl border border-slate-800 bg-slate-800/40 p-5 transition-all hover:border-slate-700 hover:bg-slate-800"
+                  target={portal.targetBlank ? "_blank" : undefined}
+                  className="group rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all hover:border-slate-300 hover:shadow-md flex flex-col justify-between"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-700/80 text-amber-400">
-                      <Icon className="h-5 w-5" />
+                  <div className="space-y-3.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-800 group-hover:bg-slate-900 group-hover:text-amber-400 transition-colors">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 border border-slate-200/60">
+                        {portal.role}
+                      </span>
                     </div>
-                    <span className="rounded bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
-                      {portal.role}
+
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 group-hover:text-amber-700 transition-colors flex items-center justify-between">
+                        <span>{portal.title}</span>
+                        {portal.targetBlank && (
+                          <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
+                        )}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        {portal.desc}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-700 group-hover:text-slate-900">
+                    <span className="text-[11px] text-slate-400">{portal.highlight}</span>
+                    <span className="inline-flex items-center gap-1 font-bold text-amber-700">
+                      Open <ChevronRight className="h-3.5 w-3.5" />
                     </span>
                   </div>
-                  <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
-                    {portal.title}
-                  </h3>
-                  <p className="mt-1.5 text-xs text-slate-400 leading-relaxed">{portal.desc}</p>
                 </Link>
               );
             })}
           </div>
-        </div>
+        </section>
 
-        {/* Architecture Badges */}
-        <div className="mt-12 rounded-2xl border border-slate-800 bg-slate-950/60 p-6">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-            Core Architecture Principles
-          </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-3">
-              <span className="font-semibold text-amber-400">Layered Separation</span>
-              <p className="text-[11px] text-slate-400 mt-0.5">Component ➔ Hook ➔ Service ➔ API</p>
-            </div>
-            <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-3">
-              <span className="font-semibold text-amber-400">Polymorphic QR</span>
-              <p className="text-[11px] text-slate-400 mt-0.5">Unified Table & Room Context</p>
-            </div>
-            <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-3">
-              <span className="font-semibold text-amber-400">State Stratification</span>
-              <p className="text-[11px] text-slate-400 mt-0.5">Query (Server) + Zustand (Drafts)</p>
-            </div>
-            <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-3">
-              <span className="font-semibold text-amber-400">Centralized Sockets</span>
-              <p className="text-[11px] text-slate-400 mt-0.5">1 Tab = 1 Connection + Backoff</p>
-            </div>
+        {/* Section 3: Architecture & Enterprise Standards */}
+        <section className="space-y-4">
+          <div className="border-b border-slate-200/80 pb-3">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+              Architecture &amp; Enterprise Reliability Standards
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {architecturePillars.map((pillar) => (
+              <div
+                key={pillar.title}
+                className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs space-y-1.5"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900">
+                    {pillar.title}
+                  </span>
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60">
+                    {pillar.tag}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  {pillar.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      {/* Refined Luxury Footer */}
+      <footer className="border-t border-slate-200/80 bg-white py-6 mt-12 text-xs text-slate-500">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-800">
+              The Grand Royal Palace &amp; Resort
+            </span>
+            <span>•</span>
+            <span>Restro E-Billing &amp; QR Dining Platform</span>
+          </div>
+
+          <div className="flex items-center gap-4 text-xs font-medium">
+            <Link
+              href="/dashboard"
+              className="text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              POS Floor
+            </Link>
+            <Link
+              href="/kitchen"
+              className="text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              KDS Display
+            </Link>
+            <Link
+              href="/admin"
+              className="text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              Admin Back-Office
+            </Link>
+            <Link
+              href="/docs"
+              className="text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              Documentation
+            </Link>
           </div>
         </div>
-      </div>
-
-      <footer className="mx-auto max-w-5xl w-full pt-8 mt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
-        <span>© 2026 Restro E-Billing Platform. Enterprise Edition.</span>
-        <div className="flex gap-4">
-          <Link href="/docs" className="hover:text-slate-400 transition-colors">
-            Documentation
-          </Link>
-          <Link href="/login" className="hover:text-slate-400 transition-colors">
-            Staff Login
-          </Link>
-        </div>
       </footer>
-    </main>
+    </div>
   );
 }

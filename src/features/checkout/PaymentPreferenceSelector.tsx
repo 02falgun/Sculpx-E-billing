@@ -62,9 +62,9 @@ export function PaymentPreferenceSelector({
               key={option.id}
               type="button"
               onClick={() => onChange(option.id)}
-              className={`relative flex flex-col justify-between rounded-2xl border p-4 text-left transition-all active:scale-[0.99] ${
+              className={`relative flex flex-col justify-between rounded-xl border p-4 text-left transition-all active:scale-[0.99] cursor-pointer ${
                 isSelected
-                  ? "border-amber-600 bg-amber-50/20 shadow-xs ring-1 ring-amber-600/30"
+                  ? "border-amber-600 bg-amber-50/20 shadow-2xs ring-1 ring-amber-600/30"
                   : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50"
               }`}
             >

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Badge } from "@/components/ui/Badge";
+import { cn } from "@/lib/utils";
 import {
   OrderStatus,
   KOTStatus,
@@ -104,8 +105,9 @@ export function StatusBadge({ status, type = "order", className }: StatusBadgePr
   }
 
   return (
-    <Badge variant={variant} className={className}>
-      {label}
+    <Badge variant={variant} className={cn("inline-flex items-center gap-1.5 font-medium", className)}>
+      <span className="h-1.5 w-1.5 rounded-full inline-block shrink-0 bg-current opacity-70" aria-hidden="true" />
+      <span>{label}</span>
     </Badge>
   );
 }

@@ -93,13 +93,13 @@ export function OrderStatusTimeline({ order }: OrderStatusTimelineProps) {
   }, [order.status]);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-6">
+    <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-6">
       {/* Header with status badge */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <div>
-          <h2 className="text-sm font-bold text-slate-900">Live Order Status</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Live Order Status</h2>
           {estimatedTimeText && !isCancelled && (
-            <p className="text-xs text-amber-600 font-semibold mt-0.5 animate-pulse">
+            <p className="text-xs text-amber-700 font-medium mt-0.5">
               {estimatedTimeText}
             </p>
           )}
@@ -109,7 +109,7 @@ export function OrderStatusTimeline({ order }: OrderStatusTimelineProps) {
 
       {/* Cancelled state banner */}
       {isCancelled ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 space-y-2">
+        <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-4 space-y-2">
           <div className="flex items-center gap-2 text-rose-800 font-bold text-sm">
             <AlertTriangle className="h-4 w-4 text-rose-600" />
             <span>This order was cancelled</span>
@@ -144,8 +144,8 @@ export function OrderStatusTimeline({ order }: OrderStatusTimelineProps) {
                   {/* Connecting Line */}
                   {index < ORDER_STEPS.length - 1 && (
                     <div
-                      className={`absolute left-4 top-8 -bottom-6 w-0.5 -ml-[1px] transition-colors duration-500 ${
-                        isDone ? "bg-emerald-500" : "bg-slate-200"
+                      className={`absolute left-4 top-8 -bottom-6 w-0.5 -ml-[1px] transition-colors duration-300 ${
+                        isDone ? "bg-emerald-600" : "bg-slate-200"
                       }`}
                     />
                   )}
@@ -153,11 +153,11 @@ export function OrderStatusTimeline({ order }: OrderStatusTimelineProps) {
                   {/* Icon Node */}
                   <div className="relative z-10">
                     {isDone ? (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm ring-4 ring-emerald-50">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-white shadow-2xs ring-4 ring-emerald-50">
                         <Check className="h-4 w-4 stroke-[3]" />
                       </div>
                     ) : isCurrent ? (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-white shadow-md shadow-amber-500/30 ring-4 ring-amber-100 animate-pulse">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-600 text-white shadow-xs ring-4 ring-amber-100">
                         <Icon className="h-4 w-4" />
                       </div>
                     ) : (

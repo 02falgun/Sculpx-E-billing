@@ -36,10 +36,10 @@ export function MenuSearchAndFilter({
           type="button"
           onClick={() => onDietaryFilterChange("ALL")}
           className={cn(
-            "rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95",
+            "rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
             dietaryFilter === "ALL"
               ? "bg-slate-900 text-white shadow-xs"
-              : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100",
+              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50",
           )}
         >
           All
@@ -49,10 +49,10 @@ export function MenuSearchAndFilter({
           type="button"
           onClick={() => onDietaryFilterChange("VEG")}
           className={cn(
-            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95",
+            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
             dietaryFilter === "VEG"
-              ? "bg-emerald-600 text-white shadow-xs"
-              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100",
+              ? "bg-emerald-700 text-white shadow-xs"
+              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50",
           )}
         >
           <DietIndicator type="VEG" />
@@ -63,10 +63,10 @@ export function MenuSearchAndFilter({
           type="button"
           onClick={() => onDietaryFilterChange("NON_VEG")}
           className={cn(
-            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95",
+            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
             dietaryFilter === "NON_VEG"
-              ? "bg-rose-600 text-white shadow-xs"
-              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100",
+              ? "bg-rose-700 text-white shadow-xs"
+              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50",
           )}
         >
           <DietIndicator type="NON_VEG" />
@@ -77,13 +77,13 @@ export function MenuSearchAndFilter({
           type="button"
           onClick={() => onDietaryFilterChange("CHEF_SPECIAL")}
           className={cn(
-            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95",
+            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
             dietaryFilter === "CHEF_SPECIAL"
-              ? "bg-amber-500 text-slate-950 shadow-xs"
-              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100",
+              ? "bg-purple-700 text-white shadow-xs"
+              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50",
           )}
         >
-          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+          <Sparkles className="h-3.5 w-3.5 text-purple-400" />
           <span>Chef Specials</span>
         </button>
       </div>

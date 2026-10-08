@@ -127,27 +127,27 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
 
   return (
     <Dialog isOpen={isOpen} onClose={onClose} maxWidth="md">
-      <div className="space-y-5">
+      <div className="space-y-4">
         {/* Header */}
         <div className="border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1.5">
             <DietIndicator type={item.dietaryType} showLabel />
             {item.isChefSpecial && (
-              <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+              <span className="rounded-md bg-purple-50 border border-purple-200 px-1.5 py-0.5 text-[10px] font-bold text-purple-800">
                 Chef&apos;s Special
               </span>
             )}
           </div>
-          <h3 className="text-base font-extrabold text-slate-900">{item.name}</h3>
-          <p className="mt-1 text-xs text-slate-500 line-clamp-2">{item.description}</p>
-          <div className="mt-2 text-sm font-bold text-slate-900">
-            <CurrencyDisplay amount={item.price} />
-            <span className="text-[11px] font-normal text-slate-400 ml-1">base price</span>
+          <h3 className="text-base font-bold text-slate-900">{item.name}</h3>
+          <p className="mt-1 text-xs text-slate-500 leading-relaxed">{item.description}</p>
+          <div className="mt-2.5 flex items-baseline gap-1.5">
+            <CurrencyDisplay amount={item.price} className="text-sm font-bold text-slate-900" />
+            <span className="text-[11px] text-slate-400">base price</span>
           </div>
         </div>
 
         {/* Modifier Groups */}
-        <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-1">
+        <div className="space-y-3.5 max-h-[48vh] overflow-y-auto pr-1">
           {item.modifierGroups?.map((group) => {
             const isSingleChoice = group.maxSelections === 1;
             const currentGroupSelections = selectedModifiers.filter(
@@ -158,15 +158,15 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
             return (
               <div
                 key={group.id}
-                className={`rounded-2xl border p-3.5 transition-colors ${
-                  isUnmet ? "border-amber-300 bg-amber-50/20" : "border-slate-200/80 bg-slate-50/40"
+                className={`rounded-xl border p-3.5 transition-colors ${
+                  isUnmet ? "border-amber-300 bg-amber-50/20" : "border-slate-200/80 bg-slate-50/30"
                 }`}
               >
-                <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <h4 className="text-xs font-bold text-slate-900">{group.name}</h4>
                     {group.isRequired ? (
-                      <span className="rounded bg-rose-100 px-1.5 py-0.2 text-[9px] font-extrabold text-rose-700">
+                      <span className="rounded bg-rose-50 border border-rose-200 px-1.5 py-0.5 text-[9px] font-bold text-rose-700">
                         Required
                       </span>
                     ) : (
@@ -196,17 +196,17 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
                             isSingleChoice,
                           )
                         }
-                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-all ${
+                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors cursor-pointer ${
                           isSelected
-                            ? "bg-amber-500/10 border border-amber-500/30 text-amber-950 font-semibold"
-                            : "bg-white border border-slate-200/60 text-slate-700 hover:bg-slate-100/70"
+                            ? "bg-amber-50 border border-amber-300 text-amber-950 font-semibold shadow-2xs"
+                            : "bg-white border border-slate-200/80 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
                           <div
                             className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-${
                               isSingleChoice ? "full" : "md"
-                            } border ${
+                            } border transition-colors ${
                               isSelected
                                 ? "border-amber-600 bg-amber-600 text-white"
                                 : "border-slate-300 bg-white"
@@ -217,8 +217,8 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
                           <span>{mod.name}</span>
                         </div>
 
-                        <span className="text-xs font-semibold text-slate-900">
-                          {mod.price > 0 ? `+₹${mod.price}` : "Free"}
+                        <span className="text-xs font-semibold text-slate-900 tabular-nums">
+                          {mod.price > 0 ? `+₹${mod.price}` : "Included"}
                         </span>
                       </button>
                     );
@@ -229,7 +229,7 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
           })}
 
           {/* Special Cooking Instructions */}
-          <div className="space-y-1">
+          <div className="space-y-1.5 pt-1">
             <label
               htmlFor="special-instructions"
               className="text-xs font-semibold text-slate-700 block text-left"
@@ -240,9 +240,9 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
               id="special-instructions"
               value={specialInstructions}
               onChange={(e) => setSpecialInstructions(e.target.value.slice(0, 150))}
-              placeholder="e.g. Less oil, extra spicy, no onion..."
+              placeholder="e.g. Less spicy, dressing on the side..."
               rows={2}
-              className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 resize-none"
+              className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 resize-none transition-colors"
             />
             <span className="text-[10px] text-slate-400 text-right block">
               {specialInstructions.length}/150
@@ -252,8 +252,8 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
 
         {/* Validation warning if required options missing */}
         {!isValid && (
-          <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-2.5 text-xs text-rose-700">
-            <AlertCircle className="h-4 w-4 shrink-0" />
+          <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
+            <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
             <span>Please select required option: {unmetRequiredGroups.join(", ")}</span>
           </div>
         )}
@@ -261,22 +261,22 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
         {/* Footer with Quantity Stepper & Add Button */}
         <div className="flex items-center justify-between border-t border-slate-100 pt-3">
           {/* Quantity Controls */}
-          <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+          <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
             <button
               type="button"
               disabled={quantity <= 1}
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
               aria-label="Decrease quantity"
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-700 shadow-xs hover:bg-slate-100 disabled:opacity-40 active:scale-95 transition-all"
+              className="flex h-7 w-7 items-center justify-center rounded bg-white text-slate-700 shadow-2xs hover:bg-slate-100 disabled:opacity-40 active:scale-95 transition-all cursor-pointer"
             >
               <Minus className="h-3.5 w-3.5" />
             </button>
-            <span className="w-9 text-center text-xs font-bold text-slate-900">{quantity}</span>
+            <span className="w-8 text-center text-xs font-bold text-slate-900 tabular-nums">{quantity}</span>
             <button
               type="button"
               onClick={() => setQuantity(quantity + 1)}
               aria-label="Increase quantity"
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-700 shadow-xs hover:bg-slate-100 active:scale-95 transition-all"
+              className="flex h-7 w-7 items-center justify-center rounded bg-white text-slate-700 shadow-2xs hover:bg-slate-100 active:scale-95 transition-all cursor-pointer"
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
@@ -288,9 +288,9 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
             size="md"
             disabled={!isValid}
             onClick={handleAddToCart}
-            className="px-6 font-bold text-xs"
+            className="px-5 font-semibold text-xs shadow-xs"
           >
-            Add to Order • <CurrencyDisplay amount={totalPrice} className="text-white ml-1 font-black" />
+            Add to Order • <CurrencyDisplay amount={totalPrice} className="text-white ml-1 font-bold" />
           </Button>
         </div>
       </div>
