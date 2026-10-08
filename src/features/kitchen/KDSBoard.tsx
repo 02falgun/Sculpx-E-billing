@@ -78,7 +78,7 @@ export function KDSBoard() {
   return (
     <div className="space-y-6">
       {/* Top Controls: Mode switcher & Stage counts */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-800 pb-4">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           <button
             type="button"
@@ -86,14 +86,14 @@ export function KDSBoard() {
               setViewMode("COLUMNS");
               setFilterStage("ALL");
             }}
-            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               viewMode === "COLUMNS"
-                ? "bg-amber-500 text-slate-950 shadow-md font-black"
-                : "bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800"
+                ? "bg-white text-black shadow-xs"
+                : "bg-neutral-900 text-neutral-400 border border-neutral-800 hover:bg-neutral-800 hover:text-white"
             }`}
           >
             <span>Columns View</span>
-            <span className="rounded-md bg-slate-950/40 px-1.5 py-0.5 text-[10px] font-black">
+            <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${viewMode === "COLUMNS" ? "bg-neutral-200 text-black" : "bg-neutral-800 text-neutral-300"}`}>
               {stats.total}
             </span>
           </button>
@@ -104,15 +104,15 @@ export function KDSBoard() {
               setViewMode("FILTER");
               setFilterStage("NEW");
             }}
-            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               viewMode === "FILTER" && filterStage === "NEW"
-                ? "bg-blue-600 text-white shadow-md font-black"
-                : "bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800"
+                ? "bg-white text-black shadow-xs"
+                : "bg-neutral-900 text-neutral-400 border border-neutral-800 hover:bg-neutral-800 hover:text-white"
             }`}
           >
             <Clock className="h-3.5 w-3.5" />
-            <span>New KOTs</span>
-            <span className="rounded-md bg-slate-950/40 px-1.5 py-0.5 text-[10px] font-black">
+            <span>New</span>
+            <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${viewMode === "FILTER" && filterStage === "NEW" ? "bg-neutral-200 text-black" : "bg-neutral-800 text-neutral-300"}`}>
               {stats.newCount}
             </span>
           </button>
@@ -123,15 +123,15 @@ export function KDSBoard() {
               setViewMode("FILTER");
               setFilterStage("PREPARING");
             }}
-            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               viewMode === "FILTER" && filterStage === "PREPARING"
-                ? "bg-amber-600 text-white shadow-md font-black"
-                : "bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800"
+                ? "bg-white text-black shadow-xs"
+                : "bg-neutral-900 text-neutral-400 border border-neutral-800 hover:bg-neutral-800 hover:text-white"
             }`}
           >
             <Flame className="h-3.5 w-3.5" />
             <span>Preparing</span>
-            <span className="rounded-md bg-slate-950/40 px-1.5 py-0.5 text-[10px] font-black">
+            <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${viewMode === "FILTER" && filterStage === "PREPARING" ? "bg-neutral-200 text-black" : "bg-neutral-800 text-neutral-300"}`}>
               {stats.cooking}
             </span>
           </button>
@@ -142,22 +142,22 @@ export function KDSBoard() {
               setViewMode("FILTER");
               setFilterStage("READY");
             }}
-            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               viewMode === "FILTER" && filterStage === "READY"
-                ? "bg-emerald-600 text-white shadow-md font-black"
-                : "bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800"
+                ? "bg-white text-black shadow-xs"
+                : "bg-neutral-900 text-neutral-400 border border-neutral-800 hover:bg-neutral-800 hover:text-white"
             }`}
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
             <span>Ready</span>
-            <span className="rounded-md bg-slate-950/40 px-1.5 py-0.5 text-[10px] font-black">
+            <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${viewMode === "FILTER" && filterStage === "READY" ? "bg-neutral-200 text-black" : "bg-neutral-800 text-neutral-300"}`}>
               {stats.ready}
             </span>
           </button>
         </div>
 
-        <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
-          <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="text-xs text-neutral-400 font-mono flex items-center gap-2">
+          <span className="flex h-2 w-2 rounded-full bg-white" />
           <span>Kitchen Live WebSocket Sync Active</span>
         </div>
       </div>
@@ -166,15 +166,15 @@ export function KDSBoard() {
       {viewMode === "COLUMNS" ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
           {/* Column 1: NEW KOTs */}
-          <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-4 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="bg-neutral-900/80 rounded-lg border border-neutral-800 p-4 space-y-4">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
               <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-blue-500" />
-                <h3 className="font-black text-sm uppercase tracking-wider text-white">
-                  NEW KOTs
+                <span className="h-2 w-2 rounded-full bg-neutral-400" />
+                <h3 className="font-bold text-xs uppercase tracking-wider text-neutral-200">
+                  NEW KOTS
                 </h3>
               </div>
-              <span className="bg-blue-950 border border-blue-800 text-blue-300 text-xs px-2 py-0.5 rounded-full font-bold">
+              <span className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs px-2 py-0.5 rounded font-mono font-semibold">
                 {newKOTs.length}
               </span>
             </div>
@@ -183,7 +183,7 @@ export function KDSBoard() {
               {newKOTs.length > 0 ? (
                 newKOTs.map((kot) => <KOTCard key={kot.id} kot={kot} />)
               ) : (
-                <div className="py-8 text-center text-xs text-slate-500">
+                <div className="py-8 text-center text-xs text-neutral-500">
                   No new orders waiting
                 </div>
               )}
@@ -191,15 +191,15 @@ export function KDSBoard() {
           </div>
 
           {/* Column 2: PREPARING */}
-          <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-4 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="bg-neutral-900/80 rounded-lg border border-neutral-800 p-4 space-y-4">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
               <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-amber-500" />
-                <h3 className="font-black text-sm uppercase tracking-wider text-white">
+                <span className="h-2 w-2 rounded-full bg-white" />
+                <h3 className="font-bold text-xs uppercase tracking-wider text-neutral-200">
                   PREPARING
                 </h3>
               </div>
-              <span className="bg-amber-950 border border-amber-800 text-amber-300 text-xs px-2 py-0.5 rounded-full font-bold">
+              <span className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs px-2 py-0.5 rounded font-mono font-semibold">
                 {preparingKOTs.length}
               </span>
             </div>
@@ -208,23 +208,23 @@ export function KDSBoard() {
               {preparingKOTs.length > 0 ? (
                 preparingKOTs.map((kot) => <KOTCard key={kot.id} kot={kot} />)
               ) : (
-                <div className="py-8 text-center text-xs text-slate-500">
-                  No tickets on the cooking line
+                <div className="py-8 text-center text-xs text-neutral-500">
+                  No tickets on cooking line
                 </div>
               )}
             </div>
           </div>
 
           {/* Column 3: READY */}
-          <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-4 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="bg-neutral-900/80 rounded-lg border border-neutral-800 p-4 space-y-4">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
               <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-emerald-500" />
-                <h3 className="font-black text-sm uppercase tracking-wider text-white">
+                <span className="h-2 w-2 rounded-full bg-white" />
+                <h3 className="font-bold text-xs uppercase tracking-wider text-neutral-200">
                   READY FOR EXPEDITE
                 </h3>
               </div>
-              <span className="bg-emerald-950 border border-emerald-800 text-emerald-300 text-xs px-2 py-0.5 rounded-full font-bold">
+              <span className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs px-2 py-0.5 rounded font-mono font-semibold">
                 {readyKOTs.length}
               </span>
             </div>
@@ -233,8 +233,8 @@ export function KDSBoard() {
               {readyKOTs.length > 0 ? (
                 readyKOTs.map((kot) => <KOTCard key={kot.id} kot={kot} />)
               ) : (
-                <div className="py-8 text-center text-xs text-slate-500">
-                  No plates waiting on the counter
+                <div className="py-8 text-center text-xs text-neutral-500">
+                  No plates waiting on counter
                 </div>
               )}
             </div>

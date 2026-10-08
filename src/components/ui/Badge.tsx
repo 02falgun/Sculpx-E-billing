@@ -14,13 +14,13 @@ export function Badge({
   ...props
 }: BadgeProps) {
   const variantStyles = {
-    default: "bg-slate-900 text-white border border-slate-800",
-    secondary: "bg-slate-100 text-slate-700 border border-slate-200/80",
-    success: "bg-emerald-50 text-emerald-800 border border-emerald-200/80",
-    warning: "bg-amber-50 text-amber-800 border border-amber-200/80",
-    destructive: "bg-rose-50 text-rose-800 border border-rose-200/80",
-    outline: "border border-slate-200 text-slate-700 bg-white shadow-2xs",
-    accent: "bg-amber-50 text-amber-800 border border-amber-300 font-semibold",
+    default: "bg-black text-white border border-black",
+    secondary: "bg-neutral-100 text-neutral-800 border border-neutral-200",
+    success: "bg-neutral-900 text-white border border-neutral-900",
+    warning: "bg-neutral-100 text-neutral-900 border border-neutral-300",
+    destructive: "bg-neutral-100 text-neutral-900 border border-neutral-400 line-through decoration-neutral-500",
+    outline: "border border-neutral-300 text-neutral-800 bg-white",
+    accent: "bg-neutral-800 text-white border border-neutral-800",
   };
 
   const sizeStyles = {
@@ -31,7 +31,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-center font-medium rounded-full tracking-wide transition-colors",
+        "inline-flex items-center justify-center font-medium rounded-[4px] tracking-wide transition-colors",
         variantStyles[variant],
         sizeStyles[size],
         className,

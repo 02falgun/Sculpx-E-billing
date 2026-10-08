@@ -27,28 +27,28 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref,
   ) => {
     const baseStyles =
-      "inline-flex items-center justify-center font-semibold select-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.99] cursor-pointer";
+      "inline-flex items-center justify-center font-medium select-none transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-900 disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] cursor-pointer";
 
     const variantStyles = {
       primary:
-        "bg-amber-600 text-white hover:bg-amber-700 active:bg-amber-800 focus-visible:ring-amber-500/40 shadow-xs font-semibold",
+        "bg-black text-white hover:bg-neutral-800 active:bg-neutral-900 border border-black font-semibold",
       secondary:
-        "bg-slate-900 text-white hover:bg-slate-800 active:bg-slate-950 focus-visible:ring-slate-800/40 shadow-xs font-semibold",
+        "bg-white text-neutral-900 hover:bg-neutral-100 active:bg-neutral-200 border border-neutral-300 font-semibold",
       outline:
-        "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 active:bg-slate-100 focus-visible:ring-slate-400/40 shadow-xs font-semibold",
+        "bg-transparent text-neutral-900 hover:bg-neutral-100 hover:text-black border border-neutral-300 font-medium",
       ghost:
-        "text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-200 focus-visible:ring-slate-400/40 font-semibold",
+        "text-neutral-700 hover:text-black hover:bg-neutral-100 active:bg-neutral-200 font-medium",
       danger:
-        "bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 focus-visible:ring-rose-500/40 shadow-xs font-semibold",
+        "bg-neutral-900 text-white hover:bg-black border border-neutral-900 font-semibold",
       success:
-        "bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 focus-visible:ring-emerald-500/40 shadow-xs font-semibold",
+        "bg-black text-white hover:bg-neutral-800 border border-black font-semibold",
     };
 
     const sizeStyles = {
-      sm: "h-8 px-3 text-xs gap-1.5 rounded-lg",
-      md: "h-9.5 px-4 text-xs sm:text-sm gap-2 rounded-xl",
-      lg: "h-11 px-5 text-sm sm:text-base gap-2.5 rounded-xl",
-      icon: "h-9 w-9 p-0 rounded-lg",
+      sm: "h-8 px-3 text-xs gap-1.5 rounded-[6px]",
+      md: "h-9 px-3.5 text-xs sm:text-sm gap-2 rounded-[6px]",
+      lg: "h-10 px-4 text-sm gap-2 rounded-[6px]",
+      icon: "h-8 w-8 p-0 rounded-[6px]",
     };
 
     return (

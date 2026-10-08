@@ -1,42 +1,26 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuthStore } from "@/store";
-import { DEMO_USERS, mockAuthenticate, getDefaultRouteForRole } from "@/utils/auth";
+import { mockAuthenticate, getDefaultRouteForRole } from "@/utils/auth";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import {
-  ShieldCheck,
-  UtensilsCrossed,
-  Receipt,
-  ChefHat,
-  BarChart3,
-  KeyRound,
-  ArrowRight,
-  AlertCircle,
-  Sparkles,
-} from "lucide-react";
+import { AlertCircle, ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectPath = searchParams.get("redirect");
+
   const setSession = useAuthStore((s) => s.setSession);
-  const user = useAuthStore((s) => s.user);
 
   const [email, setEmail] = React.useState("admin@demo.com");
   const [password, setPassword] = React.useState("••••••••");
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
-
-  // If already authenticated and user visits /login, give them a shortcut to their workspace
-  const handleQuickLogin = (roleKey: string) => {
-    const demo = DEMO_USERS[roleKey];
-    if (!demo) return;
-    setEmail(demo.user.email);
-    setPassword("demo-secure-pass");
-    doLogin(demo.user.email);
-  };
 
   const doLogin = (targetEmail: string) => {
     setLoading(true);
@@ -45,90 +29,100 @@ export default function LoginPage() {
     setTimeout(() => {
       const session = mockAuthenticate(targetEmail);
       if (!session) {
-        setError("Invalid email address. Please select one of the demo hospitality accounts below.");
+        setError(
+          "Unrecognized staff account. Use a registered hospitality email (e.g. admin@demo.com, waiter@demo.com, kitchen@demo.com, cashier@demo.com).",
+        );
         setLoading(false);
         return;
       }
 
       setSession(session);
-      const destination = getDefaultRouteForRole(session.user.role);
-      router.push(destination);
-    }, 400);
+      const destination = redirectPath || getDefaultRouteForRole(session.user.role);
+      router.replace(destination);
+    }, 300);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      setError("Please enter your employee email address.");
+    if (!email.trim()) {
+      setError("Please enter your staff email.");
       return;
     }
     doLogin(email);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        {/* Subtle Hospitality Branding */}
-        <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-slate-900 text-amber-400 font-black text-xl mb-3 shadow-sm">
-          S
+    <div className="min-h-screen bg-white text-neutral-900 flex flex-col lg:flex-row">
+      {/* LEFT COLUMN: Clean Minimalist Sign In Form (~50%) */}
+      <div className="w-full lg:w-1/2 flex flex-col justify-between p-6 sm:p-12 lg:p-16 xl:p-20">
+        {/* Brand */}
+        <div>
+          <Link href="/" className="inline-flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-black text-white font-bold text-xs">
+              S
+            </div>
+            <span className="text-sm font-bold tracking-tight uppercase text-black">
+              SCULPX
+            </span>
+          </Link>
         </div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">SCULPX</h1>
-        <p className="text-xs uppercase tracking-widest font-semibold text-slate-500 mt-0.5">
-          Hospitality Operations Platform
-        </p>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 sm:px-10 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="mb-6">
-            <h2 className="text-base font-bold text-slate-900">Sign in to your station</h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Access your role-specific station using your staff credentials.
+        {/* Center Content: Sign In Form */}
+        <div className="my-10 max-w-sm w-full mx-auto lg:mx-0">
+          <div className="space-y-1 mb-8">
+            <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
+              Sign in to your workspace
+            </h1>
+            <p className="text-xs text-neutral-500">
+              Enter your staff credentials to access your station.
             </p>
           </div>
 
           {error && (
-            <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{error}</span>
+            <div className="mb-6 p-3 rounded-[6px] border border-neutral-300 bg-neutral-100 text-neutral-900 text-xs flex items-start gap-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 text-black mt-0.5" />
+              <span className="leading-relaxed">{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                Staff Email
-              </label>
-              <Input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@demo.com"
-                className="w-full text-sm"
-              />
-            </div>
+            <Input
+              id="staff-email"
+              label="Email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@demo.com"
+              className="w-full"
+            />
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-slate-700">
-                  Password / PIN
+              <div className="flex items-center justify-between mb-1">
+                <label
+                  htmlFor="staff-password"
+                  className="block text-xs font-semibold text-neutral-700 tracking-wide"
+                >
+                  Password
                 </label>
                 <button
                   type="button"
-                  onClick={() => alert("Demo Mode: Any password or PIN is accepted for verified demo staff.")}
-                  className="text-[11px] font-semibold text-amber-600 hover:text-amber-700 cursor-pointer"
+                  onClick={() =>
+                    alert("Demo System: Any password is accepted for mock accounts.")
+                  }
+                  className="text-[11px] text-neutral-500 hover:text-black transition-colors cursor-pointer"
                 >
                   Forgot password?
                 </button>
               </div>
               <Input
+                id="staff-password"
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full text-sm font-mono"
+                className="w-full font-mono"
               />
             </div>
 
@@ -137,121 +131,57 @@ export default function LoginPage() {
               variant="primary"
               size="lg"
               isLoading={loading}
-              className="w-full font-bold bg-slate-900 hover:bg-slate-800 text-white mt-2"
+              className="w-full mt-2 font-semibold"
               rightIcon={<ArrowRight className="h-4 w-4" />}
             >
-              Sign in to Workspace
+              Sign In
             </Button>
           </form>
 
-          {/* Quick Demo Stations Selector */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                1-Click Demo Profiles
-              </span>
-              <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
-                Mock Auth Ready
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-left">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("waiter")}
-                className="p-2.5 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 transition-all text-left cursor-pointer group"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-blue-700">
-                  <UtensilsCrossed className="h-3.5 w-3.5 text-blue-600" />
-                  <span>Waiter / Staff</span>
-                </div>
-                <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                  waiter@demo.com
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("cashier")}
-                className="p-2.5 rounded-xl border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/50 transition-all text-left cursor-pointer group"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-emerald-700">
-                  <Receipt className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>Cashier Desk</span>
-                </div>
-                <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                  cashier@demo.com
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("kitchen")}
-                className="p-2.5 rounded-xl border border-slate-200 hover:border-amber-400 hover:bg-amber-50/50 transition-all text-left cursor-pointer group"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-amber-700">
-                  <ChefHat className="h-3.5 w-3.5 text-amber-600" />
-                  <span>Kitchen (KDS)</span>
-                </div>
-                <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                  kitchen@demo.com
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("manager")}
-                className="p-2.5 rounded-xl border border-slate-200 hover:border-purple-400 hover:bg-purple-50/50 transition-all text-left cursor-pointer group"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-purple-700">
-                  <BarChart3 className="h-3.5 w-3.5 text-purple-600" />
-                  <span>Floor Manager</span>
-                </div>
-                <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                  manager@demo.com
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("admin")}
-                className="p-2.5 rounded-xl border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all text-left cursor-pointer group"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-slate-900">
-                  <ShieldCheck className="h-3.5 w-3.5 text-slate-700" />
-                  <span>Administrator</span>
-                </div>
-                <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                  admin@demo.com
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("superadmin")}
-                className="p-2.5 rounded-xl border border-slate-200 hover:border-rose-400 hover:bg-rose-50/50 transition-all text-left cursor-pointer group"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-rose-700">
-                  <KeyRound className="h-3.5 w-3.5 text-rose-600" />
-                  <span>Super Admin</span>
-                </div>
-                <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                  superadmin@demo.com
-                </div>
-              </button>
-            </div>
+          {/* Discreet Demo Note for verification without role buttons */}
+          <div className="mt-8 pt-6 border-t border-neutral-200 text-left">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 block mb-1.5">
+              Authorized Demo Accounts
+            </span>
+            <p className="text-[11px] text-neutral-500 leading-relaxed font-mono">
+              waiter@demo.com · cashier@demo.com · kitchen@demo.com · manager@demo.com · admin@demo.com
+            </p>
           </div>
         </div>
 
-        {/* Back to Customer Experience Link */}
-        <div className="text-center mt-6">
+        {/* Footer info */}
+        <div className="pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-400">
+          <span>&copy; {new Date().getFullYear()} SCULPX Hospitality</span>
           <Link
-            href="/menu/table-token-5"
-            className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1"
+            href="/menu/table/T01"
+            className="text-xs text-neutral-600 hover:text-black transition-colors"
           >
-            <span>Are you a guest? Open Table 05 Guest Menu</span>
-            <ArrowRight className="h-3 w-3" />
+            Guest Table Menu &rarr;
           </Link>
+        </div>
+      </div>
+
+      {/* RIGHT COLUMN: Premium Restaurant Visual (~50%) */}
+      <div className="w-full lg:w-1/2 relative bg-neutral-950 min-h-[380px] lg:min-h-screen overflow-hidden flex items-end p-8 sm:p-12 lg:p-16">
+        <Image
+          src="/images/dining.jpg"
+          alt="SCULPX Fine Dining Interior"
+          fill
+          priority
+          className="object-cover opacity-60 mix-blend-luminosity filter grayscale"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+
+        <div className="relative z-10 max-w-md text-white space-y-3">
+          <div className="inline-flex items-center gap-2 rounded-[4px] border border-white/20 bg-black/60 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-300">
+            SCULPX Grand Hotel
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+            Restaurant operations, simplified.
+          </h2>
+          <p className="text-xs sm:text-sm text-neutral-300 tracking-wide font-medium">
+            Orders &middot; Kitchen &middot; Billing &middot; Inventory
+          </p>
         </div>
       </div>
     </div>

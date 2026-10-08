@@ -68,7 +68,7 @@ export default function CashierDashboardPage() {
               <Button
                 variant="primary"
                 size="md"
-                className="bg-emerald-600 hover:bg-emerald-500 font-black shadow-md shadow-emerald-600/20"
+                className="bg-white text-black hover:bg-neutral-200 font-semibold"
                 leftIcon={<Receipt className="h-4 w-4" />}
               >
                 All Invoices ({bills.length})
@@ -78,49 +78,49 @@ export default function CashierDashboardPage() {
         </div>
 
         {/* Financial KPI Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mt-6 pt-6 border-t border-slate-800">
-          <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700/80">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mt-6 pt-6 border-t border-neutral-800">
+          <div className="p-3.5 rounded-lg bg-neutral-900 border border-neutral-800">
+            <div className="flex items-center justify-between text-neutral-400 text-xs">
               <span>Today&apos;s Revenue</span>
-              <TrendingUp className="h-4 w-4 text-emerald-400" />
+              <TrendingUp className="h-4 w-4 text-neutral-400" />
             </div>
-            <div className="text-2xl font-black text-white mt-1">
+            <div className="text-xl font-bold text-white mt-1">
               <CurrencyDisplay amount={totalRevenue} />
             </div>
-            <span className="text-[10px] text-emerald-400 font-semibold">+14.2% vs yesterday</span>
+            <span className="text-[10px] text-neutral-400 font-medium">+14.2% vs yesterday</span>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700/80">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
+          <div className="p-3.5 rounded-lg bg-neutral-900 border border-neutral-800">
+            <div className="flex items-center justify-between text-neutral-400 text-xs">
               <span>Settled Bills</span>
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-neutral-400" />
             </div>
-            <div className="text-2xl font-black text-emerald-400 mt-1">
+            <div className="text-xl font-bold text-white mt-1">
               {paidBills.length > 0 ? paidBills.length : 18} Paid
             </div>
-            <span className="text-[10px] text-slate-400 font-medium">Digital UPI / Cards</span>
+            <span className="text-[10px] text-neutral-400 font-medium">Digital UPI / Cards</span>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700/80">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
+          <div className="p-3.5 rounded-lg bg-neutral-900 border border-neutral-800">
+            <div className="flex items-center justify-between text-neutral-400 text-xs">
               <span>Outstanding Due</span>
-              <Clock className="h-4 w-4 text-amber-400" />
+              <Clock className="h-4 w-4 text-neutral-400" />
             </div>
-            <div className="text-2xl font-black text-amber-400 mt-1">
+            <div className="text-xl font-bold text-white mt-1">
               <CurrencyDisplay amount={totalOutstanding} />
             </div>
-            <span className="text-[10px] text-amber-400 font-medium">
+            <span className="text-[10px] text-neutral-400 font-medium">
               {outstandingBills.length > 0 ? outstandingBills.length : 4} unpaid bills
             </span>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700/80">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
+          <div className="p-3.5 rounded-lg bg-neutral-900 border border-neutral-800">
+            <div className="flex items-center justify-between text-neutral-400 text-xs">
               <span>Exceptions &amp; Refunds</span>
-              <RefreshCw className="h-4 w-4 text-rose-400" />
+              <RefreshCw className="h-4 w-4 text-neutral-400" />
             </div>
-            <div className="text-2xl font-black text-rose-300 mt-1">2 Refunds</div>
-            <span className="text-[10px] text-slate-400 font-medium">1 Void approval pending</span>
+            <div className="text-xl font-bold text-white mt-1">2 Refunds</div>
+            <span className="text-[10px] text-neutral-400 font-medium">1 Void approval pending</span>
           </div>
         </div>
       </div>
@@ -129,37 +129,37 @@ export default function CashierDashboardPage() {
       <div>
         <div className="flex items-center justify-between mb-3 px-1">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
-              <AlertTriangle className="h-3.5 w-3.5" />
+            <div className="flex h-5 w-5 items-center justify-center rounded bg-neutral-100 text-neutral-800 border border-neutral-200">
+              <AlertTriangle className="h-3 w-3" />
             </div>
-            <h2 className="text-sm font-black uppercase tracking-wider text-slate-900">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-900">
               Needs Attention • Cashier Alerts
             </h2>
           </div>
-          <span className="text-xs font-semibold text-slate-500">
+          <span className="text-xs text-neutral-500">
             3 Outstanding • 1 Failed Payment • 1 Refund Pending
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
           {/* Item 1 */}
-          <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/70 p-4.5 shadow-xs flex flex-col justify-between">
+          <div className="rounded-lg border border-neutral-200 bg-white p-4 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-600 text-white px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-semibold uppercase tracking-wider bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded border border-neutral-200">
                   Unsettled Bill
                 </span>
-                <span className="text-xs font-mono font-bold text-amber-900">Table 05</span>
+                <span className="text-xs font-mono font-medium text-neutral-600">Table 05</span>
               </div>
-              <h3 className="text-base font-black text-slate-900 mt-2">
+              <h3 className="text-sm font-bold text-neutral-900 mt-2">
                 Bill #BILL-2026-1042 • ₹1,240
               </h3>
-              <p className="text-xs text-slate-600 mt-1">
+              <p className="text-xs text-neutral-600 mt-1">
                 Dine-in guest completed meal. Awaiting UPI QR or card swipe settlement.
               </p>
             </div>
-            <div className="mt-4 pt-3 border-t border-amber-200 flex items-center justify-between">
-              <Link href="/cashier/bills/bill-1001" className="text-xs font-bold text-amber-900 hover:underline">
+            <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between">
+              <Link href="/cashier/bills/bill-1001" className="text-xs font-medium text-neutral-600 hover:text-black hover:underline">
                 View Bill
               </Link>
               <Button
@@ -169,7 +169,7 @@ export default function CashierDashboardPage() {
                   if (bills[0]) setSelectedBillForPayment(bills[0]);
                   else addToast({ type: "info", title: "Collecting Payment", message: "Opening terminal gateway..." });
                 }}
-                className="bg-emerald-600 hover:bg-emerald-700 font-bold text-xs"
+                className="font-medium text-xs"
                 leftIcon={<CreditCard className="h-3.5 w-3.5" />}
               >
                 Collect Payment
@@ -178,28 +178,28 @@ export default function CashierDashboardPage() {
           </div>
 
           {/* Item 2 */}
-          <div className="rounded-2xl border-2 border-rose-300 bg-rose-50/70 p-4.5 shadow-xs flex flex-col justify-between">
+          <div className="rounded-lg border border-neutral-200 bg-white p-4 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-600 text-white px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-semibold uppercase tracking-wider bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded border border-neutral-200">
                   Failed Payment
                 </span>
-                <span className="text-xs font-mono font-bold text-rose-900">Room 301</span>
+                <span className="text-xs font-mono font-medium text-neutral-600">Room 301</span>
               </div>
-              <h3 className="text-base font-black text-slate-900 mt-2">
+              <h3 className="text-sm font-bold text-neutral-900 mt-2">
                 Card Gateway Timeout • ₹2,480
               </h3>
-              <p className="text-xs text-slate-600 mt-1">
+              <p className="text-xs text-neutral-600 mt-1">
                 UPI QR transaction expired without bank webhook confirmation.
               </p>
             </div>
-            <div className="mt-4 pt-3 border-t border-rose-200 flex items-center justify-between">
-              <span className="text-xs font-bold text-rose-900">Auto-retry pending</span>
+            <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between">
+              <span className="text-xs text-neutral-500 font-medium">Auto-retry pending</span>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => addToast({ type: "info", title: "Retrying Gateway", message: "Polling payment switch..." })}
-                className="border-rose-400 bg-white text-rose-900 font-bold text-xs hover:bg-rose-100"
+                className="font-medium text-xs"
               >
                 Retry Charge
               </Button>
@@ -207,28 +207,28 @@ export default function CashierDashboardPage() {
           </div>
 
           {/* Item 3 */}
-          <div className="rounded-2xl border-2 border-purple-300 bg-purple-50/70 p-4.5 shadow-xs flex flex-col justify-between">
+          <div className="rounded-lg border border-neutral-200 bg-white p-4 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-600 text-white px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-semibold uppercase tracking-wider bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded border border-neutral-200">
                   Refund Request
                 </span>
-                <span className="text-xs font-mono font-bold text-purple-900">Table 02</span>
+                <span className="text-xs font-mono font-medium text-neutral-600">Table 02</span>
               </div>
-              <h3 className="text-base font-black text-slate-900 mt-2">
+              <h3 className="text-sm font-bold text-neutral-900 mt-2">
                 Double Swipe Refund • ₹380
               </h3>
-              <p className="text-xs text-slate-600 mt-1">
+              <p className="text-xs text-neutral-600 mt-1">
                 Guest billed twice for dessert item. Manager approval verified.
               </p>
             </div>
-            <div className="mt-4 pt-3 border-t border-purple-200 flex items-center justify-between">
-              <span className="text-xs font-bold text-purple-900">Manager: Approved</span>
+            <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between">
+              <span className="text-xs text-neutral-500 font-medium">Manager: Approved</span>
               <Button
                 size="sm"
-                variant="primary"
+                variant="outline"
                 onClick={() => addToast({ type: "success", title: "Refund Issued", message: "₹380 credited back to customer card." })}
-                className="bg-purple-600 hover:bg-purple-700 font-bold text-xs"
+                className="font-medium text-xs"
               >
                 Process Refund
               </Button>

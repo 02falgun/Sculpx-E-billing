@@ -158,22 +158,22 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
             return (
               <div
                 key={group.id}
-                className={`rounded-xl border p-3.5 transition-colors ${
-                  isUnmet ? "border-amber-300 bg-amber-50/20" : "border-slate-200/80 bg-slate-50/30"
+                className={`rounded-lg border p-3.5 transition-colors ${
+                  isUnmet ? "border-neutral-400 bg-neutral-50/60" : "border-neutral-200 bg-white"
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-bold text-slate-900">{group.name}</h4>
+                    <h4 className="text-xs font-bold text-neutral-900">{group.name}</h4>
                     {group.isRequired ? (
-                      <span className="rounded bg-rose-50 border border-rose-200 px-1.5 py-0.5 text-[9px] font-bold text-rose-700">
+                      <span className="rounded bg-neutral-100 border border-neutral-300 px-1.5 py-0.5 text-[9px] font-semibold text-neutral-900">
                         Required
                       </span>
                     ) : (
-                      <span className="text-[10px] text-slate-400">Optional</span>
+                      <span className="text-[10px] text-neutral-400">Optional</span>
                     )}
                   </div>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-neutral-400">
                     {isSingleChoice ? "Choose 1" : `Up to ${group.maxSelections}`}
                   </span>
                 </div>
@@ -196,20 +196,20 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
                             isSingleChoice,
                           )
                         }
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors cursor-pointer ${
+                        className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs transition-colors cursor-pointer ${
                           isSelected
-                            ? "bg-amber-50 border border-amber-300 text-amber-950 font-semibold shadow-2xs"
-                            : "bg-white border border-slate-200/80 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                            ? "bg-neutral-100 border border-black text-black font-semibold"
+                            : "bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300"
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
                           <div
                             className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-${
-                              isSingleChoice ? "full" : "md"
+                              isSingleChoice ? "full" : "sm"
                             } border transition-colors ${
                               isSelected
-                                ? "border-amber-600 bg-amber-600 text-white"
-                                : "border-slate-300 bg-white"
+                                ? "border-black bg-black text-white"
+                                : "border-neutral-300 bg-white"
                             }`}
                           >
                             {isSelected && <Check className="h-2.5 w-2.5 stroke-[3]" />}
@@ -217,7 +217,7 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
                           <span>{mod.name}</span>
                         </div>
 
-                        <span className="text-xs font-semibold text-slate-900 tabular-nums">
+                        <span className="text-xs font-semibold text-neutral-900 tabular-nums">
                           {mod.price > 0 ? `+₹${mod.price}` : "Included"}
                         </span>
                       </button>
@@ -232,7 +232,7 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
           <div className="space-y-1.5 pt-1">
             <label
               htmlFor="special-instructions"
-              className="text-xs font-semibold text-slate-700 block text-left"
+              className="text-xs font-semibold text-neutral-700 block text-left"
             >
               Special Cooking Instructions (Optional)
             </label>
@@ -242,9 +242,9 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
               onChange={(e) => setSpecialInstructions(e.target.value.slice(0, 150))}
               placeholder="e.g. Less spicy, dressing on the side..."
               rows={2}
-              className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 resize-none transition-colors"
+              className="w-full rounded-md border border-neutral-300 bg-white p-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-black focus:outline-none resize-none transition-colors"
             />
-            <span className="text-[10px] text-slate-400 text-right block">
+            <span className="text-[10px] text-neutral-400 text-right block">
               {specialInstructions.length}/150
             </span>
           </div>
@@ -252,8 +252,8 @@ export function ModifierModal({ item, isOpen, onClose }: ModifierModalProps) {
 
         {/* Validation warning if required options missing */}
         {!isValid && (
-          <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
-            <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+          <div className="flex items-center gap-2 rounded-md bg-neutral-100 border border-neutral-300 p-2.5 text-xs text-neutral-800">
+            <AlertCircle className="h-4 w-4 shrink-0 text-neutral-700" />
             <span>Please select required option: {unmetRequiredGroups.join(", ")}</span>
           </div>
         )}

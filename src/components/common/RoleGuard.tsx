@@ -60,8 +60,8 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
   if (checking) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <Spinner size="lg" className="text-amber-500" />
-        <p className="text-xs font-semibold text-slate-400">Verifying station authorization...</p>
+        <Spinner size="lg" className="text-neutral-900" />
+        <p className="text-xs font-semibold text-neutral-400">Verifying station authorization...</p>
       </div>
     );
   }
@@ -77,14 +77,14 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
 
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
-        <div className="max-w-md w-full rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm space-y-4">
-          <div className="h-12 w-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
-            <ShieldAlert className="h-6 w-6" />
+        <div className="max-w-md w-full rounded-[8px] border border-neutral-300 bg-white p-6 text-center space-y-4">
+          <div className="h-10 w-10 rounded-[6px] bg-neutral-100 text-neutral-900 flex items-center justify-center mx-auto border border-neutral-300">
+            <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Restricted Station</h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Your profile is logged in as <strong>{getRoleDisplayName(user.role)}</strong>, which does not have access to this workspace.
+            <h2 className="text-base font-bold text-neutral-900">Restricted Station</h2>
+            <p className="text-xs text-neutral-500 mt-1">
+              Your profile is signed in as <strong>{getRoleDisplayName(user.role)}</strong>, which does not have access to this workspace.
             </p>
           </div>
           <div className="pt-2 flex flex-col gap-2">
@@ -97,7 +97,7 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
               Go to Your Workspace ({userDefault})
             </Button>
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={() => router.push("/login")}
               leftIcon={<LogIn className="h-4 w-4" />}

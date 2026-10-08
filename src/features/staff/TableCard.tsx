@@ -42,23 +42,23 @@ export function TableCard({ table }: TableCardProps) {
 
   return (
     <div
-      className={`relative rounded-2xl border bg-white p-5 shadow-xs transition-all hover:shadow-md ${
+      className={`relative rounded-lg border bg-white p-4 transition-all ${
         isOccupied
-          ? "border-amber-300 ring-1 ring-amber-200"
-          : "border-slate-200 hover:border-slate-300"
+          ? "border-neutral-400"
+          : "border-neutral-200 hover:border-neutral-300"
       }`}
     >
       {/* Top row: Table No, Section, and status badge */}
       <div className="flex items-start justify-between">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
             {table.section}
           </span>
-          <h3 className="text-lg font-black text-slate-900 tracking-tight">
+          <h3 className="text-base font-bold text-neutral-900 tracking-tight">
             Table {table.tableNumber}
           </h3>
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
-            <Users className="h-3.5 w-3.5 text-slate-400" />
+          <div className="flex items-center gap-1.5 text-xs text-neutral-500 mt-0.5">
+            <Users className="h-3.5 w-3.5 text-neutral-400" />
             <span>Cap: {table.capacity} Guests</span>
           </div>
         </div>
@@ -71,39 +71,39 @@ export function TableCard({ table }: TableCardProps) {
             <button
               type="button"
               onClick={() => setShowStatusMenu(!showStatusMenu)}
-              className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
+              className="p-1 text-neutral-400 hover:text-neutral-800 rounded hover:bg-neutral-100 cursor-pointer"
               title="Change table status"
             >
               <MoreVertical className="h-4 w-4" />
             </button>
 
             {showStatusMenu && (
-              <div className="absolute right-0 top-6 z-20 w-36 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg text-xs space-y-0.5">
+              <div className="absolute right-0 top-6 z-20 w-36 rounded-md border border-neutral-200 bg-white p-1 shadow-md text-xs space-y-0.5">
                 <button
                   type="button"
                   onClick={() => handleChangeStatus("AVAILABLE")}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-emerald-700 hover:bg-emerald-50 font-medium cursor-pointer"
+                  className="w-full text-left px-2.5 py-1.5 rounded text-neutral-800 hover:bg-neutral-100 font-medium cursor-pointer"
                 >
                   Mark Available
                 </button>
                 <button
                   type="button"
                   onClick={() => handleChangeStatus("OCCUPIED")}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-amber-700 hover:bg-amber-50 font-medium cursor-pointer"
+                  className="w-full text-left px-2.5 py-1.5 rounded text-neutral-800 hover:bg-neutral-100 font-medium cursor-pointer"
                 >
                   Mark Occupied
                 </button>
                 <button
                   type="button"
                   onClick={() => handleChangeStatus("RESERVED")}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-blue-700 hover:bg-blue-50 font-medium cursor-pointer"
+                  className="w-full text-left px-2.5 py-1.5 rounded text-neutral-800 hover:bg-neutral-100 font-medium cursor-pointer"
                 >
                   Mark Reserved
                 </button>
                 <button
                   type="button"
                   onClick={() => handleChangeStatus("BILLED")}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-purple-700 hover:bg-purple-50 font-medium cursor-pointer"
+                  className="w-full text-left px-2.5 py-1.5 rounded text-neutral-800 hover:bg-neutral-100 font-medium cursor-pointer"
                 >
                   Mark Billed
                 </button>
@@ -115,26 +115,26 @@ export function TableCard({ table }: TableCardProps) {
 
       {/* Active Order / Bill info */}
       {isOccupied && (
-        <div className="my-3.5 rounded-xl border border-amber-200/60 bg-amber-50/50 p-2.5 text-xs text-amber-900 space-y-1">
-          <div className="flex items-center justify-between font-semibold">
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3 text-amber-600" /> Active Session
+        <div className="my-3 rounded-md border border-neutral-200 bg-neutral-50 p-2.5 text-xs text-neutral-800 space-y-1">
+          <div className="flex items-center justify-between font-medium">
+            <span className="flex items-center gap-1 text-neutral-600">
+              <Clock className="h-3 w-3 text-neutral-500" /> Active Session
             </span>
             {table.activeOrderId && (
               <Link
                 href={`/order/${table.activeOrderId}`}
-                className="text-[11px] text-amber-700 hover:underline font-bold"
+                className="text-[11px] text-neutral-900 hover:underline font-mono font-semibold"
               >
                 #{table.activeOrderId}
               </Link>
             )}
           </div>
           {table.activeBillId && (
-            <div className="flex items-center justify-between text-[11px] text-amber-800">
+            <div className="flex items-center justify-between text-[11px] text-neutral-600">
               <span>E-Bill Issued</span>
               <Link
                 href={`/bill/${table.activeBillId}`}
-                className="font-bold underline"
+                className="font-medium text-neutral-900 underline"
               >
                 View Bill
               </Link>

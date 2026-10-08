@@ -17,23 +17,23 @@ export function ToastContainer() {
     >
       {toasts.map((toast) => {
         const icons = {
-          success: <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />,
-          error: <AlertCircle className="h-5 w-5 text-rose-500 shrink-0" />,
-          warning: <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />,
-          info: <Info className="h-5 w-5 text-blue-500 shrink-0" />,
+          success: <CheckCircle2 className="h-4 w-4 text-neutral-900 shrink-0" />,
+          error: <AlertCircle className="h-4 w-4 text-neutral-900 shrink-0" />,
+          warning: <AlertTriangle className="h-4 w-4 text-neutral-700 shrink-0" />,
+          info: <Info className="h-4 w-4 text-neutral-600 shrink-0" />,
         };
 
         const borderStyles = {
-          success: "border-emerald-200 bg-white",
-          error: "border-rose-200 bg-white",
-          warning: "border-amber-200 bg-white",
-          info: "border-blue-200 bg-white",
+          success: "border-neutral-300 bg-white",
+          error: "border-neutral-400 bg-white",
+          warning: "border-neutral-300 bg-white",
+          info: "border-neutral-200 bg-white",
         };
 
         return (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex items-start gap-3 rounded-2xl border p-4 shadow-xl transition-all animate-in slide-in-from-bottom-2 ${borderStyles[toast.type]}`}
+            className={`pointer-events-auto flex items-start gap-2.5 rounded-[8px] border p-3 shadow-md transition-all animate-in slide-in-from-bottom-2 ${borderStyles[toast.type]}`}
           >
             {icons[toast.type]}
             <div className="flex-1 text-left">

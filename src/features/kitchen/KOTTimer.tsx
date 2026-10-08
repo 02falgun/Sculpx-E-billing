@@ -47,8 +47,8 @@ export function KOTTimer({ createdAt }: KOTTimerProps) {
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-lg bg-slate-800 px-2 py-0.5 text-xs font-mono font-bold text-slate-300 border border-slate-700">
-      <Clock className="h-3.5 w-3.5 text-emerald-400" />
+    <div className="flex items-center gap-1 rounded-md bg-neutral-800 px-2 py-0.5 text-xs font-mono font-medium text-neutral-300 border border-neutral-700">
+      <Clock className="h-3 w-3 text-neutral-400" />
       <span>{formatted}</span>
     </div>
   );

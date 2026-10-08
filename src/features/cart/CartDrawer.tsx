@@ -117,13 +117,13 @@ export function CartDrawer() {
               <span>Subtotal</span>
               <CurrencyDisplay amount={summary.subtotal} />
             </div>
-            <div className="flex justify-between text-xs text-slate-500">
+            <div className="flex justify-between text-xs text-neutral-500">
               <span>Estimated GST (5%)</span>
               <CurrencyDisplay amount={summary.estimatedTax} />
             </div>
-            <div className="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t border-dashed border-slate-200">
+            <div className="flex justify-between text-sm font-bold text-neutral-900 pt-2 border-t border-dashed border-neutral-200">
               <span>Total Payable</span>
-              <CurrencyDisplay amount={summary.estimatedTotal} className="text-amber-800 font-bold" />
+              <CurrencyDisplay amount={summary.estimatedTotal} className="text-neutral-900 font-bold" />
             </div>
 
             <div className="mt-4 flex flex-col gap-2 pt-2">
@@ -135,7 +135,7 @@ export function CartDrawer() {
                 <Button
                   variant="primary"
                   size="md"
-                  className="w-full text-xs font-semibold shadow-xs"
+                  className="w-full text-xs font-semibold"
                   rightIcon={<ArrowRight className="h-4 w-4" />}
                 >
                   <span>Proceed to Checkout • </span>
@@ -156,7 +156,7 @@ export function CartDrawer() {
                   variant="ghost"
                   size="sm"
                   onClick={clearCart}
-                  className="text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                  className="text-xs text-neutral-500 hover:text-black hover:bg-neutral-100"
                 >
                   Clear Order
                 </Button>

@@ -5,7 +5,7 @@ import { RoleGuard } from "@/components/common/RoleGuard";
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <RoleGuard allowedRoles={["ADMIN", "SUPER_ADMIN"]}>
-      <div className="min-h-screen bg-slate-50 flex">
+      <div className="min-h-screen bg-neutral-50 flex">
         <div className="print:hidden">
           <AdminSidebar />
         </div>

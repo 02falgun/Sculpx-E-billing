@@ -160,10 +160,10 @@ export function DigitalReceiptActions({ bill }: DigitalReceiptActionsProps) {
                     key={tag}
                     type="button"
                     onClick={() => handleToggleTag(tag)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer border ${
                       isSelected
-                        ? "bg-amber-100 text-amber-800 border border-amber-300"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        ? "bg-black text-white border-black font-semibold"
+                        : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 border-neutral-200"
                     }`}
                   >
                     {tag}

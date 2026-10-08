@@ -35,10 +35,10 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             type={type}
             ref={ref}
             className={cn(
-              "flex h-10 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400",
-              leftIcon && "pl-9",
-              rightIcon && "pr-9",
-              error && "border-rose-500 focus:border-rose-500 focus:ring-rose-500/20",
+              "flex h-9 w-full rounded-[6px] border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-400 transition-colors focus:border-black focus:outline-none focus:ring-1 focus:ring-black disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400",
+              leftIcon && "pl-8",
+              rightIcon && "pr-8",
+              error && "border-neutral-900 focus:border-black focus:ring-1 focus:ring-black",
               className,
             )}
             aria-invalid={!!error}

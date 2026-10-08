@@ -56,13 +56,12 @@ export function MenuItemCard({ item, onOpenModifiers, className }: MenuItemCardP
 
           <div className="flex items-center gap-1">
             {item.isBestseller && (
-              <span className="rounded-md bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[10px] font-bold tracking-wide text-amber-800">
+              <span className="rounded-[4px] border border-neutral-300 bg-neutral-100 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-neutral-800 uppercase">
                 Bestseller
               </span>
             )}
             {item.isChefSpecial && (
-              <span className="flex items-center gap-0.5 rounded-md bg-purple-50 border border-purple-200/80 px-2 py-0.5 text-[10px] font-bold tracking-wide text-purple-800">
-                <Sparkles className="h-2.5 w-2.5 text-purple-600" />
+              <span className="flex items-center gap-0.5 rounded-[4px] border border-neutral-300 bg-neutral-100 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-neutral-800 uppercase">
                 <span>Special</span>
               </span>
             )}
@@ -70,19 +69,32 @@ export function MenuItemCard({ item, onOpenModifiers, className }: MenuItemCardP
         </div>
 
         {/* Title & Description */}
-        <h3 className="text-sm font-semibold text-slate-900 group-hover:text-amber-800 transition-colors line-clamp-1">
+        <h3 className="text-sm font-semibold text-neutral-900 transition-colors line-clamp-1">
           {item.name}
         </h3>
-        <p className="mt-1 text-xs text-slate-500 line-clamp-2 leading-relaxed">
+        <p className="mt-1 text-xs text-neutral-500 line-clamp-2 leading-relaxed">
           {item.description}
         </p>
+
+        {/* Availability Badge */}
+        <div className="mt-2">
+          {!item.isAvailable ? (
+            <span className="inline-block text-[10px] font-semibold text-neutral-500">
+              Currently unavailable
+            </span>
+          ) : (
+            <span className="inline-block text-[10px] text-neutral-400 font-medium">
+              Available
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Footer: Price, Prep Time & Add Trigger */}
-      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+      <div className="mt-4 flex items-center justify-between border-t border-neutral-100 pt-3">
         <div className="flex flex-col">
-          <CurrencyDisplay amount={item.price} className="text-base font-bold text-slate-900" />
-          <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
+          <CurrencyDisplay amount={item.price} className="text-base font-bold text-neutral-900" />
+          <div className="flex items-center gap-1 text-[11px] text-neutral-400 mt-0.5">
             <Clock className="h-3 w-3" />
             <span>{item.preparationTimeMinutes} mins</span>
           </div>
@@ -91,17 +103,17 @@ export function MenuItemCard({ item, onOpenModifiers, className }: MenuItemCardP
         <div className="flex items-center">
           {item.isAvailable ? (
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={handleQuickAdd}
-              leftIcon={<Plus className="h-3.5 w-3.5 text-amber-600" />}
-              className="border-amber-200 bg-amber-50/40 text-amber-900 hover:bg-amber-600 hover:text-white hover:border-amber-600 font-semibold text-xs rounded-lg px-3 transition-colors"
+              leftIcon={<Plus className="h-3.5 w-3.5" />}
+              className="text-xs font-semibold rounded-[6px]"
             >
               {hasModifiers ? "Customize" : "Add"}
             </Button>
           ) : (
-            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-400">
-              Sold Out
+            <span className="rounded-[4px] border border-neutral-200 bg-neutral-100 px-2.5 py-1 text-[11px] font-medium text-neutral-400">
+              Unavailable
             </span>
           )}
         </div>

@@ -33,7 +33,7 @@ export const DEMO_USERS: Record<string, DemoUserConfig> = {
     roleName: "Waiter / Floor Staff",
     defaultRoute: "/staff",
     description: "Table-side orders, live floor statuses, and fast mobile POS",
-    badgeColor: "bg-blue-50 text-blue-700 border-blue-200",
+    badgeColor: "bg-neutral-100 text-neutral-800 border-neutral-200",
   },
   cashier: {
     user: {
@@ -59,7 +59,7 @@ export const DEMO_USERS: Record<string, DemoUserConfig> = {
     roleName: "Cashier / Billing Desk",
     defaultRoute: "/cashier",
     description: "Settlements, digital tax bills, UPI/Card payments, and receipts",
-    badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    badgeColor: "bg-neutral-100 text-neutral-800 border-neutral-200",
   },
   kitchen: {
     user: {
@@ -83,7 +83,7 @@ export const DEMO_USERS: Record<string, DemoUserConfig> = {
     roleName: "Kitchen Staff / Expediter",
     defaultRoute: "/kitchen",
     description: "High-contrast KDS board, elapsed timers, and ticket progression",
-    badgeColor: "bg-amber-50 text-amber-800 border-amber-200",
+    badgeColor: "bg-neutral-100 text-neutral-800 border-neutral-200",
   },
   manager: {
     user: {
@@ -110,7 +110,7 @@ export const DEMO_USERS: Record<string, DemoUserConfig> = {
     roleName: "Floor Manager",
     defaultRoute: "/manager",
     description: "Real-time floor velocity, operational exceptions, and shift audits",
-    badgeColor: "bg-purple-50 text-purple-700 border-purple-200",
+    badgeColor: "bg-neutral-100 text-neutral-800 border-neutral-200",
   },
   admin: {
     user: {
@@ -139,7 +139,7 @@ export const DEMO_USERS: Record<string, DemoUserConfig> = {
     roleName: "Hotel / Restaurant Admin",
     defaultRoute: "/admin",
     description: "Catalog manager, QR generator, hardware printers, and inventory",
-    badgeColor: "bg-slate-900 text-white border-slate-900",
+    badgeColor: "bg-neutral-900 text-white border-neutral-900",
   },
   superadmin: {
     user: {

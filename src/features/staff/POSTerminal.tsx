@@ -329,12 +329,19 @@ export function POSTerminal() {
 
               <Button
                 type="button"
-                variant="outline"
+                variant={item.isAvailable ? "secondary" : "outline"}
                 size="sm"
-                className="shrink-0 h-8 px-2.5 text-xs font-semibold"
+                disabled={!item.isAvailable}
+                className="shrink-0 h-8 px-2.5 text-xs font-semibold rounded-[4px]"
                 onClick={() => handleAddItem(item)}
               >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                {item.isAvailable ? (
+                  <>
+                    <Plus className="h-3 w-3 mr-1" /> Add
+                  </>
+                ) : (
+                  "Unavailable"
+                )}
               </Button>
             </div>
           ))}
@@ -479,9 +486,9 @@ export function POSTerminal() {
             <span>GST (5%)</span>
             <CurrencyDisplay amount={tax} />
           </div>
-          <div className="flex justify-between text-sm font-bold text-slate-900 pt-1 border-t border-slate-200">
+          <div className="flex justify-between text-sm font-bold text-neutral-900 pt-1 border-t border-neutral-200">
             <span>Total Bill</span>
-            <CurrencyDisplay amount={grandTotal} className="text-amber-600 font-black text-base" />
+            <CurrencyDisplay amount={grandTotal} className="text-neutral-900 font-bold text-base" />
           </div>
         </div>
 

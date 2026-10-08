@@ -19,23 +19,23 @@ export function CustomerBottomNav() {
         <button
           type="button"
           onClick={() => setCartDrawerOpen(true)}
-          className="flex w-full items-center justify-between rounded-xl bg-amber-600 px-4 py-3 text-white shadow-lg active:scale-[0.99] transition-all cursor-pointer"
+          className="flex w-full items-center justify-between rounded-lg bg-black px-4 py-3 text-white shadow-md hover:bg-neutral-900 active:scale-[0.99] transition-all cursor-pointer border border-neutral-800"
         >
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/20">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-neutral-800 text-white">
               <ShoppingBag className="h-4 w-4" />
             </div>
             <div className="flex flex-col text-left">
               <span className="text-xs font-semibold">
                 {summary.totalItems} {summary.totalItems === 1 ? "Item" : "Items"}
               </span>
-              <span className="text-xs opacity-90">
+              <span className="text-xs text-neutral-300">
                 <CurrencyDisplay amount={summary.estimatedTotal} className="text-white" />
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs font-bold">
+          <div className="flex items-center gap-1.5 text-xs font-semibold">
             <span>View Cart</span>
             <ArrowRight className="h-4 w-4" />
           </div>

@@ -60,10 +60,10 @@ export function TipSelector({ baseAmount, selectedTip, onTipChange }: TipSelecto
               key={preset.label}
               type="button"
               onClick={() => handleSelectPreset(preset.value)}
-              className={`rounded-xl px-3 py-2 text-xs font-bold transition-all cursor-pointer ${
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
                 isSelected
-                  ? "bg-amber-500 text-white shadow-sm ring-2 ring-amber-300"
-                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  ? "bg-black text-white shadow-xs"
+                  : "bg-neutral-100 text-neutral-800 hover:bg-neutral-200 border border-neutral-200"
               }`}
             >
               {preset.label}
@@ -82,10 +82,10 @@ export function TipSelector({ baseAmount, selectedTip, onTipChange }: TipSelecto
             setIsCustom(true);
             onTipChange(customValue ? parseInt(customValue, 10) || 0 : 0);
           }}
-          className={`rounded-xl px-3 py-2 text-xs font-bold transition-all cursor-pointer ${
+          className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
             isCustom
-              ? "bg-amber-500 text-white shadow-sm ring-2 ring-amber-300"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              ? "bg-black text-white shadow-xs"
+              : "bg-neutral-100 text-neutral-800 hover:bg-neutral-200 border border-neutral-200"
           }`}
         >
           Custom
@@ -95,14 +95,14 @@ export function TipSelector({ baseAmount, selectedTip, onTipChange }: TipSelecto
       {isCustom && (
         <div className="pt-1">
           <div className="relative max-w-xs">
-            <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">₹</span>
+            <span className="absolute left-3 top-2 text-xs text-neutral-400 font-bold">₹</span>
             <input
               type="text"
               inputMode="numeric"
               placeholder="Enter custom tip amount"
               value={customValue}
               onChange={handleCustomChange}
-              className="w-full rounded-xl border border-slate-200 py-2 pl-7 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+              className="w-full rounded-md border border-neutral-300 py-1.5 pl-7 pr-3 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-black focus:outline-none"
             />
           </div>
         </div>

@@ -50,7 +50,7 @@ export function Dialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/40 transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -62,7 +62,7 @@ export function Dialog({
         aria-labelledby={title ? "dialog-title" : undefined}
         aria-describedby={description ? "dialog-description" : undefined}
         className={cn(
-          "relative z-10 w-full overflow-hidden rounded-2xl bg-white p-6 shadow-2xl transition-all animate-in fade-in-0 zoom-in-95",
+          "relative z-10 w-full overflow-hidden rounded-[8px] border border-neutral-200 bg-white p-6 shadow-xl transition-all animate-in fade-in-0 zoom-in-95",
           maxWidthStyles[maxWidth],
         )}
       >
@@ -70,9 +70,9 @@ export function Dialog({
           type="button"
           onClick={onClose}
           aria-label="Close dialog"
-          className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+          className="absolute right-4 top-4 rounded-[4px] p-1 text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors cursor-pointer"
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
         </button>
 
         {title && (

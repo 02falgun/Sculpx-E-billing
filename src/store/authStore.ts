@@ -35,12 +35,18 @@ export const useAuthStore = create<AuthStoreState>()(
           isAuthenticated: false,
         }),
 
-      logout: () =>
+      logout: () => {
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.removeItem("restro_staff_auth");
+          } catch {}
+        }
         set({
           session: null,
           user: null,
           isAuthenticated: false,
-        }),
+        });
+      },
 
       switchRole: (roleKey: string) => {
         const demoUser = DEMO_USERS[roleKey];

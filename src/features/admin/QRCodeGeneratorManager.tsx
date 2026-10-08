@@ -94,7 +94,7 @@ export function QRCodeGeneratorManager() {
         width: 600,
         margin: 2,
         color: {
-          dark: "#0f172a", // slate-900
+          dark: "#000000",
           light: "#ffffff",
         },
         errorCorrectionLevel: "H",
@@ -115,7 +115,7 @@ export function QRCodeGeneratorManager() {
     addToast({
       type: "success",
       title: "QR URL Copied",
-      message: `Direct customer link for ${selectedItem.displayName} copied to clipboard.`,
+      message: `Direct link for ${selectedItem.displayName} copied to clipboard.`,
     });
     setTimeout(() => setCopied(false), 2000);
   };
@@ -198,29 +198,29 @@ export function QRCodeGeneratorManager() {
   return (
     <div className="space-y-8 font-sans">
       {/* 1. TOP CREATION & CONFIGURATION CONTROLS */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs print:hidden space-y-6">
+      <div className="rounded-xl border border-neutral-200 bg-white p-6 print:hidden space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-lg font-black text-slate-900 tracking-tight">
+            <h2 className="text-base font-bold text-neutral-900 tracking-tight">
               Create &amp; Preview Location QR
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Generate scannable tokens that automatically resolve to guest dining menus
+            <p className="text-xs text-neutral-500 mt-0.5">
+              Generate scannable tokens that resolve directly to the guest ordering flow.
             </p>
           </div>
 
           {/* Type Selector (Table vs Room) */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl">
+          <div className="flex items-center gap-1 p-1 bg-neutral-100 rounded-lg">
             <button
               type="button"
               onClick={() => {
                 setMode("TABLE");
                 setSelectedIdentifier("T05");
               }}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 mode === "TABLE"
-                  ? "bg-slate-900 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-black text-white shadow-xs"
+                  : "text-neutral-600 hover:text-neutral-900"
               }`}
             >
               <UtensilsCrossed className="h-3.5 w-3.5" />
@@ -233,10 +233,10 @@ export function QRCodeGeneratorManager() {
                 setMode("ROOM");
                 setSelectedIdentifier("301");
               }}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 mode === "ROOM"
-                  ? "bg-slate-900 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-black text-white shadow-xs"
+                  : "text-neutral-600 hover:text-neutral-900"
               }`}
             >
               <BedDouble className="h-3.5 w-3.5" />
@@ -248,13 +248,13 @@ export function QRCodeGeneratorManager() {
         {/* Quick Parameters Selector Bar */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
           <div className="md:col-span-4">
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+            <label className="block text-xs font-medium text-neutral-700 mb-1.5">
               Select {mode === "TABLE" ? "Table Number" : "Guestroom Number"}
             </label>
             <select
               value={selectedIdentifier}
               onChange={(e) => setSelectedIdentifier(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-none"
+              className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-900 focus:border-black focus:outline-none"
             >
               {mode === "TABLE" ? (
                 <>
@@ -280,18 +280,18 @@ export function QRCodeGeneratorManager() {
           </div>
 
           <div className="md:col-span-5">
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+            <label className="block text-xs font-medium text-neutral-700 mb-1.5">
               Destination URL (Live Route)
             </label>
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-mono text-slate-700">
+            <div className="flex items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-mono text-neutral-800">
               <span className="truncate flex-1">{selectedItem.fullUrl}</span>
               <button
                 type="button"
                 onClick={handleCopy}
-                className="text-slate-500 hover:text-slate-900 cursor-pointer"
+                className="text-neutral-500 hover:text-black cursor-pointer"
                 title="Copy URL"
               >
-                {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                {copied ? <Check className="h-4 w-4 text-neutral-900" /> : <Copy className="h-4 w-4" />}
               </button>
             </div>
           </div>
@@ -302,7 +302,7 @@ export function QRCodeGeneratorManager() {
               variant="primary"
               size="md"
               onClick={() => generateQRCode(selectedItem.fullUrl)}
-              className="flex-1 font-bold bg-slate-900 hover:bg-slate-800"
+              className="flex-1 font-semibold"
               leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
             >
               Regenerate
@@ -313,7 +313,7 @@ export function QRCodeGeneratorManager() {
                 type="button"
                 variant="outline"
                 size="md"
-                className="font-bold border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                className="font-medium"
                 leftIcon={<ExternalLink className="h-3.5 w-3.5" />}
               >
                 Preview
@@ -322,68 +322,64 @@ export function QRCodeGeneratorManager() {
           </div>
         </div>
       </div>
-
       {/* 2. PRINTABLE TENT CARD DISPLAY (Hotel Ready) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Printable Preview Container */}
-        <div className="lg:col-span-7 bg-slate-100 rounded-3xl p-6 flex flex-col items-center justify-center print:bg-white print:p-0">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3 print:hidden">
-            Printable Tent Card Mockup (A5 / Tent Spec)
+        <div className="lg:col-span-7 bg-neutral-100 rounded-xl p-6 flex flex-col items-center justify-center print:bg-white print:p-0">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-3 print:hidden">
+            Printable Tent Card Specification
           </div>
 
           {/* Actual Tent Card to Print */}
           <div
             id="printable-tent-card"
-            className="w-full max-w-sm rounded-3xl border-2 border-slate-900 bg-white p-7 text-center shadow-xl space-y-5 print:border-2 print:border-black print:shadow-none print:m-0 print:max-w-none print:w-full"
+            className="w-full max-w-sm rounded-xl border border-neutral-300 bg-white p-8 text-center space-y-6 print:border print:border-black print:m-0 print:max-w-none print:w-full"
           >
             {/* Branding Header */}
             <div>
-              <div className="inline-flex items-center justify-center h-8 w-8 rounded-xl bg-slate-900 text-amber-400 font-black text-sm mb-1.5 shadow-xs">
-                S
-              </div>
-              <h2 className="text-xl font-black text-slate-900 tracking-tight uppercase">
+              <h2 className="text-xl font-bold text-neutral-900 tracking-wider uppercase">
                 SCULPX
               </h2>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600 block">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500 block mt-1">
                 {mode === "TABLE" ? "SCAN TO ORDER" : "IN-ROOM DINING"}
               </span>
             </div>
 
             {/* High-Resolution Scannable QR Code */}
-            <div className="mx-auto w-56 h-56 rounded-2xl border-2 border-slate-200 bg-white p-3 flex flex-col items-center justify-center shadow-inner">
+            <div className="mx-auto w-52 h-52 rounded-lg border border-neutral-200 bg-white p-3 flex flex-col items-center justify-center">
               {qrDataUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={qrDataUrl}
                   alt={`QR code for ${selectedItem.displayName}`}
-                  className="h-48 w-48 object-contain"
+                  className="h-44 w-44 object-contain"
                 />
               ) : (
-                <div className="h-48 w-48 flex items-center justify-center text-slate-300">
+                <div className="h-44 w-44 flex items-center justify-center text-neutral-400">
                   <QrCode className="h-16 w-16" />
                 </div>
               )}
             </div>
 
             {/* Context Badge */}
-            <div className="rounded-2xl bg-slate-900 py-3 px-4 text-white">
-              <span className="text-[10px] font-bold tracking-widest uppercase text-amber-400 block">
-                {mode === "TABLE" ? "Dine-In Location" : "Suite Folio Number"}
+            <div className="rounded-lg bg-black py-2.5 px-4 text-white">
+              <span className="text-[10px] font-medium tracking-widest uppercase text-neutral-400 block">
+                {mode === "TABLE" ? "Dine-In Location" : "Suite Room"}
               </span>
-              <span className="text-2xl font-black tracking-tight block mt-0.5">
+              <span className="text-xl font-bold tracking-tight block mt-0.5">
                 {selectedItem.displayName}
               </span>
             </div>
 
             {/* Instructional Footer */}
-            <div className="text-xs text-slate-600 space-y-1 pt-1">
-              <p className="font-bold text-slate-900">
+            <div className="text-xs text-neutral-600 space-y-1 pt-1">
+              <p className="font-medium text-neutral-900">
                 {mode === "TABLE"
                   ? "Scan with your phone to browse our menu and order."
                   : "Scan to order from our restaurant directly to your room."}
               </p>
-              <p className="text-[10px] text-slate-400 font-mono">
-                No app download needed • GST Tax Invoice Issued
+              <p className="text-[10px] text-neutral-400 font-mono">
+                No app download required • Instant order tracking
               </p>
             </div>
           </div>
@@ -391,65 +387,65 @@ export function QRCodeGeneratorManager() {
 
         {/* Action Panel for Active QR */}
         <div className="lg:col-span-5 space-y-4 print:hidden">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-5">
+          <div className="bg-white rounded-xl border border-neutral-200 p-6 space-y-5">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-700 bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200">
                   {selectedItem.type} QR ACTIVE
                 </span>
-                <span className="text-xs font-mono font-bold text-emerald-600">
-                  ● Scannable
+                <span className="text-xs font-mono font-medium text-neutral-600">
+                  Ready to scan
                 </span>
               </div>
-              <h3 className="text-xl font-black text-slate-900 tracking-tight mt-1.5">
+              <h3 className="text-lg font-bold text-neutral-900 tracking-tight mt-2">
                 {selectedItem.displayName}
               </h3>
-              <p className="text-xs text-slate-500">{selectedItem.subtext}</p>
+              <p className="text-xs text-neutral-500">{selectedItem.subtext}</p>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 text-xs space-y-2">
+            <div className="p-3 rounded-lg bg-neutral-50 border border-neutral-200 text-xs space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Destination:</span>
-                <span className="font-mono font-bold text-slate-800">{selectedItem.relativeUrl}</span>
+                <span className="text-neutral-500">Destination:</span>
+                <span className="font-mono font-semibold text-neutral-800">{selectedItem.relativeUrl}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Correction:</span>
-                <span className="font-semibold text-slate-800">High (30% redundancy)</span>
+                <span className="text-neutral-500">Correction:</span>
+                <span className="font-medium text-neutral-800">High (Level H)</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Format:</span>
-                <span className="font-semibold text-slate-800">512×512 PNG / Vector</span>
+                <span className="text-neutral-500">Format:</span>
+                <span className="font-medium text-neutral-800">PNG / Vector</span>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="space-y-2.5 pt-2">
+            <div className="space-y-2 pt-1">
               <Button
                 variant="primary"
                 size="md"
                 onClick={handlePrint}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold"
+                className="w-full font-semibold"
                 leftIcon={<Printer className="h-4 w-4" />}
               >
-                Print Tent Card (A5 Spec)
+                Print Tent Card
               </Button>
 
               <Button
                 variant="outline"
                 size="md"
                 onClick={handleDownload}
-                className="w-full font-bold"
+                className="w-full font-medium"
                 leftIcon={<Download className="h-4 w-4" />}
               >
-                Download PNG (High-Res)
+                Download PNG
               </Button>
 
               <Button
                 variant="outline"
                 size="md"
                 onClick={handleCopy}
-                className="w-full font-bold"
-                leftIcon={copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                className="w-full font-medium"
+                leftIcon={copied ? <Check className="h-4 w-4 text-neutral-900" /> : <Copy className="h-4 w-4" />}
               >
                 {copied ? "Link Copied!" : "Copy Customer URL"}
               </Button>
@@ -458,7 +454,7 @@ export function QRCodeGeneratorManager() {
                 <Button
                   variant="outline"
                   size="md"
-                  className="w-full font-bold border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                  className="w-full font-medium"
                   leftIcon={<ExternalLink className="h-4 w-4" />}
                 >
                   Open Live Customer Menu
@@ -470,34 +466,34 @@ export function QRCodeGeneratorManager() {
       </div>
 
       {/* 3. QR FLEET DIRECTORY TABLE */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs print:hidden space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="rounded-xl border border-neutral-200 bg-white p-6 print:hidden space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-neutral-200">
           <div>
-            <h3 className="text-base font-bold text-slate-900">QR Code Fleet Directory</h3>
-            <p className="text-xs text-slate-500">
-              Active and standby QR codes deployed across dining tables and hotel guestrooms
+            <h3 className="text-sm font-bold text-neutral-900">QR Code Fleet Directory</h3>
+            <p className="text-xs text-neutral-500">
+              Active and standby QR codes deployed across dining tables and guestrooms.
             </p>
           </div>
 
           {/* Search & Filter */}
           <div className="flex items-center gap-2">
             <div className="relative">
-              <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="h-3.5 w-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search table or room..."
-                className="pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500"
+                className="pl-8 pr-3 py-1.5 rounded-md border border-neutral-300 text-xs text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-black"
               />
             </div>
 
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+            <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-md text-xs font-medium">
               <button
                 type="button"
                 onClick={() => setFilterType("ALL")}
-                className={`px-2.5 py-1 rounded-lg cursor-pointer ${
-                  filterType === "ALL" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600"
+                className={`px-2.5 py-1 rounded cursor-pointer ${
+                  filterType === "ALL" ? "bg-white text-black shadow-xs font-semibold" : "text-neutral-600"
                 }`}
               >
                 All ({fleetList.length})
@@ -505,8 +501,8 @@ export function QRCodeGeneratorManager() {
               <button
                 type="button"
                 onClick={() => setFilterType("TABLE")}
-                className={`px-2.5 py-1 rounded-lg cursor-pointer ${
-                  filterType === "TABLE" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600"
+                className={`px-2.5 py-1 rounded cursor-pointer ${
+                  filterType === "TABLE" ? "bg-white text-black shadow-xs font-semibold" : "text-neutral-600"
                 }`}
               >
                 Tables (8)
@@ -514,8 +510,8 @@ export function QRCodeGeneratorManager() {
               <button
                 type="button"
                 onClick={() => setFilterType("ROOM")}
-                className={`px-2.5 py-1 rounded-lg cursor-pointer ${
-                  filterType === "ROOM" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600"
+                className={`px-2.5 py-1 rounded cursor-pointer ${
+                  filterType === "ROOM" ? "bg-white text-black shadow-xs font-semibold" : "text-neutral-600"
                 }`}
               >
                 Rooms (5)
@@ -527,53 +523,47 @@ export function QRCodeGeneratorManager() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                <th className="pb-3">Type</th>
-                <th className="pb-3">Entity Name</th>
-                <th className="pb-3">Customer Target Route</th>
-                <th className="pb-3">Status</th>
-                <th className="pb-3 text-right">Actions</th>
+              <tr className="border-b border-neutral-200 text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">
+                <th className="pb-2.5">Type</th>
+                <th className="pb-2.5">Entity Name</th>
+                <th className="pb-2.5">Customer Route</th>
+                <th className="pb-2.5">Status</th>
+                <th className="pb-2.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody className="divide-y divide-neutral-100 text-neutral-700">
               {filteredFleet.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase ${
-                        item.type === "TABLE"
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-slate-100 text-slate-800"
-                      }`}
-                    >
+                <tr key={item.id} className="hover:bg-neutral-50 transition-colors">
+                  <td className="py-2.5">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 text-neutral-800 border border-neutral-200">
                       {item.type === "TABLE" ? <UtensilsCrossed className="h-3 w-3" /> : <BedDouble className="h-3 w-3" />}
                       {item.type}
                     </span>
                   </td>
-                  <td className="py-3 font-bold text-slate-900">
+                  <td className="py-2.5 font-semibold text-neutral-900">
                     <div>{item.displayName}</div>
-                    <span className="text-[10px] text-slate-400 font-normal">{item.subtext}</span>
+                    <span className="text-[10px] text-neutral-400 font-normal">{item.subtext}</span>
                   </td>
-                  <td className="py-3 font-mono text-emerald-700 font-semibold">
+                  <td className="py-2.5 font-mono text-neutral-700">
                     <Link href={item.routeUrl} target="_blank" className="hover:underline">
                       {item.routeUrl}
                     </Link>
                   </td>
-                  <td className="py-3">
+                  <td className="py-2.5">
                     <button
                       type="button"
                       onClick={() => toggleActiveStatus(item.id)}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold cursor-pointer ${
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium cursor-pointer border ${
                         item.isActive
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-slate-100 text-slate-500 border border-slate-200"
+                          ? "bg-neutral-900 text-white border-neutral-900"
+                          : "bg-neutral-100 text-neutral-500 border-neutral-200"
                       }`}
                     >
-                      <span className={`h-1.5 w-1.5 rounded-full ${item.isActive ? "bg-emerald-500" : "bg-slate-400"}`} />
+                      <span className={`h-1.5 w-1.5 rounded-full ${item.isActive ? "bg-white" : "bg-neutral-400"}`} />
                       <span>{item.isActive ? "Active" : "Inactive"}</span>
                     </button>
                   </td>
-                  <td className="py-3 text-right">
+                  <td className="py-2.5 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         type="button"
@@ -582,7 +572,7 @@ export function QRCodeGeneratorManager() {
                           setSelectedIdentifier(item.identifier);
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
-                        className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] cursor-pointer"
+                        className="px-2.5 py-1 rounded border border-neutral-300 hover:bg-neutral-100 text-neutral-700 font-medium text-[11px] cursor-pointer"
                       >
                         Inspect
                       </button>

@@ -17,11 +17,11 @@ export function Spinner({ size = "md", label, className, ...props }: SpinnerProp
   return (
     <div
       role="status"
-      className={cn("flex flex-col items-center justify-center gap-2 text-amber-600", className)}
+      className={cn("flex flex-col items-center justify-center gap-2 text-neutral-900", className)}
       {...props}
     >
       <Loader2 className={cn("animate-spin", sizeStyles[size])} />
-      {label && <span className="text-xs font-medium text-slate-500">{label}</span>}
+      {label && <span className="text-xs font-medium text-neutral-500">{label}</span>}
       <span className="sr-only">{label || "Loading..."}</span>
     </div>
   );
@@ -33,7 +33,7 @@ export function Skeleton({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("animate-pulse rounded-xl bg-slate-200/80", className)}
+      className={cn("animate-pulse rounded-[6px] bg-neutral-200", className)}
       {...props}
     />
   );

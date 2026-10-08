@@ -57,23 +57,23 @@ export function KOTCard({ kot }: KOTCardProps) {
 
   return (
     <div
-      className={`rounded-2xl border flex flex-col justify-between p-4.5 transition-all ${
+      className={`rounded-lg border flex flex-col justify-between p-4 transition-all ${
         kot.status === "READY"
-          ? "border-emerald-500/40 bg-slate-900 shadow-sm ring-1 ring-emerald-500/30"
+          ? "border-neutral-600 bg-neutral-900"
           : kot.status === "PREPARING"
-          ? "border-amber-500/40 bg-slate-900 shadow-sm"
-          : "border-slate-800 bg-slate-900/90 shadow-sm"
+          ? "border-neutral-700 bg-neutral-900"
+          : "border-neutral-800 bg-neutral-900"
       }`}
     >
       {/* Top Header */}
       <div>
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+        <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-lg font-black tracking-tight text-amber-400">
+              <span className="font-mono text-base font-bold tracking-tight text-white">
                 #{kot.kotNumber}
               </span>
-              <span className="text-xs font-semibold text-slate-400">
+              <span className="text-xs font-mono text-neutral-400">
                 ({kot.orderNumber})
               </span>
             </div>
@@ -85,12 +85,12 @@ export function KOTCard({ kot }: KOTCardProps) {
           <div className="flex flex-col items-end gap-1.5">
             <KOTTimer createdAt={kot.createdAt} />
             <span
-              className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+              className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
                 kot.status === "READY"
-                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                  ? "bg-white text-black border border-white font-bold"
                   : kot.status === "PREPARING"
-                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                  : "bg-sky-500/15 text-sky-300 border border-sky-500/30"
+                  ? "bg-neutral-800 text-white border border-neutral-600"
+                  : "bg-neutral-800 text-neutral-300 border border-neutral-700"
               }`}
             >
               {kot.status}
@@ -100,52 +100,52 @@ export function KOTCard({ kot }: KOTCardProps) {
 
         {/* Special Notes banner if present */}
         {kot.specialNotes && (
-          <div className="my-3 flex items-start gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
-            <span className="font-semibold">{kot.specialNotes}</span>
+          <div className="my-3 flex items-start gap-1.5 rounded border border-neutral-700 bg-neutral-800/80 p-2 text-xs text-neutral-200">
+            <AlertTriangle className="h-3.5 w-3.5 text-neutral-400 shrink-0 mt-0.5" />
+            <span className="font-medium">{kot.specialNotes}</span>
           </div>
         )}
 
         {/* Items Checklist */}
-        <div className="py-3 space-y-2.5">
+        <div className="py-3 space-y-2">
           {kot.items.map((item) => {
             const isDone = !!completedItems[item.id];
             return (
               <div
                 key={item.id}
                 onClick={() => toggleItem(item.id)}
-                className={`flex items-start gap-3 rounded-xl p-2.5 transition-colors cursor-pointer select-none ${
+                className={`flex items-start gap-3 rounded-md p-2.5 transition-colors cursor-pointer select-none ${
                   isDone
-                    ? "bg-slate-950/60 text-slate-500 line-through opacity-60"
-                    : "bg-slate-800/60 text-slate-100 hover:bg-slate-800"
+                    ? "bg-black/40 text-neutral-500 line-through opacity-60"
+                    : "bg-neutral-800/60 text-neutral-100 hover:bg-neutral-800"
                 }`}
               >
                 <div
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border mt-0.5 transition-colors ${
+                  className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded border mt-0.5 transition-colors ${
                     isDone
-                      ? "border-emerald-500 bg-emerald-500 text-white"
-                      : "border-slate-600 bg-slate-900"
+                      ? "border-white bg-white text-black"
+                      : "border-neutral-600 bg-neutral-900"
                   }`}
                 >
-                  {isDone && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                  {isDone && <Check className="h-3 w-3 stroke-[3]" />}
                 </div>
 
                 <div className="flex-1">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-bold">
-                      <span className="text-amber-400 mr-1.5">{item.quantity}x</span>
+                    <span className="font-semibold">
+                      <span className="text-neutral-400 mr-1.5">{item.quantity}x</span>
                       {item.name}
                     </span>
                   </div>
 
                   {item.modifiers && item.modifiers.length > 0 && (
-                    <p className="text-[11px] text-slate-400 mt-0.5">
+                    <p className="text-[11px] text-neutral-400 mt-0.5">
                       + {item.modifiers.map((m) => m.name).join(", ")}
                     </p>
                   )}
 
                   {item.specialInstructions && (
-                    <p className="text-[11px] text-amber-300 font-medium italic mt-0.5">
+                    <p className="text-[11px] text-neutral-400 font-medium italic mt-0.5">
                       Note: “{item.specialInstructions}”
                     </p>
                   )}
@@ -157,7 +157,7 @@ export function KOTCard({ kot }: KOTCardProps) {
       </div>
 
       {/* Action Footer Button based on stage */}
-      <div className="pt-3 border-t border-slate-800">
+      <div className="pt-3 border-t border-neutral-800">
         {kot.status === "NEW" && (
           <Button
             type="button"
@@ -165,7 +165,7 @@ export function KOTCard({ kot }: KOTCardProps) {
             size="md"
             isLoading={isPending}
             onClick={() => handleAdvanceStatus("ACCEPTED")}
-            className="w-full font-bold bg-blue-600 hover:bg-blue-700"
+            className="w-full font-semibold bg-white text-black hover:bg-neutral-200"
             leftIcon={<ChefHat className="h-4 w-4" />}
           >
             Accept Ticket
@@ -179,7 +179,7 @@ export function KOTCard({ kot }: KOTCardProps) {
             size="md"
             isLoading={isPending}
             onClick={() => handleAdvanceStatus("PREPARING")}
-            className="w-full font-bold bg-amber-600 hover:bg-amber-700 shadow-md shadow-amber-600/30"
+            className="w-full font-semibold bg-white text-black hover:bg-neutral-200"
             leftIcon={<Flame className="h-4 w-4" />}
           >
             Start Cooking
@@ -193,7 +193,7 @@ export function KOTCard({ kot }: KOTCardProps) {
             size="md"
             isLoading={isPending}
             onClick={() => handleAdvanceStatus("READY")}
-            className="w-full font-bold bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/30"
+            className="w-full font-semibold bg-white text-black hover:bg-neutral-200"
             leftIcon={<UtensilsCrossed className="h-4 w-4" />}
           >
             Mark Ready to Serve
@@ -207,8 +207,8 @@ export function KOTCard({ kot }: KOTCardProps) {
             size="md"
             isLoading={isPending}
             onClick={() => handleAdvanceStatus("SERVED")}
-            className="w-full font-bold border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
-            leftIcon={<CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+            className="w-full font-semibold border-neutral-700 bg-neutral-800 text-neutral-200 hover:bg-neutral-700"
+            leftIcon={<CheckCircle2 className="h-4 w-4 text-white" />}
           >
             Expedite & Complete
           </Button>

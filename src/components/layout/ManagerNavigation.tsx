@@ -12,15 +12,11 @@ import {
   Receipt,
   AlertTriangle,
   BarChart3,
-  LogOut,
-  ShieldAlert,
 } from "lucide-react";
+import { UserWorkspaceMenu } from "./UserWorkspaceMenu";
 
 export function ManagerNavigation() {
   const pathname = usePathname();
-  const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
 
   const navLinks = [
     { href: "/manager", label: "Operations", icon: LayoutDashboard },
@@ -33,17 +29,19 @@ export function ManagerNavigation() {
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-purple-900/30 bg-slate-900 text-white shadow-sm">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+    <header className="sticky top-0 z-40 border-b border-neutral-800 bg-black text-white">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
         {/* Brand & Floor Manager */}
         <div className="flex items-center gap-6">
           <Link href="/manager" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-600 font-black text-white text-sm">
-              M
+            <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-white font-bold text-black text-xs">
+              S
             </div>
             <div className="flex flex-col text-left">
-              <span className="text-sm font-bold tracking-tight">SCULPX Operations</span>
-              <span className="text-[10px] text-purple-300">Floor Manager Workspace</span>
+              <span className="text-xs font-bold tracking-tight text-white uppercase">
+                SCULPX Manager
+              </span>
+              <span className="text-[10px] text-neutral-400">Shift Operations</span>
             </div>
           </Link>
 
@@ -60,13 +58,13 @@ export function ManagerNavigation() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all ${
+                  className={`flex items-center gap-2 rounded-[6px] px-3 py-1.5 text-xs font-medium transition-colors ${
                     isActive
-                      ? "bg-purple-950/70 text-purple-300 border border-purple-500/30 shadow-inner"
-                      : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
+                      ? "bg-neutral-900 text-white font-semibold border border-neutral-700"
+                      : "text-neutral-400 hover:bg-neutral-900 hover:text-white"
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-3.5 w-3.5" />
                   <span>{link.label}</span>
                 </Link>
               );
@@ -76,27 +74,14 @@ export function ManagerNavigation() {
 
         {/* Right side: User & Log out */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex flex-col text-right">
-            <span className="text-xs font-bold text-white">{user?.name || "Vikram Mehta"}</span>
-            <span className="text-[10px] text-purple-400 font-medium">Floor Manager</span>
+          <div className="pl-2 border-l border-neutral-800">
+            <UserWorkspaceMenu theme="dark" />
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              logout();
-              router.push("/login");
-            }}
-            title="Sign out"
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 text-slate-400 hover:bg-rose-900/40 hover:text-rose-300 transition-colors cursor-pointer"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
         </div>
       </div>
 
       {/* Mobile / Tablet scrollable nav */}
-      <div className="flex lg:hidden overflow-x-auto border-t border-slate-800 px-3 py-1.5 gap-2 bg-slate-950/80 scrollbar-none">
+      <div className="flex lg:hidden overflow-x-auto border-t border-neutral-800 px-3 py-1.5 gap-2 bg-neutral-950 scrollbar-none">
         {navLinks.map((link) => {
           const Icon = link.icon;
           const isActive =
@@ -108,8 +93,8 @@ export function ManagerNavigation() {
             <Link
               key={link.href}
               href={link.href}
-              className={`flex items-center gap-1.5 shrink-0 py-1 px-2.5 rounded-lg text-xs font-bold ${
-                isActive ? "bg-purple-900/60 text-purple-300 border border-purple-700/50" : "text-slate-400"
+              className={`flex items-center gap-1.5 shrink-0 py-1 px-2.5 rounded-[6px] text-xs font-medium ${
+                isActive ? "bg-neutral-900 text-white font-bold border border-neutral-700" : "text-neutral-400"
               }`}
             >
               <Icon className="h-3.5 w-3.5" />

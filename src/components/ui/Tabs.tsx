@@ -26,7 +26,7 @@ export function Tabs({
 }: TabsProps) {
   if (variant === "underline") {
     return (
-      <div className={cn("flex space-x-6 border-b border-slate-200 overflow-x-auto", className)}>
+      <div className={cn("flex space-x-6 border-b border-neutral-200 overflow-x-auto", className)}>
         {tabs.map((tab) => {
           const isActive = tab.id === activeTab;
           return (
@@ -35,10 +35,10 @@ export function Tabs({
               type="button"
               onClick={() => onChange(tab.id)}
               className={cn(
-                "flex items-center space-x-2 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors",
+                "flex items-center space-x-2 py-2.5 text-xs font-semibold border-b-2 whitespace-nowrap transition-colors",
                 isActive
-                  ? "border-amber-600 text-amber-600 font-semibold"
-                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300",
+                  ? "border-black text-black font-bold"
+                  : "border-transparent text-neutral-500 hover:text-black hover:border-neutral-300",
               )}
             >
               <span>{tab.label}</span>
@@ -53,7 +53,7 @@ export function Tabs({
   return (
     <div
       className={cn(
-        "inline-flex p-1 rounded-xl bg-slate-100 space-x-1 overflow-x-auto max-w-full",
+        "inline-flex p-1 rounded-[6px] bg-neutral-100 space-x-1 overflow-x-auto max-w-full",
         className,
       )}
     >
@@ -65,10 +65,10 @@ export function Tabs({
             type="button"
             onClick={() => onChange(tab.id)}
             className={cn(
-              "flex items-center space-x-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap",
+              "flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-[4px] transition-all whitespace-nowrap",
               isActive
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60",
+                ? "bg-white text-black font-semibold shadow-xs"
+                : "text-neutral-600 hover:text-black hover:bg-neutral-200/50",
             )}
           >
             <span>{tab.label}</span>

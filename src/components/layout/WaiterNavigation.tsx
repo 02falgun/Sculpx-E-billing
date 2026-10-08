@@ -9,16 +9,11 @@ import {
   Grid3X3,
   FileText,
   UtensilsCrossed,
-  LogOut,
-  Bell,
-  Sparkles,
 } from "lucide-react";
+import { UserWorkspaceMenu } from "./UserWorkspaceMenu";
 
 export function WaiterNavigation() {
   const pathname = usePathname();
-  const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
 
   const navLinks = [
     { href: "/staff", label: "Overview", icon: LayoutDashboard },
@@ -28,17 +23,19 @@ export function WaiterNavigation() {
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-900 text-white shadow-sm">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+    <header className="sticky top-0 z-40 border-b border-neutral-800 bg-black text-white">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
         {/* Brand & Floor Name */}
         <div className="flex items-center gap-6">
           <Link href="/staff" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 font-black text-slate-950 text-sm">
-              W
+            <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-white font-bold text-black text-xs">
+              S
             </div>
             <div className="flex flex-col text-left">
-              <span className="text-sm font-bold tracking-tight">SCULPX Floor Staff</span>
-              <span className="text-[10px] text-slate-400">Waitstaff & Table Service</span>
+              <span className="text-xs font-bold tracking-tight text-white uppercase">
+                SCULPX Staff
+              </span>
+              <span className="text-[10px] text-neutral-400">Waitstaff &amp; Floor</span>
             </div>
           </Link>
 
@@ -55,13 +52,13 @@ export function WaiterNavigation() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition-all ${
+                  className={`flex items-center gap-2 rounded-[6px] px-3 py-1.5 text-xs font-medium transition-colors ${
                     isActive
-                      ? "bg-slate-800 text-amber-400 shadow-inner"
-                      : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
+                      ? "bg-neutral-900 text-white font-semibold border border-neutral-700"
+                      : "text-neutral-400 hover:bg-neutral-900 hover:text-white"
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-3.5 w-3.5" />
                   <span>{link.label}</span>
                 </Link>
               );
@@ -69,39 +66,26 @@ export function WaiterNavigation() {
           </nav>
         </div>
 
-        {/* Right side: User & Quick POS trigger */}
+        {/* Right side: Quick POS trigger & Shared User Menu */}
         <div className="flex items-center gap-3">
           <Link href="/staff/pos" className="hidden sm:block">
             <button
               type="button"
-              className="flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-3.5 py-2 text-xs shadow-sm cursor-pointer transition-all active:scale-95"
+              className="flex items-center gap-1.5 rounded-[6px] bg-white hover:bg-neutral-100 text-black font-semibold px-3 py-1.5 text-xs border border-white cursor-pointer transition-colors"
             >
               <UtensilsCrossed className="h-3.5 w-3.5" />
               <span>Take Order</span>
             </button>
           </Link>
 
-          <div className="hidden sm:flex flex-col text-right">
-            <span className="text-xs font-bold text-white">{user?.name || "Rahul (Waiter)"}</span>
-            <span className="text-[10px] text-amber-400 font-medium">Floor Staff</span>
+          <div className="pl-2 border-l border-neutral-800">
+            <UserWorkspaceMenu theme="dark" />
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              logout();
-              router.push("/login");
-            }}
-            title="Sign out to Login"
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 text-slate-400 hover:bg-rose-900/40 hover:text-rose-300 transition-colors cursor-pointer"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
         </div>
       </div>
 
       {/* Mobile Secondary Sub-nav */}
-      <div className="flex md:hidden border-t border-slate-800 px-3 py-1.5 justify-around bg-slate-950/80">
+      <div className="flex md:hidden border-t border-neutral-800 px-3 py-1.5 justify-around bg-neutral-950">
         {navLinks.map((link) => {
           const Icon = link.icon;
           const isActive =
@@ -113,11 +97,11 @@ export function WaiterNavigation() {
             <Link
               key={link.href}
               href={link.href}
-              className={`flex flex-col items-center gap-1 py-1 px-2 text-[10px] font-bold ${
-                isActive ? "text-amber-400" : "text-slate-400"
+              className={`flex flex-col items-center gap-1 py-1 px-2 text-[10px] font-medium ${
+                isActive ? "text-white font-bold" : "text-neutral-400"
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-3.5 w-3.5" />
               <span>{link.label}</span>
             </Link>
           );

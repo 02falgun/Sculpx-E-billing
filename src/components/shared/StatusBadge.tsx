@@ -30,7 +30,7 @@ export function StatusBadge({ status, type = "order", className }: StatusBadgePr
     switch (status) {
       case "PLACED":
       case "PENDING_VALIDATION":
-        variant = "warning";
+        variant = "outline";
         break;
       case "CONFIRMED":
         variant = "secondary";
@@ -39,11 +39,11 @@ export function StatusBadge({ status, type = "order", className }: StatusBadgePr
         variant = "accent";
         break;
       case "READY":
-        variant = "warning";
+        variant = "default";
         break;
       case "SERVED":
       case "COMPLETED":
-        variant = "success";
+        variant = "default";
         break;
       case "CANCELLED":
         variant = "destructive";
@@ -53,36 +53,36 @@ export function StatusBadge({ status, type = "order", className }: StatusBadgePr
     label = KOT_STATUS_LABELS[status as KOTStatus] || status;
     switch (status) {
       case "NEW":
-        variant = "destructive";
+        variant = "outline";
         break;
       case "ACCEPTED":
         variant = "secondary";
         break;
       case "PREPARING":
-        variant = "warning";
+        variant = "accent";
         break;
       case "READY":
-        variant = "success";
-        break;
-      case "SERVED":
         variant = "default";
         break;
+      case "SERVED":
+        variant = "secondary";
+        break;
       case "CANCELLED":
-        variant = "outline";
+        variant = "destructive";
         break;
     }
   } else if (type === "bill") {
     label = BILL_STATUS_LABELS[status as BillStatus] || status;
     switch (status) {
       case "DRAFT":
-        variant = "secondary";
+        variant = "outline";
         break;
       case "ISSUED":
       case "PARTIALLY_PAID":
-        variant = "warning";
+        variant = "secondary";
         break;
       case "PAID":
-        variant = "success";
+        variant = "default";
         break;
       case "VOIDED":
         variant = "destructive";
@@ -92,10 +92,10 @@ export function StatusBadge({ status, type = "order", className }: StatusBadgePr
     label = PAYMENT_STATUS_LABELS[status as PaymentStatus] || status;
     switch (status) {
       case "PENDING":
-        variant = "warning";
+        variant = "outline";
         break;
       case "SUCCESS":
-        variant = "success";
+        variant = "default";
         break;
       case "FAILED":
       case "REFUNDED":

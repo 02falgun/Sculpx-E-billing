@@ -41,30 +41,30 @@ export function Drawer({
     <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/40 transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
 
       <div
         className={cn(
-          "fixed z-10 bg-white shadow-2xl transition-all duration-300 ease-out",
+          "fixed z-10 bg-white shadow-xl transition-all duration-300 ease-out border-neutral-200",
           position === "bottom" &&
-            "inset-x-0 bottom-0 max-h-[90vh] rounded-t-3xl p-6 overflow-y-auto animate-in slide-in-from-bottom",
+            "inset-x-0 bottom-0 max-h-[90vh] rounded-t-xl border-t p-6 overflow-y-auto animate-in slide-in-from-bottom",
           position === "right" &&
-            "inset-y-0 right-0 w-full max-w-md p-6 overflow-y-auto animate-in slide-in-from-right",
+            "inset-y-0 right-0 w-full max-w-md border-l p-6 overflow-y-auto animate-in slide-in-from-right",
         )}
         role="dialog"
         aria-modal="true"
       >
         {/* Mobile handle indicator */}
         {position === "bottom" && (
-          <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200" />
+          <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-neutral-300" />
         )}
 
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div className="flex items-center justify-between pb-3 border-b border-neutral-200">
           {title ? (
-            <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+            <h2 className="text-base font-bold text-neutral-900">{title}</h2>
           ) : (
             <div />
           )}
@@ -72,9 +72,9 @@ export function Drawer({
             type="button"
             onClick={onClose}
             aria-label="Close drawer"
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            className="rounded-[4px] p-1 text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors cursor-pointer"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 

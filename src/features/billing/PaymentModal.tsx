@@ -123,13 +123,13 @@ export function PaymentModal({
             <button
               type="button"
               onClick={() => setSelectedMethod("ROOM_CHARGE")}
-              className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer ${
+              className={`flex flex-col items-center justify-center p-3 rounded-lg border text-center transition-all cursor-pointer ${
                 selectedMethod === "ROOM_CHARGE"
-                  ? "border-amber-500 bg-amber-50/50 text-amber-900 font-bold ring-2 ring-amber-400/30"
-                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  ? "border-black bg-neutral-100 text-black font-semibold shadow-xs"
+                  : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"
               }`}
             >
-              <Building2 className="h-5 w-5 mb-1 text-blue-600" />
+              <Building2 className="h-4 w-4 mb-1 text-neutral-800" />
               <span className="text-xs">Room Folio</span>
             </button>
           )}
@@ -137,39 +137,39 @@ export function PaymentModal({
           <button
             type="button"
             onClick={() => setSelectedMethod("UPI")}
-            className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center p-3 rounded-lg border text-center transition-all cursor-pointer ${
               selectedMethod === "UPI"
-                ? "border-amber-500 bg-amber-50/50 text-amber-900 font-bold ring-2 ring-amber-400/30"
-                : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                ? "border-black bg-neutral-100 text-black font-semibold shadow-xs"
+                : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"
             }`}
           >
-            <QrCode className="h-5 w-5 mb-1 text-emerald-600" />
+            <QrCode className="h-4 w-4 mb-1 text-neutral-800" />
             <span className="text-xs">UPI QR</span>
           </button>
 
           <button
             type="button"
             onClick={() => setSelectedMethod("CARD")}
-            className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center p-3 rounded-lg border text-center transition-all cursor-pointer ${
               selectedMethod === "CARD"
-                ? "border-amber-500 bg-amber-50/50 text-amber-900 font-bold ring-2 ring-amber-400/30"
-                : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                ? "border-black bg-neutral-100 text-black font-semibold shadow-xs"
+                : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"
             }`}
           >
-            <CreditCard className="h-5 w-5 mb-1 text-indigo-600" />
+            <CreditCard className="h-4 w-4 mb-1 text-neutral-800" />
             <span className="text-xs">Card</span>
           </button>
 
           <button
             type="button"
             onClick={() => setSelectedMethod("CASH")}
-            className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center p-3 rounded-lg border text-center transition-all cursor-pointer ${
               selectedMethod === "CASH"
-                ? "border-amber-500 bg-amber-50/50 text-amber-900 font-bold ring-2 ring-amber-400/30"
-                : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                ? "border-black bg-neutral-100 text-black font-semibold shadow-xs"
+                : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"
             }`}
           >
-            <Banknote className="h-5 w-5 mb-1 text-amber-600" />
+            <Banknote className="h-4 w-4 mb-1 text-neutral-800" />
             <span className="text-xs">Cash Desk</span>
           </button>
         </div>
@@ -250,7 +250,7 @@ export function PaymentModal({
                 placeholder="Card Number (XXXX XXXX XXXX XXXX)"
                 value={cardNumber}
                 onChange={(e) => setCardNumber(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none"
+                className="w-full rounded-md border border-neutral-300 bg-white p-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-black focus:outline-none"
               />
               <div className="grid grid-cols-2 gap-2">
                 <input
@@ -259,7 +259,7 @@ export function PaymentModal({
                   maxLength={5}
                   value={cardExpiry}
                   onChange={(e) => setCardExpiry(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none"
+                  className="w-full rounded-md border border-neutral-300 bg-white p-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-black focus:outline-none"
                 />
                 <input
                   type="password"
@@ -267,7 +267,7 @@ export function PaymentModal({
                   maxLength={4}
                   value={cardCvv}
                   onChange={(e) => setCardCvv(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none"
+                  className="w-full rounded-md border border-neutral-300 bg-white p-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-black focus:outline-none"
                 />
               </div>
             </div>
@@ -275,12 +275,12 @@ export function PaymentModal({
 
           {/* 4. CASH */}
           {selectedMethod === "CASH" && (
-            <div className="space-y-2 text-xs text-slate-700">
-              <div className="flex items-center gap-2 font-bold text-slate-900">
-                <Banknote className="h-4 w-4 text-amber-600" />
+            <div className="space-y-2 text-xs text-neutral-700">
+              <div className="flex items-center gap-2 font-bold text-neutral-900">
+                <Banknote className="h-4 w-4 text-neutral-900" />
                 <span>Cash Payment at Table / Counter</span>
               </div>
-              <p className="text-slate-500">
+              <p className="text-neutral-500">
                 Hand cash directly to your floor captain or pay at the central billing desk. Staff will confirm receipt on the POS terminal.
               </p>
             </div>
@@ -288,8 +288,8 @@ export function PaymentModal({
         </div>
 
         {/* Security watermark */}
-        <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 text-center">
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+        <div className="flex items-center justify-center gap-1.5 text-[11px] text-neutral-400 text-center">
+          <ShieldCheck className="h-3.5 w-3.5 text-neutral-600" />
           <span>PCI-DSS 256-bit encrypted transaction simulation</span>
         </div>
 
@@ -301,10 +301,10 @@ export function PaymentModal({
             size="lg"
             isLoading={isPending}
             onClick={handleSubmitPayment}
-            className="w-full font-bold shadow-md shadow-amber-600/25"
+            className="w-full font-semibold"
           >
             <span>Confirm Payment • </span>
-            <CurrencyDisplay amount={totalToPay} className="text-white ml-1 font-black" />
+            <CurrencyDisplay amount={totalToPay} className="text-white ml-1 font-bold" />
           </Button>
         </div>
       </div>

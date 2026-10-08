@@ -38,8 +38,8 @@ export function MenuSearchAndFilter({
           className={cn(
             "rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
             dietaryFilter === "ALL"
-              ? "bg-slate-900 text-white shadow-xs"
-              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50",
+              ? "bg-black text-white shadow-xs"
+              : "bg-white text-neutral-800 border border-neutral-200 hover:bg-neutral-50",
           )}
         >
           All
@@ -49,10 +49,10 @@ export function MenuSearchAndFilter({
           type="button"
           onClick={() => onDietaryFilterChange("VEG")}
           className={cn(
-            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
+            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
             dietaryFilter === "VEG"
-              ? "bg-emerald-700 text-white shadow-xs"
-              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50",
+              ? "bg-black text-white shadow-xs"
+              : "bg-white text-neutral-800 border border-neutral-200 hover:bg-neutral-50",
           )}
         >
           <DietIndicator type="VEG" />
@@ -63,10 +63,10 @@ export function MenuSearchAndFilter({
           type="button"
           onClick={() => onDietaryFilterChange("NON_VEG")}
           className={cn(
-            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
+            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
             dietaryFilter === "NON_VEG"
-              ? "bg-rose-700 text-white shadow-xs"
-              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50",
+              ? "bg-black text-white shadow-xs"
+              : "bg-white text-neutral-800 border border-neutral-200 hover:bg-neutral-50",
           )}
         >
           <DietIndicator type="NON_VEG" />
@@ -77,10 +77,10 @@ export function MenuSearchAndFilter({
           type="button"
           onClick={() => onDietaryFilterChange("BESTSELLER")}
           className={cn(
-            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
+            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
             dietaryFilter === "BESTSELLER"
-              ? "bg-amber-700 text-white shadow-xs"
-              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50",
+              ? "bg-black text-white shadow-xs"
+              : "bg-white text-neutral-800 border border-neutral-200 hover:bg-neutral-50",
           )}
         >
           <span>Popular / Bestsellers</span>
@@ -90,13 +90,13 @@ export function MenuSearchAndFilter({
           type="button"
           onClick={() => onDietaryFilterChange("CHEF_SPECIAL")}
           className={cn(
-            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
+            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
             dietaryFilter === "CHEF_SPECIAL"
-              ? "bg-purple-700 text-white shadow-xs"
-              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50",
+              ? "bg-black text-white shadow-xs"
+              : "bg-white text-neutral-800 border border-neutral-200 hover:bg-neutral-50",
           )}
         >
-          <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+          <Sparkles className="h-3.5 w-3.5" />
           <span>Chef Specials</span>
         </button>
       </div>
