@@ -20,10 +20,10 @@ import {
 export default function HomePage() {
   const customerEntryPoints = [
     {
-      title: "Table 5 Dining QR",
-      context: "Table 5 • Heritage Dining Pavilion",
+      title: "Table 05 Dining QR",
+      context: "Table 05 • Heritage Dining Pavilion",
       desc: "Simulate a restaurant guest scanning a table QR code. Browse categorized digital menus, customize portion modifiers, send live orders to the kitchen, and view digital GST tax invoices.",
-      href: "/menu/table-token-5",
+      href: "/menu/table/T05",
       type: "DINE-IN TABLE",
       icon: UtensilsCrossed,
       color: "bg-amber-600 text-white",
@@ -34,7 +34,7 @@ export default function HomePage() {
       title: "Room 301 In-Room Dining QR",
       context: "Room 301 • Deluxe Palace Suite",
       desc: "Simulate an in-room dining guest ordering from bed or desk. Select culinary specialties with specific chef instructions, charge food directly to the room folio, and receive order status updates.",
-      href: "/menu/room-token-301",
+      href: "/menu/room/301",
       type: "IN-ROOM SERVICE",
       icon: BedDouble,
       color: "bg-slate-900 text-amber-400",
@@ -45,32 +45,50 @@ export default function HomePage() {
 
   const operationalPortals = [
     {
-      title: "Staff Point of Sale (POS)",
-      role: "Waitstaff & Cashiers",
-      desc: "Floor table occupancies, fast table-side order entry, fire orders to kitchen lines, and central billing settlement desk.",
-      href: "/dashboard",
+      title: "Waiter / Floor Staff",
+      role: "Waitstaff & Captains",
+      desc: "Table occupancy overview, quick table-side order entry, fire KOT tickets, and immediate service attention requests.",
+      href: "/staff",
       icon: UtensilsCrossed,
-      badge: "Floor Operations",
-      highlight: "Table management & tickets",
+      badge: "Floor Velocity",
+      highlight: "Speed + tables + POS",
+    },
+    {
+      title: "Cashier Settlement Desk",
+      role: "Cashiers & Front Desk",
+      desc: "Instant GST invoice settlement, UPI QR/Card processing, bill splitting, courtesy discounts, and thermal receipts.",
+      href: "/cashier",
+      icon: Receipt,
+      badge: "Financial Desk",
+      highlight: "Today's collections & billing",
     },
     {
       title: "Kitchen Display System (KDS)",
-      role: "Chefs & Expedite Line",
-      desc: "High-contrast commercial KOT board with real-time cooking timers, overdue urgency alerts, and one-tap prep progression.",
+      role: "Expediters & Chefs",
+      desc: "High-contrast multi-column KOT board with real-time cooking timers, overdue urgency alerts, and one-tap prep progression.",
       href: "/kitchen",
       icon: ChefHat,
-      badge: "Kitchen Expedite",
-      highlight: "Wall-mount ready display",
+      badge: "Kitchen Line",
+      highlight: "Touch-friendly cook line display",
       targetBlank: true,
     },
     {
-      title: "Hotel Admin Back-Office",
-      role: "Management & Auditors",
-      desc: "Full menu catalog manager, 86 sold-out inventory toggles, thermal printer fleet diagnostics, and QR tent card generator.",
-      href: "/admin",
+      title: "Floor Manager Operations",
+      role: "Restaurant Managers",
+      desc: "Real-time floor velocity, hardware alerts (printer offline), delayed order bottlenecks, and shift exceptions.",
+      href: "/manager",
       icon: ShieldCheck,
+      badge: "Shift Governance",
+      highlight: "Operational exceptions & status",
+    },
+    {
+      title: "Hotel Admin & QR Studio",
+      role: "Management & Owners",
+      desc: "Full menu catalog manager, real scannable QR generator with tent card exporter, thermal printer fleet, and audit logs.",
+      href: "/admin",
+      icon: QrCode,
       badge: "System Administration",
-      highlight: "Hardware fleet & catalog",
+      highlight: "QR engine & hardware fleet",
     },
   ];
 
@@ -128,7 +146,7 @@ export default function HomePage() {
             </div>
 
             <Link
-              href="/dashboard"
+              href="/login"
               className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition-colors shadow-xs"
             >
               <span>Staff Login</span>

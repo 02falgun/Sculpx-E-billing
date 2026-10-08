@@ -17,6 +17,7 @@ export interface User extends Timestamped {
   avatarUrl?: string;
   phoneNumber?: string;
   isActive: boolean;
+  permissions?: string[];
 }
 
 export interface AuthSession {

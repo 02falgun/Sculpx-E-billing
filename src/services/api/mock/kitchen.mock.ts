@@ -5,7 +5,7 @@ import { MOCK_KOTS } from "@/mocks/mockDb";
 const delay = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class MockKitchenService implements IKitchenService {
-  private kots: KOT[] = [...MOCK_KOTS];
+  private kots: KOT[] = MOCK_KOTS;
 
   async getActiveKOTs(): Promise<ApiResponse<KOT[]>> {
     await delay(150);

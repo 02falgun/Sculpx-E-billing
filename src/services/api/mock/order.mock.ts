@@ -7,11 +7,16 @@ import {
   OrderValidationResult,
   PaginatedResult,
   PaginationParams,
+  KOT,
+  Bill,
 } from "@/types";
 import {
   MOCK_ORDERS,
   MOCK_MENU_ITEMS,
   MOCK_QR_CONTEXTS,
+  MOCK_KOTS,
+  MOCK_BILLS,
+  MOCK_TABLES,
 } from "@/mocks/mockDb";
 
 const delay = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -143,6 +148,79 @@ export class MockOrderService implements IOrderService {
     };
 
     this.orders.unshift(newOrder);
+
+    // 1. Synchronize to Kitchen KDS (create new KOT ticket)
+    const kotId = `kot-${Date.now()}`;
+    const newKOT: KOT = {
+      id: kotId,
+      kotNumber: `KOT-${Math.floor(1000 + Math.random() * 9000)}`,
+      orderId: newOrder.id,
+      orderNumber: newOrder.orderNumber,
+      qrContext: context,
+      status: "NEW",
+      urgency: "NORMAL",
+      items: newOrder.items.map((it) => ({
+        id: it.id,
+        menuItemId: it.menuItemId,
+        name: it.name,
+        quantity: it.quantity,
+        modifiers: it.modifiers,
+        specialInstructions: it.specialInstructions,
+        status: "PENDING",
+      })),
+      specialNotes: payload.specialInstructions,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    MOCK_KOTS.unshift(newKOT);
+
+    // 2. Synchronize to Cashier Invoices (create new Bill)
+    const billId = `bill-${Date.now()}`;
+    const newBill: Bill = {
+      id: billId,
+      billNumber: `BILL-${Math.floor(1000 + Math.random() * 9000)}`,
+      orderId: newOrder.id,
+      orderNumber: newOrder.orderNumber,
+      qrContext: context,
+      status: "ISSUED",
+      items: newOrder.items.map((it) => ({
+        id: it.id,
+        name: it.name,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        totalPrice: it.totalPrice,
+      })),
+      subtotal: newOrder.subtotal,
+      discounts: [],
+      totalDiscount: 0,
+      taxes: [
+        { name: "CGST (2.5%)", ratePercentage: 2.5, amount: Math.round(newOrder.subtotal * 0.025 * 100) / 100 },
+        { name: "SGST (2.5%)", ratePercentage: 2.5, amount: Math.round(newOrder.subtotal * 0.025 * 100) / 100 },
+      ],
+      totalTax: newOrder.taxTotal,
+      roundOff: 0,
+      grandTotal: newOrder.grandTotal,
+      paidAmount: 0,
+      dueAmount: newOrder.grandTotal,
+      payments: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    MOCK_BILLS.unshift(newBill);
+
+    // 3. Synchronize to Waiter Floor Tables
+    if (context.type === "TABLE") {
+      const cleanIdent = context.identifier.replace(/^0+/, "");
+      const tbl = MOCK_TABLES.find(
+        (t) => t.tableNumber === context.identifier || t.tableNumber === cleanIdent
+      );
+      if (tbl) {
+        tbl.status = "OCCUPIED";
+        tbl.activeOrderId = newOrder.id;
+        tbl.activeBillId = newBill.id;
+      }
+    }
+
     return { success: true, data: newOrder, message: "Order placed successfully" };
   }
 

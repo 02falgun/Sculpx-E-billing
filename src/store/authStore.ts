@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { AuthSession, User } from "@/types";
+import { DEMO_USERS, mockAuthenticate } from "@/utils/auth";
 
 interface AuthStoreState {
   session: AuthSession | null;
@@ -9,6 +10,8 @@ interface AuthStoreState {
 
   setSession: (session: AuthSession) => void;
   clearSession: () => void;
+  logout: () => void;
+  switchRole: (roleKey: string) => AuthSession | null;
 }
 
 export const useAuthStore = create<AuthStoreState>()(
@@ -31,6 +34,27 @@ export const useAuthStore = create<AuthStoreState>()(
           user: null,
           isAuthenticated: false,
         }),
+
+      logout: () =>
+        set({
+          session: null,
+          user: null,
+          isAuthenticated: false,
+        }),
+
+      switchRole: (roleKey: string) => {
+        const demoUser = DEMO_USERS[roleKey];
+        if (!demoUser) return null;
+        const session = mockAuthenticate(demoUser.user.email);
+        if (session) {
+          set({
+            session,
+            user: session.user,
+            isAuthenticated: true,
+          });
+        }
+        return session;
+      },
     }),
     {
       name: "restro_staff_auth",

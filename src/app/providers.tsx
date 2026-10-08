@@ -6,6 +6,7 @@ import { createQueryClient } from "@/lib/query-client";
 import { CartDrawer } from "@/features/cart/CartDrawer";
 import { ToastContainer } from "@/components/ui/Toast";
 import { PWARegister } from "@/components/common/PWARegister";
+import { DemoRoleSwitcher } from "@/components/common/DemoRoleSwitcher";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   // QueryClient initialized once per client session
@@ -17,6 +18,8 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       <CartDrawer />
       <ToastContainer />
       <PWARegister />
+      <DemoRoleSwitcher />
     </QueryClientProvider>
   );
 }
+

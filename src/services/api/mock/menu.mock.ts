@@ -15,7 +15,51 @@ export class MockMenuService implements IMenuService {
 
   async getContextByQrToken(qrToken: string): Promise<ApiResponse<QRContext>> {
     await delay(100);
-    const context = this.contexts[qrToken];
+    // 1. Direct match in registered contexts
+    let context = this.contexts[qrToken] || MOCK_QR_CONTEXTS[qrToken];
+
+    // 2. Dynamic resolution for table patterns (e.g. T01, T05, table-5, 5)
+    if (!context) {
+      const lower = qrToken.toLowerCase();
+      if (lower.startsWith("table-") || lower.startsWith("t") || /^\d+$/.test(qrToken)) {
+        const rawNum = qrToken.replace(/^table-?/i, "").replace(/^t/i, "");
+        const formattedNum = rawNum.padStart(2, "0");
+        context = {
+          token: qrToken,
+          type: "TABLE",
+          identifier: rawNum,
+          displayName: `Table ${formattedNum}`,
+          hotelId: "htl-grand-1",
+          hotelName: "The Grand Royal Palace & Resort",
+          locationDetails: {
+            section: "Main Dining",
+            capacity: 4,
+          },
+          isActive: true,
+          activeOrderId: "ord-1001",
+          activeBillId: "bill-1001",
+        };
+        this.contexts[qrToken] = context;
+        MOCK_QR_CONTEXTS[qrToken] = context;
+      } else if (lower.startsWith("room-") || lower.startsWith("r") || /^\d{3,}$/.test(qrToken)) {
+        const rawNum = qrToken.replace(/^room-?/i, "").replace(/^r/i, "");
+        context = {
+          token: qrToken,
+          type: "ROOM",
+          identifier: rawNum,
+          displayName: `Room ${rawNum}`,
+          hotelId: "htl-grand-1",
+          hotelName: "The Grand Royal Palace & Resort",
+          locationDetails: {
+            floor: `${rawNum.charAt(0)}th Floor`,
+          },
+          isActive: true,
+        };
+        this.contexts[qrToken] = context;
+        MOCK_QR_CONTEXTS[qrToken] = context;
+      }
+    }
+
     if (!context) {
       return {
         success: false,
