@@ -1,0 +1,111 @@
+import * as React from "react";
+import { Badge } from "@/components/ui/Badge";
+import {
+  OrderStatus,
+  KOTStatus,
+  BillStatus,
+  PaymentStatus,
+} from "@/types";
+import {
+  ORDER_STATUS_LABELS,
+  KOT_STATUS_LABELS,
+  BILL_STATUS_LABELS,
+  PAYMENT_STATUS_LABELS,
+} from "@/constants";
+
+export interface StatusBadgeProps {
+  status: OrderStatus | KOTStatus | BillStatus | PaymentStatus;
+  type?: "order" | "kot" | "bill" | "payment";
+  className?: string;
+}
+
+export function StatusBadge({ status, type = "order", className }: StatusBadgeProps) {
+  let label: string = status;
+  let variant: "default" | "secondary" | "success" | "warning" | "destructive" | "outline" | "accent" =
+    "secondary";
+
+  if (type === "order") {
+    label = ORDER_STATUS_LABELS[status as OrderStatus] || status;
+    switch (status) {
+      case "PLACED":
+      case "PENDING_VALIDATION":
+        variant = "warning";
+        break;
+      case "CONFIRMED":
+        variant = "secondary";
+        break;
+      case "PREPARING":
+        variant = "accent";
+        break;
+      case "READY":
+        variant = "warning";
+        break;
+      case "SERVED":
+      case "COMPLETED":
+        variant = "success";
+        break;
+      case "CANCELLED":
+        variant = "destructive";
+        break;
+    }
+  } else if (type === "kot") {
+    label = KOT_STATUS_LABELS[status as KOTStatus] || status;
+    switch (status) {
+      case "NEW":
+        variant = "destructive";
+        break;
+      case "ACCEPTED":
+        variant = "secondary";
+        break;
+      case "PREPARING":
+        variant = "warning";
+        break;
+      case "READY":
+        variant = "success";
+        break;
+      case "SERVED":
+        variant = "default";
+        break;
+      case "CANCELLED":
+        variant = "outline";
+        break;
+    }
+  } else if (type === "bill") {
+    label = BILL_STATUS_LABELS[status as BillStatus] || status;
+    switch (status) {
+      case "DRAFT":
+        variant = "secondary";
+        break;
+      case "ISSUED":
+      case "PARTIALLY_PAID":
+        variant = "warning";
+        break;
+      case "PAID":
+        variant = "success";
+        break;
+      case "VOIDED":
+        variant = "destructive";
+        break;
+    }
+  } else if (type === "payment") {
+    label = PAYMENT_STATUS_LABELS[status as PaymentStatus] || status;
+    switch (status) {
+      case "PENDING":
+        variant = "warning";
+        break;
+      case "SUCCESS":
+        variant = "success";
+        break;
+      case "FAILED":
+      case "REFUNDED":
+        variant = "destructive";
+        break;
+    }
+  }
+
+  return (
+    <Badge variant={variant} className={className}>
+      {label}
+    </Badge>
+  );
+}

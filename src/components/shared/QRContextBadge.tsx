@@ -1,0 +1,28 @@
+import * as React from "react";
+import { QRContext } from "@/types";
+import { BedDouble, UtensilsCrossed } from "lucide-react";
+
+export interface QRContextBadgeProps {
+  context: QRContext | null;
+  className?: string;
+}
+
+export function QRContextBadge({ context, className }: QRContextBadgeProps) {
+  if (!context) return null;
+
+  const isRoom = context.type === "ROOM";
+
+  return (
+    <div
+      className={`inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-1.5 text-xs text-white shadow-sm ${className || ""}`}
+    >
+      <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500 text-white">
+        {isRoom ? <BedDouble className="h-3.5 w-3.5" /> : <UtensilsCrossed className="h-3.5 w-3.5" />}
+      </div>
+      <div className="flex flex-col text-left leading-tight">
+        <span className="font-bold">{context.displayName}</span>
+        <span className="text-[10px] text-slate-400">{context.hotelName}</span>
+      </div>
+    </div>
+  );
+}

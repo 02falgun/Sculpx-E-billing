@@ -1,0 +1,60 @@
+import { useQuery } from "@tanstack/react-query";
+import { menuApi } from "@/services/api";
+
+export function useQRContext(qrToken: string) {
+  return useQuery({
+    queryKey: ["menu", "context", qrToken],
+    queryFn: async () => {
+      const res = await menuApi.getContextByQrToken(qrToken);
+      if (!res.success) {
+        throw new Error(res.error?.message || "Failed to resolve QR token");
+      }
+      return res.data;
+    },
+    enabled: !!qrToken,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
+export function useCategories() {
+  return useQuery({
+    queryKey: ["menu", "categories"],
+    queryFn: async () => {
+      const res = await menuApi.getCategories();
+      if (!res.success) {
+        throw new Error(res.error?.message || "Failed to load categories");
+      }
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useMenuItems(params?: { categoryId?: string; search?: string }) {
+  return useQuery({
+    queryKey: ["menu", "items", params?.categoryId || "all", params?.search || ""],
+    queryFn: async () => {
+      const res = await menuApi.getMenuItems(params);
+      if (!res.success) {
+        throw new Error(res.error?.message || "Failed to load menu items");
+      }
+      return res.data;
+    },
+    staleTime: 3 * 60 * 1000,
+  });
+}
+
+export function useMenuItem(id: string) {
+  return useQuery({
+    queryKey: ["menu", "item", id],
+    queryFn: async () => {
+      const res = await menuApi.getMenuItemById(id);
+      if (!res.success) {
+        throw new Error(res.error?.message || "Failed to load item detail");
+      }
+      return res.data;
+    },
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  });
+}
