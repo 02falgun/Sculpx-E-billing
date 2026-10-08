@@ -2,6 +2,18 @@
 
 All notable changes to the Hotel Restaurant QR E-Billing platform will be documented in this file.
 
+## [Phase 9: Admin Back-Office, Hardware Fleet & QR Provisioning] - 2026-10-09
+
+### Added
+- **Admin Layout & Navigation (`/admin`)**: Built persistent responsive admin shell in `src/app/admin/layout.tsx` with `AdminSidebar` containing deep navigation and direct links to POS, Floor, and KDS.
+- **Admin Dashboard Overview (`AdminDashboardOverview`)**: Executive dashboard tracking today's gross revenue, active orders, live table occupancy, printer network health, and category performance.
+- **Menu Catalog Management Route (`/admin/menu`)**: Built `MenuCatalogManager` enabling item search, category filtering, price inspection, 86-list instant availability toggling, and new dish creation.
+- **Thermal Printer Fleet Management Route (`/admin/printers`)**: Built `PrinterFleetManager` managing ESC/POS network and USB thermal printers across KOT, Bar, and Front Cashier with live status badges, paper level indicators, and a print job history queue with instant retry.
+- **QR Code Tent Card Provisioning Route (`/admin/qr`)**: Built `QRCodeGeneratorManager` generating dynamic SVG QR codes with table badges, deep-linked URLs, live single-table previews, and print-ready multi-table tent cards.
+- **Custom Hardware Hooks**: Added `usePrinters`, `usePrintJobs`, `useCreatePrintJob`, `useRetryPrintJob` in `src/hooks/usePrinters.ts`.
+- **Automated Verification**: Added 3 new test suites (`menuCatalogManager.test.tsx`, `printerFleetManager.test.tsx`, `printerManagement.test.ts`), bringing total to 80 passing assertions across 31 suites.
+- **Architecture Decision Record**: Authored ADR-0013 for Admin Back-Office Operations, Hardware Fleet Management & QR Provisioning.
+
 ## [Phase 8: Active Orders Management & Settlement Billing Desk] - 2026-10-09
 
 ### Added
