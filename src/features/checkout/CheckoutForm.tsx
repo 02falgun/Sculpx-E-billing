@@ -31,6 +31,7 @@ export function CheckoutForm() {
     control,
     handleSubmit,
     register,
+    watch,
     formState: { errors },
   } = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutFormSchema),
@@ -41,6 +42,9 @@ export function CheckoutForm() {
       paymentPreference: "PAY_NOW",
     },
   });
+
+  const selectedPaymentPref = watch("paymentPreference");
+  const isRoom = qrContext?.type === "ROOM";
 
   const onSubmit = async (data: CheckoutFormData) => {
     if (!qrContext) {
@@ -110,11 +114,34 @@ export function CheckoutForm() {
         </div>
       )}
 
+      {/* Dining Context Reassurance Banner */}
+      {qrContext && (
+        <div className="flex items-center justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-800 border border-amber-200/60 font-bold text-xs">
+              {isRoom ? "ROOM" : "TABLE"}
+            </div>
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                {isRoom ? "In-Room Dining" : "Restaurant Dine-In"}
+              </span>
+              <h4 className="text-sm font-bold text-slate-900 leading-tight">
+                {isRoom ? `Deliver to Room ${qrContext.identifier}` : `Dining at Table ${qrContext.identifier}`}
+              </h4>
+              <p className="text-[11px] text-slate-500">{qrContext.hotelName || "The Grand Royal Palace & Resort"}</p>
+            </div>
+          </div>
+          <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+            {qrContext.displayName}
+          </span>
+        </div>
+      )}
+
       {/* Guest Information */}
       <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-4">
         <div className="border-b border-slate-100 pb-2">
           <h3 className="text-sm font-semibold text-slate-900">Guest Information</h3>
-          <p className="text-xs text-slate-500">Optional for e-bill SMS receipts & kitchen contact</p>
+          <p className="text-xs text-slate-500">Optional for e-bill SMS receipts &amp; kitchen contact</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -188,13 +215,19 @@ export function CheckoutForm() {
           className="w-full font-semibold shadow-xs"
           rightIcon={<ArrowRight className="h-4 w-4" />}
         >
-          <span>Confirm & Place Order • </span>
+          {selectedPaymentPref === "PAY_NOW" ? (
+            <span>Pay &amp; Place Order • </span>
+          ) : isRoom ? (
+            <span>Post to Room Folio &amp; Place Order • </span>
+          ) : (
+            <span>Place Order (Pay at Table) • </span>
+          )}
           <CurrencyDisplay amount={summary.estimatedTotal} className="text-white ml-1 font-bold" />
         </Button>
 
         <div className="flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400">
           <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-          <span>Encrypted transmission to hotel POS & kitchen display system</span>
+          <span>Encrypted transmission to hotel POS &amp; kitchen display system</span>
         </div>
       </div>
     </form>

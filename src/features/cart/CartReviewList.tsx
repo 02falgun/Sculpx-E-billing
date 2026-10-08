@@ -171,9 +171,20 @@ export function CartReviewList() {
         </div>
       </div>
 
-      {/* Checkout Action Button */}
-      <div className="pt-2">
-        <Link href="/checkout" className="block w-full">
+      {/* Checkout Action Button & Continue Browsing */}
+      <div className="pt-2 flex flex-col sm:flex-row gap-3">
+        <Link href={menuLink} className="sm:w-1/3 order-2 sm:order-1">
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full font-semibold text-xs"
+            leftIcon={<ArrowLeft className="h-4 w-4" />}
+          >
+            Continue Browsing
+          </Button>
+        </Link>
+
+        <Link href="/checkout" className="sm:w-2/3 order-1 sm:order-2">
           <Button
             variant="primary"
             size="lg"

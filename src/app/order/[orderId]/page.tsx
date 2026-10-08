@@ -144,9 +144,26 @@ export default function OrderTrackingPage({ params }: OrderTrackingPageProps) {
               className="w-full font-semibold shadow-xs"
               leftIcon={<Receipt className="h-4 w-4" />}
             >
-              View Digital E-Bill & Settle
+              View Digital E-Bill &amp; Settle
             </Button>
           </Link>
+        )}
+
+        {/* Order Again for completed or served dining sessions */}
+        {(order.status === "SERVED" || order.status === "COMPLETED") && (
+          <div className="pt-1">
+            <Link href={`/menu/${order.qrContext.token}`} className="block w-full">
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                className="w-full font-semibold border-slate-300 text-slate-800 hover:bg-slate-50"
+                leftIcon={<PlusCircle className="h-4 w-4 text-emerald-600" />}
+              >
+                Order Again (Repeat Favorites)
+              </Button>
+            </Link>
+          </div>
         )}
 
         {/* Cancel order if still in early stage */}
@@ -162,6 +179,29 @@ export default function OrderTrackingPage({ params }: OrderTrackingPageProps) {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Guest Assistance & Reception Contact */}
+      <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 text-xs text-slate-600 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="space-y-0.5">
+          <span className="font-bold text-slate-900">Need immediate assistance?</span>
+          <p className="text-[11px] text-slate-500">
+            {order.qrContext.type === "ROOM"
+              ? "Dial 9 on your room telephone to reach Front Desk / In-Room Dining immediately."
+              : "Notify our floor captains for extra condiments, cutlery, or dietary adjustments."}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleCallStaff}
+          isLoading={isCallingStaff}
+          leftIcon={<BellRing className="h-3.5 w-3.5 text-amber-600" />}
+          className="text-xs font-semibold whitespace-nowrap bg-white"
+        >
+          Notify Captain
+        </Button>
       </div>
 
       {/* Cancel Order Dialog */}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store";
 import { Badge } from "@/components/ui/Badge";
+import { CommandPalette } from "@/components/common/CommandPalette";
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -69,6 +70,8 @@ export function StaffNavigation() {
 
         {/* Right side: Quick Links & Profile */}
         <div className="flex items-center gap-3">
+          <CommandPalette />
+
           <Link
             href="/kitchen"
             target="_blank"

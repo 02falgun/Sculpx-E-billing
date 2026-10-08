@@ -6,7 +6,7 @@ import { DietIndicator } from "@/components/shared";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type DietaryFilter = "ALL" | "VEG" | "NON_VEG" | "CHEF_SPECIAL";
+export type DietaryFilter = "ALL" | "VEG" | "NON_VEG" | "CHEF_SPECIAL" | "BESTSELLER";
 
 export interface MenuSearchAndFilterProps {
   searchQuery: string;
@@ -28,7 +28,7 @@ export function MenuSearchAndFilter({
       <SearchInput
         value={searchQuery}
         onChange={onSearchChange}
-        placeholder="Search for starters, biryani, pizza, cold brew..."
+        placeholder="What are you craving? Search dishes, drinks, desserts..."
       />
 
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
@@ -71,6 +71,19 @@ export function MenuSearchAndFilter({
         >
           <DietIndicator type="NON_VEG" />
           <span>Non-Veg</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onDietaryFilterChange("BESTSELLER")}
+          className={cn(
+            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer",
+            dietaryFilter === "BESTSELLER"
+              ? "bg-amber-700 text-white shadow-xs"
+              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50",
+          )}
+        >
+          <span>Popular / Bestsellers</span>
         </button>
 
         <button

@@ -126,19 +126,11 @@ export function CartDrawer() {
               <CurrencyDisplay amount={summary.estimatedTotal} className="text-amber-800 font-bold" />
             </div>
 
-            <div className="mt-4 flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                size="md"
-                onClick={clearCart}
-                className="w-1/3 text-xs"
-              >
-                Clear
-              </Button>
+            <div className="mt-4 flex flex-col gap-2 pt-2">
               <Link
                 href="/checkout"
                 onClick={() => setCartDrawerOpen(false)}
-                className="w-2/3"
+                className="w-full"
               >
                 <Button
                   variant="primary"
@@ -146,9 +138,29 @@ export function CartDrawer() {
                   className="w-full text-xs font-semibold shadow-xs"
                   rightIcon={<ArrowRight className="h-4 w-4" />}
                 >
-                  Proceed
+                  <span>Proceed to Checkout • </span>
+                  <CurrencyDisplay amount={summary.estimatedTotal} className="text-white ml-1 font-bold" />
                 </Button>
               </Link>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCartDrawerOpen(false)}
+                  className="flex-1 text-xs font-medium"
+                >
+                  Continue Browsing
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearCart}
+                  className="text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                >
+                  Clear Order
+                </Button>
+              </div>
             </div>
           </div>
         </div>

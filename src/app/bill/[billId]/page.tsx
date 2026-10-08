@@ -93,6 +93,35 @@ export default function DigitalBillPage({ params }: BillPageProps) {
       {/* Itemized Table & Tax Breakdown */}
       <InvoiceItemsTable bill={bill} tipAmount={tipAmount} />
 
+      {/* Bill Lifecycle & Verification Timeline */}
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-3">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          Bill Lifecycle &amp; Settlement Audit
+        </h4>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">1. Linked Order</span>
+            <span className="font-bold text-slate-800">#{bill.orderNumber}</span>
+          </div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">2. Invoice Generated</span>
+            <span className="font-bold text-slate-800">
+              {new Date(bill.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          </div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">3. Settlement</span>
+            <span className={`font-bold ${isPaid ? "text-emerald-700" : "text-amber-700"}`}>
+              {isPaid ? "Paid & Settled" : "Outstanding Due"}
+            </span>
+          </div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">4. GST Archive</span>
+            <span className="font-bold text-emerald-700">Certified Tax Record</span>
+          </div>
+        </div>
+      </div>
+
       {/* If Unpaid: Tip selector + Pay CTA */}
       {!isPaid ? (
         <div className="space-y-4 print:hidden">

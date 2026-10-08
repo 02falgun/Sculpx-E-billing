@@ -56,8 +56,19 @@ export function PrinterFleetManager() {
     );
   }
 
+  const hasOfflinePrinter = printers.some((p) => p.status === "OFFLINE");
+
   return (
     <div className="space-y-8">
+      {hasOfflinePrinter && (
+        <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-xs text-rose-800 shadow-xs">
+          <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0" />
+          <div className="flex-1">
+            <span className="font-bold">Hardware Alert:</span> One or more thermal printers are offline or unreachable. KOT tickets will queue until connection is restored.
+          </div>
+        </div>
+      )}
+
       {/* Printer Hardware Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {printers.map((printer) => {

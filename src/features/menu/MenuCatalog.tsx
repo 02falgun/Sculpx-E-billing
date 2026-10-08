@@ -47,6 +47,9 @@ export function MenuCatalog({ qrContext }: MenuCatalogProps) {
       if (dietaryFilter === "CHEF_SPECIAL") {
         return !!item.isChefSpecial;
       }
+      if (dietaryFilter === "BESTSELLER") {
+        return !!item.isBestseller;
+      }
       return true;
     });
   }, [menuItems, dietaryFilter]);
