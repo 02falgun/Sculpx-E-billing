@@ -2,6 +2,18 @@
 
 All notable changes to the Hotel Restaurant QR E-Billing platform will be documented in this file.
 
+## [Phase 7: Kitchen Display System (KDS) & Real-Time KOT Workflow] - 2026-10-09
+
+### Added
+- **Kitchen Display System Route (`/kitchen`)**: High-contrast, paperless touchscreen KDS route in `src/app/kitchen/page.tsx` with layout in `src/app/kitchen/layout.tsx`.
+- **Live Expedite Clock & Header (`KitchenHeader`)**: Displays digital second-by-second clock, active ticket badge, audio toggle, and WebSocket connection status.
+- **KOT Elapsed Timer Widget (`KOTTimer`)**: Calculates elapsed preparation minutes with color-coded urgency tiers (normal <10m, warning 10-15m, urgent >15m with pulsing alert).
+- **Interactive Line Cook Ticket Card (`KOTCard`)**: Displays KOT number, parent order number, table/room dining context, modifiers, special instructions, and item-level click-to-strike checkmarks.
+- **Kitchen Expedite Action Progression**: Buttons progress KOT stages (`NEW` ➔ `ACCEPTED` ➔ `PREPARING` ➔ `READY` ➔ `SERVED`), automatically removing completed tickets.
+- **KDS Board Filter System (`KDSBoard`)**: Stage filtering across All Active, New / Pending, Cooking, and Ready for Pickup.
+- **Automated Verification**: Added 3 new test suites (`kotTimer.test.tsx`, `kotCard.test.tsx`, `kitchenKOTLifecycle.test.ts`), bringing total to 72 passing assertions across 25 suites.
+- **Architecture Decision Record**: Authored ADR-0011 for Kitchen Display System & KOT Lifecycle.
+
 ## [Phase 6: Staff POS & Floor Table Management] - 2026-10-09
 
 ### Added
