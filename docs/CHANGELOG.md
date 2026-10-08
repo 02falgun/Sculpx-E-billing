@@ -2,6 +2,20 @@
 
 All notable changes to the Hotel Restaurant QR E-Billing platform will be documented in this file.
 
+## [Phase 6: Staff POS & Floor Table Management] - 2026-10-09
+
+### Added
+- **Staff Operations Route Group (`(staff)`)**: Built shared staff layout in `src/app/(staff)/layout.tsx` featuring `StaffNavigation` and instant demo session authentication.
+- **Floor Tables & Layout Route (`/tables`)**: Visual interactive floor plan with real-time occupancy metrics (Total Tables, Available, Occupied, Reserved).
+- **Table Card Component (`TableCard`)**: Displays section, capacity, active orders, linked bills, quick "Take Order" / "Add to Order" action, and inline status update selector (`AVAILABLE`, `OCCUPIED`, `RESERVED`, `BILLED`).
+- **Table Grid Management (`TableGrid`)**: Section filtering (Main Dining, Terrace Bar, Private Dining), real-time search, and responsive cards grid.
+- **Staff Point of Sale Route (`/pos`)**: Fast waiter order entry screen in `src/app/(staff)/pos/page.tsx`.
+- **POS Terminal Widget (`POSTerminal`)**: Dual-mode targeting (Tables vs Room Service), categorized menu browsing with search, quantity steppers, special kitchen notes, and direct KOT dispatching.
+- **Staff Overview Dashboard (`/dashboard`)**: Floor occupancy percentage, active tables overview, and quick launchpads to POS, Floor Tables, and KDS.
+- **Custom Hooks**: Added `useTables`, `useUpdateTableStatus`, `useRooms`, and `useUpdateRoomStatus` in `src/hooks/useTables.ts`.
+- **Automated Verification**: Added 3 new test suites (`tableCard.test.tsx`, `tableGrid.test.tsx`, `tableManagement.test.ts`), bringing total to 64 passing assertions across 22 suites.
+- **Architecture Decision Record**: Authored ADR-0010 for Staff POS and Floor Table Management.
+
 ## [Phase 5: Digital E-Billing & Payment Portal] - 2026-10-09
 
 ### Added
