@@ -2,6 +2,18 @@
 
 All notable changes to the Hotel Restaurant QR E-Billing platform will be documented in this file.
 
+## [Phase 5: Digital E-Billing & Payment Portal] - 2026-10-09
+
+### Added
+- **Digital E-Bill Route (`/bill/[billId]`)**: Created responsive e-bill and payment portal in `src/app/bill/[billId]/page.tsx` with print-friendly layout in `src/app/bill/layout.tsx`.
+- **Official GST Tax Invoice Header (`InvoiceHeader`)**: Formatted with hotel branding, address, GSTIN, FSSAI license credentials, and dining location badge.
+- **Itemized Bill & Tax Segregation (`InvoiceItemsTable`)**: Item descriptions, rates, quantities, subtotals, CGST (2.5%), SGST (2.5%), round-off, and dynamic due balance.
+- **Interactive Gratuity Selector (`TipSelector`)**: Quick presets (No Tip, 5%, 10%, ₹50, ₹100, Custom) with real-time net payable recalculation.
+- **Multi-Channel Payment Settlement Modal (`PaymentModal`)**: Integrated UPI QR with copyable VPA, simulated card payment with test autofill, Room Folio charges, and Cash Desk settlements.
+- **Post-Payment Verified Seal & Rating (`DigitalReceiptActions`)**: Renders verified settlement seal, PDF/print trigger, WhatsApp/SMS share modal, and 5-star customer experience feedback form.
+- **Automated Verification**: Added 3 new test suites (`invoiceItemsTable.test.tsx`, `tipSelector.test.tsx`, `paymentSettlement.test.ts`), bringing total to 56 passing assertions across 19 suites.
+- **Architecture Decision Record**: Authored ADR-0009 for Digital E-Billing and Multi-Channel Payment Settlement Portal.
+
 ## [Phase 4: Customer Live Order Tracking & WebSocket Integration] - 2026-10-08
 
 ### Added

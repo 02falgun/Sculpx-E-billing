@@ -9,8 +9,16 @@ export class MockBillingService implements IBillingService {
 
   async getBillById(id: string): Promise<ApiResponse<Bill>> {
     await delay(100);
-    const bill = this.bills.find((b) => b.id === id);
+    let bill = this.bills.find((b) => b.id === id);
     if (!bill) {
+      // Fallback check: maybe the route passed an orderId
+      const byOrder = this.bills.find((b) => b.orderId === id);
+      if (byOrder) return { success: true, data: byOrder };
+
+      if (id.startsWith("ord-")) {
+        return this.getBillByOrderId(id);
+      }
+
       return {
         success: false,
         data: null as unknown as Bill,
