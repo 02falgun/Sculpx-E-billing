@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { AlertCircle, ArrowRight } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get("redirect");
@@ -185,5 +185,24 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="min-h-screen bg-white text-neutral-900 flex items-center justify-center">
+          <div className="animate-pulse flex flex-col items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-black text-white font-bold text-xs">
+              S
+            </div>
+            <div className="h-2 w-20 bg-neutral-200 rounded" />
+          </div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </React.Suspense>
   );
 }
