@@ -200,6 +200,30 @@ npm start
   - `PATCH /api/v1/menu/modifier-options/:optionId`
   - `DELETE /api/v1/menu/modifier-options/:optionId`
 
+### Public QR Context Endpoint (`/api/v1/public`)
+- **Endpoint**: `GET /api/v1/public/qr-context/:token` (and alias `/api/public/qr-context/:token`)
+- **Authentication**: Public (no staff token required).
+- **Security & Rate Limiting**:
+  - Rate limited to 30 requests/minute per IP.
+  - Raw QR token is never logged (redacted by Pino).
+  - Enforces strict tenant isolation: rejects mismatched or foreign table/room assignments without leaking cross-tenant data.
+  - Excludes internal tenant IDs, guest identity (`guestName`), and folio IDs (`folioId`).
+  - Safely updates `lastScannedAt` timestamp in background.
+
+### Cart Validation Endpoint (`/api/v1/orders/validate`)
+- **Endpoint**: `POST /api/v1/orders/validate` (and alias `/api/orders/validate`)
+- **Authentication**: Public (guest checkout; no staff JWT required).
+- **Security & Calculation Guarantees**:
+  - Validates customer QR context via `QrService` without duplicate queries.
+  - Tenant-scoped PostgreSQL lookup for menu items and modifier options hierarchy.
+  - Modifier cardinality validation (`minSelections`, `maxSelections`, `isRequired`).
+  - Detects sold out (86'd) items and modifier options, returning structured issues in `unavailableItems`.
+  - Authoritative monetary calculations via `Prisma.Decimal` arithmetic (zero JavaScript floating-point errors).
+  - Server-calculated Indian GST (CGST 2.5% + SGST 2.5%, default 5.00%).
+  - Completely rejects/ignores client price overrides; logs and reports `priceDiscrepancies`.
+  - Strict read-only invariant: zero database writes or inventory reservations during validation.
+  - Rate limited to 60 requests/minute per IP.
+
 ---
 
 ## 6. Demo Accounts & Role Authorization Matrix
@@ -218,11 +242,12 @@ The database contains seven pre-seeded demonstration staff accounts (all passwor
 
 ---
 
-## 7. Next Implementation Steps (Phase 3B)
+## 7. Next Implementation Steps (Phase 3B.3)
 
-1. Public QR token resolution (`GET /api/v1/public/qr-context/:token`) for physical table and room mapping.
-2. Order cart validation (`POST /api/v1/orders/validate`) with server-side tax (CGST + SGST) re-computation.
-3. Order placement (`POST /api/v1/orders`) with idempotency key deduplication.
-4. Kitchen Order Ticket (KOT) station routing and progression.
-5. Bill generation, split billing, and payment records.
+1. Transactional order creation (`POST /api/v1/orders`) with `$transaction` consistency.
+2. Idempotency key handling (`Idempotency-Key` header) with in-flight locking and cached response reuse.
+3. Sequential order number generation (`ORD-YYYYMMDD-XXXX`).
+4. Kitchen Order Ticket (KOT) auto-generation and station routing.
+5. Real-time WebSocket event dispatching (`order.created`, `kot.created`).
+
 

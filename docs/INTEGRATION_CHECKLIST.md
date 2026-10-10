@@ -36,12 +36,12 @@ All items below have been verified directly against the frontend codebase and mu
 ---
 
 ### Stage 2: Menu Catalog & Customer QR Ordering
-- [ ] **QR Token Resolution**: `GET /api/v1/public/qr-context/:token` resolves valid table or room context (Phase 3B).
+- [x] **QR Token Resolution**: `GET /api/v1/public/qr-context/:token` resolves valid table or room context with multi-tenant boundary checks, zero PII leakage, and rate limiting (Phase 3B.1 verified).
 - [x] **Menu Categories**: `GET /api/v1/menu/categories` returns active category list with item counts, slug support, and tenant isolation (Phase 3A verified).
 - [x] **Menu Items**: `GET /api/v1/menu/items` returns items with decimal prices, tax rates, dietary tags, and modifier groups (Phase 3A verified).
 - [x] **Search & Filter**: Query params (`categoryId`, `dietaryType`, `isAvailable`, `search`) and pagination filter items correctly (Phase 3A verified).
 - [x] **Menu CRUD Operations**: Category, Menu Item, Modifier Group & Option creation/update/safe-deletion guarded by `ADMIN`/`SUPER_ADMIN` (Phase 3A verified).
-- [ ] **Server-Side Cart Validation**: `POST /api/v1/orders/validate` re-computes taxes, subtotal, and checks 86'd items (Phase 3B).
+- [x] **Server-Side Cart Validation**: `POST /api/v1/orders/validate` re-computes taxes, subtotal, modifier cardinality, and checks 86'd items (Phase 3B.2 verified).
 - [ ] **Order Creation**: `POST /api/v1/orders` creates an order in `PLACED` state; returns `ORD-...` order number (Phase 3B).
 - [ ] **Idempotency Verified**: Re-transmitting order with identical `Idempotency-Key` returns cached order without creating duplicate rows (Phase 3B).
 - [ ] **Order Tracking**: `GET /api/v1/orders/:id` displays live timeline on `/order/[orderId]` (Phase 3B).

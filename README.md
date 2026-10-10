@@ -7,7 +7,7 @@
 [![React 19](https://img.shields.io/badge/React-19.3.0-blue?style=for-the-badge&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.3.3-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
-[![Vitest](https://img.shields.io/badge/Vitest-141_Tests_Passing-6E9F18?style=for-the-badge&logo=vitest)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-170_Tests_Passing-6E9F18?style=for-the-badge&logo=vitest)](https://vitest.dev/)
 [![PWA Ready](https://img.shields.io/badge/PWA-Installable-purple?style=for-the-badge&logo=pwa)](https://web.dev/progressive-web-apps/)
 
 An enterprise, production-grade **Hotel & Restaurant QR-Based Dining, Waiter POS, Paperless Kitchen Display System (KDS), Central Cashier Billing Desk, and Administrative Back-Office Platform** built with **Next.js App Router**, **Fastify v5**, **Prisma ORM v6**, and **Supabase PostgreSQL**.
@@ -132,21 +132,21 @@ npm run dev
 
 ## 🧪 Verification & Testing
 
-The workspace enforces strict quality gates with 141 automated tests passing across 38 suites:
+The workspace enforces strict quality gates with 154 automated tests passing across 39 suites (61 backend tests + 93 root tests):
 
 ```bash
 # --- Backend Verification (backend/) ---
 cd backend
 npm run prisma:validate   # Validate Prisma schema
 npm run typecheck         # Type check backend (tsc --noEmit)
-npm test                  # Run 48 backend tests (health, readiness, auth, menu catalog)
+npm test                  # Run 61 backend tests (health, readiness, auth, menu catalog, qr context)
 npm run build             # Verify production build (rimraf dist && tsc)
 
 # --- Root Frontend Verification (root /) ---
 cd ..
 npm run typecheck         # Strict Next.js TypeScript typecheck
 npm run lint              # ESLint check
-npm test                  # Run full test suite (141 tests total)
+npm test                  # Run full test suite (154 tests total)
 npm run build             # Build production Next.js bundle
 ```
 

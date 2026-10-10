@@ -108,6 +108,27 @@ Each decision includes context, why it matters, a reasoned recommended default, 
 
 ---
 
+### Decision 9: QR Code Expiry, Revocation, and Dynamic Session Token Schema Support
+- **Why It Matters**: Phase 3B.1 resolves QR codes using the existing `qr_codes` table. The current schema contains `is_active` (`Boolean`), `last_scanned_at` (`DateTime?`), and `token` (`VarChar(100)`), but lacks explicit `expires_at` (`DateTime?`), `revoked_at` (`DateTime?`), or ephemeral session secret fields.
+- **Current Behavior in Phase 3B.1**: `is_active = true` is strictly verified. When inactive, requests are rejected with HTTP 400 `QR_INACTIVE`. Dynamic expiry and revocation checks are safely guarded in application code so they activate automatically once columns are added.
+- **Proposed Safe Migration**: A forward-only, non-breaking PostgreSQL migration:
+  ```sql
+  ALTER TABLE "qr_codes" 
+    ADD COLUMN "expires_at" TIMESTAMPTZ(6),
+    ADD COLUMN "revoked_at" TIMESTAMPTZ(6);
+  CREATE INDEX IF NOT EXISTS "qr_codes_expires_at_idx" ON "qr_codes"("expires_at");
+  ```
+- **Status**: `DOCUMENTED GAP — PENDING MIGRATION APPROVAL`
+- **Responsible Person**: Senior Backend Engineer & Database Architect
+
+### Decision 10: Table / Room Status Restrictions during Cart Validation vs Order Creation
+- **Why It Matters**: In hospitality dining, customers scan table QR codes and review their carts repeatedly. Tables may be `VACANT` (first order), `OCCUPIED` (repeat ordering / adding courses to open tab), or `RESERVED`. Hotel rooms may similarly be occupied by checked-in guests.
+- **Current Behavior in Phase 3B.2**: Pre-checkout cart validation does not reject requests based on `table.status` or `room.status`, nor does it lock inventory, reserve stock, or change table state. Cart validation is strictly read-only and non-destructive. Order creation (Phase 3B.3) will govern whether an order opens a new order or appends to an active tab (`currentOrderId`).
+- **Status**: `DOCUMENTED POLICY — CART VALIDATION IS NON-DESTRUCTIVE & READ-ONLY`
+- **Responsible Person**: Senior Backend Engineer & Hospitality Operations Lead
+
+---
+
 ## 3. Decision Sign-Off Summary Table
 
 | ID | Title | Recommendation | Status | Owner |
@@ -120,3 +141,6 @@ Each decision includes context, why it matters, a reasoned recommended default, 
 | D-06 | Hardware Printing | Backend Queue + LAN Print Agent | Pending | Hardware Lead |
 | D-07 | Multi-Tenancy | `tenant_id` on all tables | Pending | DB Architect |
 | D-08 | Tax & Service Charge | CGST 2.5% + SGST 2.5% + 5% SC | Pending | Finance Lead |
+| D-09 | QR Expiry & Revocation Schema | Forward-only nullable migration (`expires_at`, `revoked_at`) | Pending Approval | Backend DB Architect |
+| D-10 | Cart Validation Table/Room Status Policy | Read-only validation; status transition handled in Order Creation | Documented Policy | Senior Backend Engineer |
+

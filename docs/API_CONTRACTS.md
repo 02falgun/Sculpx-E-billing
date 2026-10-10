@@ -94,7 +94,7 @@
 | 4 | `/users` | `GET` | `/admin/users` | Bearer (`ADMIN`) | Verified in Client |
 | 5 | `/users` | `POST` | `/admin/users` | Bearer (`ADMIN`) | Verified in Client |
 | 6 | `/users/:id/role` | `PATCH` | `/admin/users` | Bearer (`SUPER_ADMIN`) | Verified in Client |
-| 7 | `/public/qr-context/:token` | `GET` | `/menu/[qrToken]` | Public | Verified in Client |
+| 7 | `/public/qr-context/:token` | `GET` | `/menu/[qrToken]` | Public | **Verified (Backend + Mock)** |
 | 8 | `/menu/categories` | `GET` | Menu & POS | Bearer (Staff) | **Verified (Backend + Mock)** |
 | 9 | `/menu/categories/:id` | `GET` | Category Detail | Bearer (Staff) | **Verified (Backend)** |
 | 10 | `/menu/categories` | `POST` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
@@ -109,7 +109,7 @@
 | 19 | `/menu/modifier-groups/:id` | `PATCH`, `DELETE` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
 | 20 | `/menu/modifier-groups/:id/options` | `POST` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
 | 21 | `/menu/modifier-options/:id` | `PATCH`, `DELETE` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
-| 14 | `/orders/validate` | `POST` | `/checkout` | Public | Verified in Client |
+| 14 | `/orders/validate` | `POST` | `/checkout` | Public | **Verified (Backend)** |
 | 15 | `/orders` | `POST` | `/checkout`, `/staff/pos` | Public / Staff | Verified in Client |
 | 16 | `/orders/:id` | `GET` | `/order/[orderId]` | Public (Token) / Staff | Verified in Client |
 | 17 | `/orders` | `GET` | `/orders`, `/staff/orders` | Bearer (`WAITER`+) | Verified in Client |
@@ -463,55 +463,175 @@
 
 ---
 
-### 3.3 QR Ordering & Validation
-- **Purpose**: Resolve table or room context from QR token.
-- **Auth**: None.
-- **Success (`200 OK`)**:
+### 3.3 QR Context & Validation
+
+#### `GET /api/v1/public/qr-context/:token`
+- **Purpose**: Resolve table or room context from an untrusted physical QR token for customer digital menu access without staff authentication.
+- **Auth**: Public (No JWT required).
+- **Rate Limit**: 30 requests per minute per IP (`@fastify/rate-limit`).
+- **Path Parameters**:
+  - `token`: string (min 3, max 100 characters, alphanumeric with hyphens/underscores).
+- **Security Guarantees**:
+  - Raw QR tokens are never logged.
+  - Zero leakage of internal `tenantId`, staff info, room `guestName`, or `folioId`.
+  - Rejects cross-tenant mismatches with generic `404 QR_INVALID_ASSIGNMENT`.
+  - Automatically updates `lastScannedAt` timestamp in background.
+- **Success (`200 OK`) — Table Context**:
   ```json
   {
     "success": true,
     "data": {
-      "id": "qr-tbl-01",
+      "id": "qr-tbl-1",
+      "token": "table-token-1",
       "type": "TABLE",
-      "identifier": "Table 01",
-      "roomOrTableId": "tbl-01",
+      "identifier": "1",
+      "displayName": "Table 1",
+      "roomOrTableId": "tbl-01-uuid",
+      "tableId": "tbl-01-uuid",
+      "locationDetails": {
+        "section": "Indoor Garden",
+        "capacity": 4
+      },
+      "subtext": "Indoor Garden • 4 Seats",
       "isActive": true,
-      "subtext": "Royal Courtyard • 4 Seats"
+      "status": "VACANT"
+    },
+    "meta": {
+      "requestId": "uuid",
+      "timestamp": "2026-10-10T19:50:00.000Z",
+      "serverVersion": "1.0.0"
     }
   }
   ```
+- **Success (`200 OK`) — Room Context**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "qr-room-301",
+      "token": "room-token-301",
+      "type": "ROOM",
+      "identifier": "301",
+      "displayName": "Room 301",
+      "roomOrTableId": "room-01-uuid",
+      "roomId": "room-01-uuid",
+      "locationDetails": {
+        "floor": "3rd Floor"
+      },
+      "subtext": "3rd Floor",
+      "isActive": true,
+      "status": "OCCUPIED"
+    },
+    "meta": {
+      "requestId": "uuid",
+      "timestamp": "2026-10-10T19:50:00.000Z",
+      "serverVersion": "1.0.0"
+    }
+  }
+  ```
+- **Errors**:
+  - `400 VALIDATION_FAILED`: Malformed token format or invalid characters.
+  - `400 QR_INACTIVE`: QR code exists but is deactivated (`is_active = false`).
+  - `404 QR_NOT_FOUND`: Token does not exist in the database.
+  - `404 QR_INVALID_ASSIGNMENT`: Target table/room is missing, ambiguous, or belongs to a different tenant.
+  - `429 RATE_LIMIT_EXCEEDED`: Scan frequency exceeds rate limit threshold.
 
 #### `POST /api/v1/orders/validate`
-- **Purpose**: Pre-checkout cart verification. Recalculates authoritative taxes and detects 86'd items.
-- **Auth**: None (Customer) or Bearer (Staff).
+- **Aliases**: `/api/orders/validate`
+- **Purpose**: Pre-checkout cart verification and authoritative server-side price computation. Resolves customer's QR context, validates menu items and modifiers against PostgreSQL snapshot, enforces group selection cardinality, verifies availability (86'd detection), and calculates checkout-ready price and Indian GST breakdown without writing any database records.
+- **Auth**: None (Customer QR guest checkout; no staff JWT required).
+- **Rate Limit**: 60 requests/minute per IP.
 - **Request Body**:
   ```json
   {
-    "qrToken": "tbl-01",
+    "qrToken": "tbl-terrace-1",
     "items": [
       {
-        "menuItemId": "item-butter-chicken",
+        "menuItemId": "c2000000-0000-0000-0000-000000000001",
         "quantity": 2,
-        "modifierIds": ["mod-full-portion"],
-        "specialInstructions": "Less spicy"
+        "modifierOptionIds": ["d1000000-0000-0000-0000-000000000002", "d2000000-0000-0000-0000-000000000001"],
+        "clientPrice": 600.00,
+        "specialInstructions": "Less spicy please"
       }
     ]
   }
   ```
+  *(Note: `modifierIds` is also accepted as a backward-compatible alias for `modifierOptionIds`)*.
 - **Success (`200 OK`)**:
   ```json
   {
     "success": true,
     "data": {
       "isValid": true,
+      "context": {
+        "type": "TABLE",
+        "identifier": "T-01",
+        "displayName": "Terrace Table 1"
+      },
+      "items": [
+        {
+          "menuItemId": "c2000000-0000-0000-0000-000000000001",
+          "name": "Makhani Butter Chicken",
+          "quantity": 2,
+          "unitBasePrice": 400.00,
+          "modifiersSubtotal": 200.00,
+          "unitPrice": 600.00,
+          "lineSubtotal": 1200.00,
+          "taxRate": 5.00,
+          "taxAmount": 60.00,
+          "lineTotal": 1260.00,
+          "modifiers": [
+            {
+              "id": "d1000000-0000-0000-0000-000000000002",
+              "name": "Full Portion",
+              "price": 150.00,
+              "groupName": "Portion Size"
+            },
+            {
+              "id": "d2000000-0000-0000-0000-000000000001",
+              "name": "Extra Gravy",
+              "price": 50.00,
+              "groupName": "Addons"
+            }
+          ],
+          "specialInstructions": "Less spicy please"
+        }
+      ],
+      "pricing": {
+        "itemsSubtotal": 800.00,
+        "modifiersSubtotal": 400.00,
+        "taxableSubtotal": 1200.00,
+        "taxes": [
+          {
+            "name": "CGST",
+            "rate": 2.50,
+            "amount": 30.00
+          },
+          {
+            "name": "SGST",
+            "rate": 2.50,
+            "amount": 30.00
+          }
+        ],
+        "totalTax": 60.00,
+        "finalTotal": 1260.00,
+        "currency": "INR"
+      },
       "unavailableItems": [],
       "priceDiscrepancies": [],
-      "calculatedSubtotal": 880.00,
-      "calculatedTax": 44.00,
-      "calculatedGrandTotal": 924.00
+      "warnings": [],
+      "calculatedSubtotal": 1200.00,
+      "calculatedTax": 60.00,
+      "calculatedGrandTotal": 1260.00
     }
   }
   ```
+- **Error Codes**:
+  - `400 VALIDATION_FAILED`: Malformed payload, invalid UUIDs, empty items array, negative or zero quantities.
+  - `400 QR_INACTIVE`: QR code exists but is marked inactive/disabled.
+  - `404 QR_NOT_FOUND`: QR token does not exist in the database.
+  - `404 QR_INVALID_ASSIGNMENT`: QR record has unassigned, ambiguous, or mismatched table/room data.
+  - `429 RATE_LIMIT_EXCEEDED`: Validation request rate limit exceeded.
 
 #### `POST /api/v1/orders`
 - **Purpose**: Submit order to kitchen.

@@ -246,10 +246,76 @@ Idempotent dev/test seed script (`npm run db:seed`) executed:
 
 ---
 
-## 8. Next Immediate Task: Phase 3B
+## 8. Phase 3B.1: Secure QR Context Resolution (Completed & Verified)
 
-**Phase 3B: Guest QR Context Resolution & Order Placement Pipeline**
-1. Public QR token resolution (`GET /api/v1/public/qr-context/:token`) mapping physical tables and rooms.
-2. Server-side pre-checkout validation (`POST /api/v1/orders/validate`) recalculating subtotal, CGST/SGST taxes, and flagging out-of-stock items.
-3. Idempotent order submission (`POST /api/v1/orders`) creating `PLACED` orders and dispatching tickets.
+### 8.1 Scope & Security Architecture
+- **Endpoint**: `GET /api/v1/public/qr-context/:token` (and `/api/public/qr-context/:token`).
+- **Authentication**: Fully public for dining guests without requiring a staff JWT. All staff routes retain strict authentication and role guards.
+- **Zero Raw Token Logging**: Pino configuration redacts all token fields (`token`, `qrToken`, `params.token`, `req.params.token`). Handlers log only token lengths and event names.
+- **Multi-Tenant Boundary Enforcement**:
+  - The token is resolved via `prisma.qrCode.findUnique`.
+  - For `TABLE`: Verifies that `table` exists, `table.tenantId === qr.tenantId`, and `roomId` is null (rejects ambiguous or cross-tenant assignments).
+  - For `ROOM`: Verifies that `room` exists, `room.tenantId === qr.tenantId`, and `tableId` is null.
+  - Cross-tenant or mismatched records are rejected with generic HTTP 404 `QR_INVALID_ASSIGNMENT` to prevent tenant enumeration.
+- **Privacy & Data Protection**:
+  - Internal `tenantId` is completely excluded from the response payload.
+  - Private hotel guest data (`guestName`, `folioId`) and internal staff/operational metadata are strictly omitted.
+- **Rate Limiting**: Protected with `@fastify/rate-limit` (30 requests/minute per IP) to mitigate brute-force QR token enumeration.
+- **Asynchronous Scan Timestamp**: Automatically updates `lastScannedAt` in the background on successful resolution.
+
+### 8.2 Database Migration Status
+- Current schema in `backend/prisma/schema.prisma` natively supports `QrCode`, `Table`, `Room`, `QrType`, `isActive`, and `lastScannedAt`.
+- Schema gap documented in `docs/OPEN_DECISIONS.md` (Decision 9): proposed forward-only nullable migration (`expires_at`, `revoked_at`) for future lifecycle management without breaking current tables.
+
+### 8.3 Automated Test Results
+- **Backend Test Suite**: 5 test files, 61 passed (100% green).
+- **Full Workspace Test Suite**: 39 test files, 154 passed (100% green).
+
+---
+
+## 9. Phase 3B.2: Pre-Checkout Cart Validation (Completed & Verified)
+
+### 9.1 Scope & Architecture
+- **Endpoint**: `POST /api/v1/orders/validate` (and alias `/api/orders/validate`).
+- **Authentication**: Fully public guest checkout endpoint without requiring a staff JWT. All staff routes maintain strict role guards.
+- **QR Context Resolution**: Reuses existing `QrService.resolveValidatedQrEntity` to prevent logic duplication. Validates that the QR code is active, unambiguous (either table or room, never both), and belongs to the valid tenant. Rejects inactive or invalid tokens with structured HTTP 400/404 errors.
+- **Tenant Isolation**:
+  - Menu items and nested modifier groups are queried strictly scoped to `category: { tenantId: qrContext.tenantId }`.
+  - Cross-tenant item IDs or unknown UUIDs are flagged as unavailable without disclosing cross-tenant metadata or database internals.
+- **Modifier Cardinality & Hierarchy Verification**:
+  - Validates that every selected modifier option belongs to a modifier group attached to that specific menu item.
+  - Enforces modifier group cardinality rules (`minSelections`, `maxSelections`, `isRequired`).
+  - Flags sold out (86'd) items and modifier options with clear item-level structured reasons in `unavailableItems`.
+- **Authoritative Decimal Pricing**:
+  - All unit prices, modifier subtotals, line totals, and taxes are calculated using `Prisma.Decimal` arithmetic — zero reliance on JavaScript floating-point math.
+  - Splits taxes into standard Indian GST (CGST 2.5% + SGST 2.5%, using item-level `taxRatePercentage`, default 5.00%).
+  - Completely ignores client-supplied prices; if client passes `clientPrice`, detects discrepancies and returns them in `priceDiscrepancies`.
+- **Non-Destructive Invariant**:
+  - Validation is strictly read-only. No orders, bills, order items, or KOTs are created in the database.
+  - No inventory is deducted or reserved during validation.
+  - Rate limited to 60 requests/minute per IP with `@fastify/rate-limit`.
+
+### 9.2 Automated Test Results
+- **Backend Test Suite**: 6 test files, 77 passed (100% green):
+  - `health.test.ts` (4 passed)
+  - `ready.test.ts` (3 passed)
+  - `auth.test.ts` (16 passed)
+  - `menu.test.ts` (25 passed)
+  - `qr.test.ts` (13 passed)
+  - `cart.test.ts` (16 passed)
+- **Full Workspace Test Suite**: 40 test files, 170 passed (100% green).
+- **TypeScript Typecheck**: 0 errors across root and backend.
+- **Production Build**: Clean compilation via `tsc`.
+
+---
+
+## 10. Next Immediate Task: Phase 3B.3
+
+**Phase 3B.3: Transactional Order Creation with Idempotency & Automatic KOT Generation (`POST /api/v1/orders`)**
+1. Re-validate cart against database snapshot inside an atomic Prisma transaction (`$transaction`).
+2. Deduplicate requests using client `Idempotency-Key` header with in-flight locking and cached response storage.
+3. Generate human-readable sequential order numbers (`ORD-YYYYMMDD-XXXX`).
+4. Atomically persist `Order`, `OrderItem`, and dispatch initial Kitchen Order Tickets (`KOT`).
+5. Emit real-time WebSocket events (`order.created`, `kot.created`) to kitchen and staff displays.
+
 
