@@ -22,28 +22,30 @@ All items below have been verified directly against the frontend codebase and mu
 ## 2. Stage-by-Stage Integration Verification Checklist
 
 ### Stage 1: Foundation (Auth, Session, Outlet Context)
-- [ ] **VPS Connectivity**: `NEXT_PUBLIC_API_URL` reaches live Node.js VPS.
-- [ ] **Health Check**: `GET /health` or `GET /api/v1/health` returns `{ "status": "UP" }`.
-- [ ] **CORS Verified**: VPS reverse proxy allows requests from frontend origin with credentials.
-- [ ] **Staff Login**: `POST /api/v1/auth/login` validates credentials and returns `{ user, token, expiresAt }`.
-- [ ] **Token Attachment**: Frontend `ApiClient` attaches `Authorization: Bearer <token>` to all subsequent requests.
-- [ ] **Session Re-Check**: `GET /api/v1/auth/me` returns authenticated user profile and permissions.
-- [ ] **Role Protection**: Unauthorized routes receive `403 Forbidden` from backend; frontend handles gracefully without crash.
-- [ ] **Logout**: `POST /api/v1/auth/logout` invalidates session and clears local storage.
-- **Acceptance Criteria**: Staff user logs in as `WAITER` on `/login`, is redirected to `/staff`, and can see their profile in the navigation bar.
+- [x] **VPS / Local Connectivity**: Fastify v5 server running with configurable `PORT`, `HOST`, and `CORS_ORIGIN`.
+- [x] **Health Check**: `GET /health`, `/api/health`, `/ready`, `/api/ready`, `/api/v1/health`, `/api/v1/ready` verified.
+- [x] **CORS Verified**: Fastify CORS configured for origin, credentials, and exposed headers (`x-request-id`).
+- [x] **Staff Login**: `POST /api/v1/auth/login` validates credentials with bcrypt, checks active status, and returns `{ user, token, expiresAt }`.
+- [x] **Token Attachment**: Frontend `ApiClient` auto-attaches `Authorization: Bearer <token>` from localStorage state.
+- [x] **Session Re-Check**: `GET /api/v1/auth/me` validates Bearer token and returns authenticated user profile and permissions from DB.
+- [x] **Role Protection**: Server-side role guards (`requireRoles`, `requirePermissions`, `requireTenantScope`) enforce HTTP 403 Forbidden.
+- [x] **Logout**: `POST /api/v1/auth/logout` terminates session and returns success envelope.
+- [x] **Database Schema & Seed**: PostgreSQL migration applied; idempotent demo seeding (`superadmin`, `admin`, `manager`, `kitchen`, `cashier`, `waiter`, and `captain`) verified.
+- **Acceptance Criteria**: Staff user authentication, role enforcement, and token lifecycle verified server-side with 23 passing tests. Mock mode remains default on frontend until full end-to-end stage verification.
 
 ---
 
 ### Stage 2: Menu Catalog & Customer QR Ordering
-- [ ] **QR Token Resolution**: `GET /api/v1/public/qr-context/:token` resolves valid table or room context.
-- [ ] **Public Categories**: `GET /api/v1/menu/categories` returns active category list.
-- [ ] **Public Menu Items**: `GET /api/v1/menu/items` returns items with prices, tax rates, dietary tags, and modifier groups.
-- [ ] **Search & Filter**: Query params (`categoryId`, `dietaryType`, `search`) filter items correctly.
-- [ ] **Server-Side Cart Validation**: `POST /api/v1/orders/validate` re-computes taxes, subtotal, and checks 86'd items.
-- [ ] **Order Creation**: `POST /api/v1/orders` creates an order in `PLACED` state; returns `ORD-...` order number.
-- [ ] **Idempotency Verified**: Re-transmitting order with identical `Idempotency-Key` returns cached order without creating duplicate rows.
-- [ ] **Order Tracking**: `GET /api/v1/orders/:id` displays live timeline on `/order/[orderId]`.
-- **Acceptance Criteria**: Guest scans table QR, adds Butter Chicken + Naan to cart, submits order, and receives confirmation screen with valid order number.
+- [ ] **QR Token Resolution**: `GET /api/v1/public/qr-context/:token` resolves valid table or room context (Phase 3B).
+- [x] **Menu Categories**: `GET /api/v1/menu/categories` returns active category list with item counts, slug support, and tenant isolation (Phase 3A verified).
+- [x] **Menu Items**: `GET /api/v1/menu/items` returns items with decimal prices, tax rates, dietary tags, and modifier groups (Phase 3A verified).
+- [x] **Search & Filter**: Query params (`categoryId`, `dietaryType`, `isAvailable`, `search`) and pagination filter items correctly (Phase 3A verified).
+- [x] **Menu CRUD Operations**: Category, Menu Item, Modifier Group & Option creation/update/safe-deletion guarded by `ADMIN`/`SUPER_ADMIN` (Phase 3A verified).
+- [ ] **Server-Side Cart Validation**: `POST /api/v1/orders/validate` re-computes taxes, subtotal, and checks 86'd items (Phase 3B).
+- [ ] **Order Creation**: `POST /api/v1/orders` creates an order in `PLACED` state; returns `ORD-...` order number (Phase 3B).
+- [ ] **Idempotency Verified**: Re-transmitting order with identical `Idempotency-Key` returns cached order without creating duplicate rows (Phase 3B).
+- [ ] **Order Tracking**: `GET /api/v1/orders/:id` displays live timeline on `/order/[orderId]` (Phase 3B).
+- **Acceptance Criteria**: Staff manage menu catalog securely on backend; frontend mock mode retained until Phase 3B QR and checkout pipeline are verified end-to-end.
 
 ---
 

@@ -88,19 +88,27 @@
 
 | # | Endpoint Path | Method | Consuming Screen | Auth Required | Status |
 |---|---|---|---|---|---|
-| 1 | `/auth/login` | `POST` | `/login` | Public | Verified in Client |
-| 2 | `/auth/logout` | `POST` | Staff Nav | Bearer | Verified in Client |
-| 3 | `/auth/me` | `GET` | Staff App Layout | Bearer | Verified in Client |
+| 1 | `/auth/login` | `POST` | `/login` | Public | **Verified (Backend + Mock)** |
+| 2 | `/auth/logout` | `POST` | Staff Nav | Bearer | **Verified (Backend + Mock)** |
+| 3 | `/auth/me` | `GET` | Staff App Layout | Bearer | **Verified (Backend + Mock)** |
 | 4 | `/users` | `GET` | `/admin/users` | Bearer (`ADMIN`) | Verified in Client |
 | 5 | `/users` | `POST` | `/admin/users` | Bearer (`ADMIN`) | Verified in Client |
 | 6 | `/users/:id/role` | `PATCH` | `/admin/users` | Bearer (`SUPER_ADMIN`) | Verified in Client |
 | 7 | `/public/qr-context/:token` | `GET` | `/menu/[qrToken]` | Public | Verified in Client |
-| 8 | `/menu/categories` | `GET` | Menu & POS | Public | Verified in Client |
-| 9 | `/menu/items` | `GET` | Menu, POS, Admin | Public | Verified in Client |
-| 10 | `/menu/items/:id` | `GET` | Item Detail Modal | Public | Verified in Client |
-| 11 | `/menu/items` | `POST` | `/admin/menu` | Bearer (`ADMIN`) | Verified in Client |
-| 12 | `/menu/items/:id` | `PATCH` | `/admin/menu` | Bearer (`ADMIN`) | Verified in Client |
-| 13 | `/menu/items/:id` | `DELETE` | `/admin/menu` | Bearer (`ADMIN`) | Verified in Client |
+| 8 | `/menu/categories` | `GET` | Menu & POS | Bearer (Staff) | **Verified (Backend + Mock)** |
+| 9 | `/menu/categories/:id` | `GET` | Category Detail | Bearer (Staff) | **Verified (Backend)** |
+| 10 | `/menu/categories` | `POST` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
+| 11 | `/menu/categories/:id` | `PATCH` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
+| 12 | `/menu/categories/:id` | `DELETE` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
+| 13 | `/menu/items` | `GET` | Menu, POS, Admin | Bearer (Staff) | **Verified (Backend + Mock)** |
+| 14 | `/menu/items/:id` | `GET` | Item Detail Modal | Bearer (Staff) | **Verified (Backend + Mock)** |
+| 15 | `/menu/items` | `POST` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
+| 16 | `/menu/items/:id` | `PATCH` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
+| 17 | `/menu/items/:id` | `DELETE` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
+| 18 | `/menu/items/:id/modifier-groups` | `POST` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
+| 19 | `/menu/modifier-groups/:id` | `PATCH`, `DELETE` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
+| 20 | `/menu/modifier-groups/:id/options` | `POST` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
+| 21 | `/menu/modifier-options/:id` | `PATCH`, `DELETE` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
 | 14 | `/orders/validate` | `POST` | `/checkout` | Public | Verified in Client |
 | 15 | `/orders` | `POST` | `/checkout`, `/staff/pos` | Public / Staff | Verified in Client |
 | 16 | `/orders/:id` | `GET` | `/order/[orderId]` | Public (Token) / Staff | Verified in Client |
@@ -139,13 +147,13 @@
 ### 3.1 Authentication
 
 #### `POST /api/v1/auth/login`
-- **Purpose**: Authenticate staff employee.
-- **Auth**: None.
+- **Purpose**: Authenticate staff employee via email and password (or `pinOrPassword`).
+- **Auth**: None (Public, Rate-Limited).
 - **Request Body**:
   ```json
   {
     "email": "waiter@demo.com",
-    "pinOrPassword": "password123"
+    "password": "demo-secure-pass" // or "pinOrPassword": "demo-secure-pass"
   }
   ```
 - **Success (`200 OK`)**:
@@ -154,26 +162,308 @@
     "success": true,
     "data": {
       "user": {
-        "id": "usr-waiter-1",
-        "name": "Amit Kumar",
+        "id": "e1b1d1f0-...",
+        "tenantId": "e1b1d1f0-0000-4000-8000-000000000001",
+        "name": "Rahul Sharma",
         "email": "waiter@demo.com",
         "role": "WAITER",
         "phoneNumber": "+91 98765 43211",
         "isActive": true,
-        "permissions": ["view_tables", "create_orders", "pos_access"]
+        "permissions": ["view_tables", "create_orders", "pos_access", "request_bill"],
+        "createdAt": "2026-10-10T19:26:09.000Z",
+        "updatedAt": "2026-10-10T19:26:09.000Z"
       },
       "token": "eyJhbGciOiJIUzI1NiIsIn...",
-      "expiresAt": "2026-10-11T15:00:00.000Z"
+      "expiresAt": "2026-10-11T03:26:09.000Z"
+    },
+    "message": "Login successful",
+    "meta": {
+      "requestId": "uuid",
+      "timestamp": "2026-10-10T19:26:09.000Z",
+      "serverVersion": "1.0.0"
     }
   }
   ```
-- **Errors**: `401 INVALID_CREDENTIALS`, `403 ACCOUNT_DISABLED`.
+- **Errors**:
+  - `400 VALIDATION_FAILED`: Malformed email or missing password.
+  - `401 INVALID_CREDENTIALS`: Generic credential failure (email not found or wrong password; no email enumeration).
+  - `403 ACCOUNT_DISABLED`: Staff account exists but is deactivated.
+  - `429 RATE_LIMIT_EXCEEDED`: Rapid login attempts blocked by rate limiter.
+
+#### `GET /api/v1/auth/me`
+- **Purpose**: Retrieve currently authenticated employee profile and permissions from DB.
+- **Auth**: `Bearer <token>` in `Authorization` header.
+- **Success (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "e1b1d1f0-...",
+      "tenantId": "e1b1d1f0-0000-4000-8000-000000000001",
+      "name": "Rahul Sharma",
+      "email": "waiter@demo.com",
+      "role": "WAITER",
+      "phoneNumber": "+91 98765 43211",
+      "isActive": true,
+      "permissions": ["view_tables", "create_orders", "pos_access"]
+    },
+    "meta": {
+      "requestId": "uuid",
+      "timestamp": "2026-10-10T19:26:09.000Z",
+      "serverVersion": "1.0.0"
+    }
+  }
+  ```
+- **Errors**:
+  - `401 UNAUTHORIZED`: Missing, forged, or expired Bearer token.
+  - `403 ACCOUNT_DISABLED`: User was disabled in DB after token issuance.
+
+#### `POST /api/v1/auth/logout`
+- **Purpose**: Terminate session.
+- **Auth**: `Bearer <token>` in `Authorization` header.
+- **Success (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "data": null,
+    "message": "Logged out successfully"
+  }
+  ```
+
+### 3.2 Menu Catalog
+
+#### Categories
+
+##### `GET /api/v1/menu/categories`
+- **Purpose**: List menu categories for the current tenant.
+- **Auth**: Bearer token (Any authenticated staff role: `WAITER`, `CASHIER`, `KITCHEN_STAFF`, `CAPTAIN`, `MANAGER`, `ADMIN`, `SUPER_ADMIN`).
+- **Query Parameters**:
+  - `includeInactive`: boolean (optional, defaults to `false`)
+- **Success (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "id": "073fc4c7-1c61-4c64-ae4a-9f36aa81828c",
+        "tenantId": "e1b1d1f0-0000-4000-8000-000000000001",
+        "name": "Tandoor & Starters",
+        "slug": "tandoor-and-starters",
+        "description": "Clay oven grilled delicacies",
+        "displayOrder": 1,
+        "isActive": true,
+        "itemCount": 8,
+        "createdAt": "2026-10-10T19:26:09.000Z",
+        "updatedAt": "2026-10-10T19:26:09.000Z"
+      }
+    ]
+  }
+  ```
+
+##### `GET /api/v1/menu/categories/:id`
+- **Purpose**: Get category details by ID.
+- **Auth**: Bearer token (Any staff role).
+- **Errors**: `404 CATEGORY_NOT_FOUND` if category does not exist or belongs to another tenant.
+
+##### `POST /api/v1/menu/categories`
+- **Purpose**: Create a new menu category.
+- **Auth**: Bearer (`ADMIN`, `SUPER_ADMIN`).
+- **Request Body**:
+  ```json
+  {
+    "name": "Breads & Naan",
+    "description": "Fresh tandoor-baked breads",
+    "displayOrder": 3,
+    "isActive": true
+  }
+  ```
+- **Success (`201 Created`)**: Returns created category with autogenerated or sanitized slug.
+- **Errors**: `400 VALIDATION_FAILED` (missing name, string length out of bounds).
+
+##### `PATCH /api/v1/menu/categories/:id`
+- **Purpose**: Update an existing menu category.
+- **Auth**: Bearer (`ADMIN`, `SUPER_ADMIN`).
+- **Request Body**: Partial category object (`name`, `description`, `displayOrder`, `isActive`).
+- **Success (`200 OK`)**: Returns updated category.
+- **Errors**: `404 CATEGORY_NOT_FOUND`.
+
+##### `DELETE /api/v1/menu/categories/:id`
+- **Purpose**: Delete a category. If items exist under the category, it performs a safe soft-deactivation (`isActive = false`) to avoid violating relational constraints.
+- **Auth**: Bearer (`ADMIN`, `SUPER_ADMIN`).
+- **Success (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "...",
+      "deleted": true, // or false if soft-deactivated
+      "deactivated": false // or true if soft-deactivated
+    },
+    "message": "Menu category removed successfully"
+  }
+  ```
 
 ---
 
-### 3.2 Menu & QR Ordering
+#### Menu Items
 
-#### `GET /api/v1/public/qr-context/:token`
+##### `GET /api/v1/menu/items`
+- **Purpose**: Retrieve menu items with pagination and filters.
+- **Auth**: Bearer token (Any staff role).
+- **Query Parameters**:
+  - `page`: integer (default `1`)
+  - `limit`: integer (default `20`, max `100`)
+  - `categoryId`: UUID (optional)
+  - `dietaryType`: `VEG` | `NON_VEG` | `VEGAN` | `EGG` (optional)
+  - `isAvailable`: boolean (optional)
+  - `search`: string (optional, searches name/description)
+- **Success (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": "1fa615b5-a628-4874-ad5c-0463900e86da",
+          "categoryId": "073fc4c7-1c61-4c64-ae4a-9f36aa81828c",
+          "name": "Butter Chicken",
+          "description": "Slow cooked chicken in rich makhani gravy",
+          "price": 440.00,
+          "taxRate": 5.00,
+          "dietaryType": "NON_VEG",
+          "spiceLevel": "MEDIUM",
+          "prepTimeMinutes": 20,
+          "isAvailable": true,
+          "tags": ["Chef Special", "Bestseller"],
+          "category": {
+            "id": "073fc4c7-1c61-4c64-ae4a-9f36aa81828c",
+            "name": "Main Course",
+            "slug": "main-course"
+          },
+          "modifierGroups": [
+            {
+              "id": "mod-group-1",
+              "name": "Portion Size",
+              "minSelections": 1,
+              "maxSelections": 1,
+              "isRequired": true,
+              "options": [
+                {
+                  "id": "mod-opt-1",
+                  "name": "Half Portion",
+                  "price": 0.00,
+                  "isAvailable": true
+                },
+                {
+                  "id": "mod-opt-2",
+                  "name": "Full Portion",
+                  "price": 180.00,
+                  "isAvailable": true
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "totalItems": 42,
+        "totalPages": 3,
+        "hasNextPage": true,
+        "hasPrevPage": false
+      }
+    }
+  }
+  ```
+
+##### `GET /api/v1/menu/items/:id`
+- **Purpose**: Get menu item details by ID including complete modifier groups and options hierarchy.
+- **Auth**: Bearer token (Any staff role).
+- **Errors**: `404 ITEM_NOT_FOUND`.
+
+##### `POST /api/v1/menu/items`
+- **Purpose**: Create a new menu item with authoritative decimal pricing and optional nested modifier groups.
+- **Auth**: Bearer (`ADMIN`, `SUPER_ADMIN`).
+- **Request Body**:
+  ```json
+  {
+    "categoryId": "073fc4c7-1c61-4c64-ae4a-9f36aa81828c",
+    "name": "Amritsari Soya Chaap",
+    "description": "Clay-oven roasted soya chunks",
+    "price": 280.00,
+    "taxRate": 5.00,
+    "dietaryType": "VEG",
+    "spiceLevel": "MEDIUM",
+    "prepTimeMinutes": 15,
+    "isAvailable": true,
+    "tags": ["Tandoor", "Must Try"],
+    "modifierGroups": [
+      {
+        "name": "Dip Selection",
+        "minSelections": 0,
+        "maxSelections": 2,
+        "isRequired": false,
+        "options": [
+          { "name": "Mint Chutney", "price": 0.00, "isAvailable": true },
+          { "name": "Garlic Mayo", "price": 30.00, "isAvailable": true }
+        ]
+      }
+    ]
+  }
+  ```
+- **Success (`201 Created`)**: Returns full item structure with IDs and serialized prices.
+- **Errors**:
+  - `400 VALIDATION_FAILED` (negative price, missing categoryId, invalid dietaryType).
+  - `400 INVALID_CATEGORY` (category does not exist or belongs to another tenant).
+
+##### `PATCH /api/v1/menu/items/:id`
+- **Purpose**: Update menu item details, prices, availability, or category assignment.
+- **Auth**: Bearer (`ADMIN`, `SUPER_ADMIN`).
+- **Request Body**: Partial menu item object.
+- **Success (`200 OK`)**: Returns updated item.
+- **Errors**: `404 ITEM_NOT_FOUND`, `400 INVALID_CATEGORY`.
+
+##### `DELETE /api/v1/menu/items/:id`
+- **Purpose**: Delete menu item. If referenced by historical order items or bills, soft-deactivates (`isAvailable = false`) to preserve audit trail.
+- **Auth**: Bearer (`ADMIN`, `SUPER_ADMIN`).
+- **Success (`200 OK`)**: Returns `{ "deleted": boolean, "deactivated": boolean }`.
+
+---
+
+#### Modifier Groups & Options Management
+
+##### `POST /api/v1/menu/items/:itemId/modifier-groups`
+- **Purpose**: Attach a new modifier group to an item.
+- **Auth**: Bearer (`ADMIN`, `SUPER_ADMIN`).
+- **Request Body**: `{ "name": "Crust", "minSelections": 1, "maxSelections": 1, "isRequired": true }`.
+- **Success (`201 Created`)**: Returns modifier group.
+
+##### `PATCH /api/v1/menu/modifier-groups/:groupId`
+- **Purpose**: Update modifier group settings.
+- **Auth**: Bearer (`ADMIN`, `SUPER_ADMIN`).
+
+##### `DELETE /api/v1/menu/modifier-groups/:groupId`
+- **Purpose**: Delete a modifier group and its child options.
+- **Auth**: Bearer (`ADMIN`, `SUPER_ADMIN`).
+
+##### `POST /api/v1/menu/modifier-groups/:groupId/options`
+- **Purpose**: Add a new option to a modifier group.
+- **Auth**: Bearer (`ADMIN`, `SUPER_ADMIN`).
+- **Request Body**: `{ "name": "Cheese Burst", "price": 80.00, "isAvailable": true }`.
+- **Success (`201 Created`)**: Returns created option with authoritative decimal price.
+
+##### `PATCH /api/v1/menu/modifier-options/:optionId`
+- **Purpose**: Update modifier option name, price, or availability.
+- **Auth**: Bearer (`ADMIN`, `SUPER_ADMIN`).
+
+##### `DELETE /api/v1/menu/modifier-options/:optionId`
+- **Purpose**: Remove a modifier option.
+- **Auth**: Bearer (`ADMIN`, `SUPER_ADMIN`).
+
+---
+
+### 3.3 QR Ordering & Validation
 - **Purpose**: Resolve table or room context from QR token.
 - **Auth**: None.
 - **Success (`200 OK`)**:

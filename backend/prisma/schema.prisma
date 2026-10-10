@@ -1,0 +1,418 @@
+// SCULPX E-Billing Prisma Schema
+// Aligned with docs/DATA_MODELS.md and docs/DATABASE_HANDOVER.md
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  CAPTAIN
+  WAITER
+  CASHIER
+  KITCHEN_STAFF
+}
+
+enum TableStatus {
+  VACANT
+  OCCUPIED
+  RESERVED
+  BILL_REQUESTED
+  DIRTY
+}
+
+enum RoomStatus {
+  VACANT
+  OCCUPIED
+  DO_NOT_DISTURB
+  CLEANING
+}
+
+enum QrType {
+  TABLE
+  ROOM
+}
+
+enum Dietary {
+  VEG
+  NON_VEG
+  VEGAN
+  CONTAINS_EGG
+}
+
+enum SpiceLevel {
+  NONE
+  MILD
+  MEDIUM
+  HOT
+  EXTRA_HOT
+}
+
+enum OrderSource {
+  CUSTOMER_QR
+  STAFF_POS
+}
+
+enum OrderStatus {
+  PENDING_VALIDATION
+  PLACED
+  CONFIRMED
+  PREPARING
+  READY
+  SERVED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentPreference {
+  PAY_NOW
+  PAY_LATER
+}
+
+enum KotStatus {
+  NEW
+  ACCEPTED
+  PREPARING
+  READY
+  SERVED
+  CANCELLED
+}
+
+enum BillPaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  VOIDED
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+  ROOM_FOLIO
+  OTHER
+}
+
+enum PaymentRecordStatus {
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum PrinterType {
+  KITCHEN
+  BAR
+  BILLING
+}
+
+enum PrintJobStatus {
+  QUEUED
+  PRINTING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id           String           @id @default(uuid()) @db.Uuid
+  tenantId     String           @default(uuid()) @map("tenant_id") @db.Uuid
+  email        String           @unique @db.VarChar(255)
+  name         String           @db.VarChar(255)
+  role         Role
+  phoneNumber  String?          @map("phone_number") @db.VarChar(30)
+  isActive     Boolean          @default(true) @map("is_active")
+  passwordHash String           @map("password_hash") @db.VarChar(255)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  permissions  UserPermission[]
+  payments     Payment[]
+
+  @@map("users")
+}
+
+model UserPermission {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  permissionKey String   @map("permission_key") @db.VarChar(100)
+  grantedAt     DateTime @default(now()) @map("granted_at") @db.Timestamptz(6)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionKey])
+  @@map("user_permissions")
+}
+
+model Table {
+  id             String      @id @default(uuid()) @db.Uuid
+  tenantId       String      @default(uuid()) @map("tenant_id") @db.Uuid
+  tableNumber    String      @map("table_number") @db.VarChar(50)
+  displayName    String      @map("display_name") @db.VarChar(100)
+  capacity       Int         @default(4)
+  status         TableStatus @default(VACANT)
+  section        String      @default("Main Dining") @db.VarChar(100)
+  currentOrderId String?     @map("current_order_id") @db.Uuid
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  qrCodes        QrCode[]
+  orders         Order[]
+
+  @@map("tables")
+}
+
+model Room {
+  id         String     @id @default(uuid()) @db.Uuid
+  tenantId   String     @default(uuid()) @map("tenant_id") @db.Uuid
+  roomNumber String     @map("room_number") @db.VarChar(50)
+  floor      String     @db.VarChar(50)
+  status     RoomStatus @default(VACANT)
+  guestName  String?    @map("guest_name") @db.VarChar(255)
+  folioId    String?    @map("folio_id") @db.VarChar(100)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  qrCodes    QrCode[]
+  orders     Order[]
+
+  @@map("rooms")
+}
+
+model QrCode {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @default(uuid()) @map("tenant_id") @db.Uuid
+  token         String    @unique @db.VarChar(100)
+  type          QrType
+  tableId       String?   @map("table_id") @db.Uuid
+  roomId        String?   @map("room_id") @db.Uuid
+  isActive      Boolean   @default(true) @map("is_active")
+  lastScannedAt DateTime? @map("last_scanned_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  table         Table?    @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  room          Room?     @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  orders        Order[]
+
+  @@map("qr_codes")
+}
+
+model MenuCategory {
+  id           String     @id @default(uuid()) @db.Uuid
+  tenantId     String     @default(uuid()) @map("tenant_id") @db.Uuid
+  name         String     @db.VarChar(255)
+  description  String?
+  displayOrder Int        @default(0) @map("display_order")
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  items        MenuItem[]
+
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id                     String          @id @default(uuid()) @db.Uuid
+  categoryId             String          @map("category_id") @db.Uuid
+  name                   String          @db.VarChar(255)
+  description            String?
+  price                  Decimal         @db.Decimal(10, 2)
+  isAvailable            Boolean         @default(true) @map("is_available")
+  dietary                Dietary?
+  spiceLevel             SpiceLevel?     @map("spice_level")
+  preparationTimeMinutes Int?            @default(15) @map("preparation_time_minutes")
+  taxRatePercentage      Decimal         @default(5.00) @map("tax_rate_percentage") @db.Decimal(5, 2)
+  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  category               MenuCategory    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  modifierGroups         ModifierGroup[]
+  orderItems             OrderItem[]
+  billItems              BillItem[]
+
+  @@map("menu_items")
+}
+
+model ModifierGroup {
+  id             String           @id @default(uuid()) @db.Uuid
+  menuItemId     String           @map("menu_item_id") @db.Uuid
+  name           String           @db.VarChar(255)
+  isRequired     Boolean          @default(false) @map("is_required")
+  minSelections  Int              @default(0) @map("min_selections")
+  maxSelections  Int              @default(1) @map("max_selections")
+  menuItem       MenuItem         @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  options        ModifierOption[]
+
+  @@map("modifier_groups")
+}
+
+model ModifierOption {
+  id      String        @id @default(uuid()) @db.Uuid
+  groupId String        @map("group_id") @db.Uuid
+  name    String        @db.VarChar(255)
+  price   Decimal       @default(0.00) @db.Decimal(10, 2)
+  group   ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@map("modifier_options")
+}
+
+model Order {
+  id                 String            @id @default(uuid()) @db.Uuid
+  tenantId           String            @default(uuid()) @map("tenant_id") @db.Uuid
+  orderNumber        String            @unique @map("order_number") @db.VarChar(50)
+  source             OrderSource
+  qrCodeId           String?           @map("qr_code_id") @db.Uuid
+  tableId            String?           @map("table_id") @db.Uuid
+  roomId             String?           @map("room_id") @db.Uuid
+  customerName       String?           @map("customer_name") @db.VarChar(255)
+  customerPhone      String?           @map("customer_phone") @db.VarChar(30)
+  status             OrderStatus       @default(CONFIRMED)
+  paymentPreference  PaymentPreference @map("payment_preference")
+  subtotal           Decimal           @db.Decimal(10, 2)
+  taxTotal           Decimal           @map("tax_total") @db.Decimal(10, 2)
+  serviceCharge      Decimal           @default(0.00) @map("service_charge") @db.Decimal(10, 2)
+  grandTotal         Decimal           @map("grand_total") @db.Decimal(10, 2)
+  cancellationReason String?           @map("cancellation_reason")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  qrCode             QrCode?           @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  table              Table?            @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  room               Room?             @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  items              OrderItem[]
+  kots               Kot[]
+  bills              Bill[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id                  String     @id @default(uuid()) @db.Uuid
+  orderId             String     @map("order_id") @db.Uuid
+  menuItemId          String?    @map("menu_item_id") @db.Uuid
+  itemName            String     @map("item_name") @db.VarChar(255)
+  quantity            Int
+  unitPrice           Decimal    @map("unit_price") @db.Decimal(10, 2)
+  totalPrice          Decimal    @map("total_price") @db.Decimal(10, 2)
+  taxAmount           Decimal    @map("tax_amount") @db.Decimal(10, 2)
+  specialInstructions String?    @map("special_instructions")
+  status              String     @default("PLACED") @db.VarChar(50)
+  order               Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem            MenuItem?  @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  kotItems            KotItem[]
+
+  @@map("order_items")
+}
+
+model Kot {
+  id         String    @id @default(uuid()) @db.Uuid
+  orderId    String    @map("order_id") @db.Uuid
+  kotNumber  String    @unique @map("kot_number") @db.VarChar(50)
+  status     KotStatus @default(NEW)
+  station    String    @default("Main Kitchen") @db.VarChar(100)
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(6)
+  readyAt    DateTime? @map("ready_at") @db.Timestamptz(6)
+  servedAt   DateTime? @map("served_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items      KotItem[]
+
+  @@map("kots")
+}
+
+model KotItem {
+  id                 String    @id @default(uuid()) @db.Uuid
+  kotId              String    @map("kot_id") @db.Uuid
+  orderItemId        String    @map("order_item_id") @db.Uuid
+  quantity           Int
+  modifiersSummary   String?   @map("modifiers_summary")
+  specialInstructions String?   @map("special_instructions")
+  kot                Kot       @relation(fields: [kotId], references: [id], onDelete: Cascade)
+  orderItem          OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@map("kot_items")
+}
+
+model Bill {
+  id                 String            @id @default(uuid()) @db.Uuid
+  tenantId           String            @default(uuid()) @map("tenant_id") @db.Uuid
+  orderId            String            @map("order_id") @db.Uuid
+  billNumber         String            @unique @map("bill_number") @db.VarChar(50)
+  subtotal           Decimal           @db.Decimal(10, 2)
+  taxDetails         Json              @default("{}") @map("tax_details")
+  serviceCharge      Decimal           @default(0.00) @map("service_charge") @db.Decimal(10, 2)
+  discountAmount     Decimal           @default(0.00) @map("discount_amount") @db.Decimal(10, 2)
+  grandTotal         Decimal           @map("grand_total") @db.Decimal(10, 2)
+  roundingDifference Decimal           @default(0.00) @map("rounding_difference") @db.Decimal(10, 2)
+  paymentStatus      BillPaymentStatus @default(UNPAID) @map("payment_status")
+  printedCount       Int               @default(0) @map("printed_count")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  order              Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items              BillItem[]
+  payments           Payment[]
+
+  @@map("bills")
+}
+
+model BillItem {
+  id         String    @id @default(uuid()) @db.Uuid
+  billId     String    @map("bill_id") @db.Uuid
+  menuItemId String?   @map("menu_item_id") @db.Uuid
+  itemName   String    @map("item_name") @db.VarChar(255)
+  quantity   Int
+  unitPrice  Decimal   @map("unit_price") @db.Decimal(10, 2)
+  totalPrice Decimal   @map("total_price") @db.Decimal(10, 2)
+  taxAmount  Decimal   @map("tax_amount") @db.Decimal(10, 2)
+  bill       Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+
+  @@map("bill_items")
+}
+
+model Payment {
+  id                   String              @id @default(uuid()) @db.Uuid
+  tenantId             String              @default(uuid()) @map("tenant_id") @db.Uuid
+  billId               String              @map("bill_id") @db.Uuid
+  paymentMethod        PaymentMethod       @map("payment_method")
+  amount               Decimal             @db.Decimal(10, 2)
+  status               PaymentRecordStatus @default(SUCCESS)
+  transactionReference String?             @map("transaction_reference") @db.VarChar(100)
+  notes                String?
+  receivedByUserId     String?             @map("received_by_user_id") @db.Uuid
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  bill                 Bill                @relation(fields: [billId], references: [id], onDelete: Cascade)
+  receivedByUser       User?               @relation(fields: [receivedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("payments")
+}
+
+model Printer {
+  id         String      @id @default(uuid()) @db.Uuid
+  tenantId   String      @default(uuid()) @map("tenant_id") @db.Uuid
+  name       String      @db.VarChar(100)
+  type       PrinterType
+  ipAddress  String      @map("ip_address") @db.VarChar(45)
+  port       Int         @default(9100)
+  macAddress String?     @map("mac_address") @db.VarChar(50)
+  isOnline   Boolean     @default(true) @map("is_online")
+  lastPingAt DateTime?   @map("last_ping_at") @db.Timestamptz(6)
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  printJobs  PrintJob[]
+
+  @@map("printers")
+}
+
+model PrintJob {
+  id           String         @id @default(uuid()) @db.Uuid
+  tenantId     String         @default(uuid()) @map("tenant_id") @db.Uuid
+  printerId    String         @map("printer_id") @db.Uuid
+  jobType      String         @map("job_type") @db.VarChar(50)
+  payload      Json
+  status       PrintJobStatus @default(QUEUED)
+  retryCount   Int            @default(0) @map("retry_count")
+  errorMessage String?        @map("error_message")
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  printer      Printer        @relation(fields: [printerId], references: [id], onDelete: Cascade)
+
+  @@map("print_jobs")
+}
