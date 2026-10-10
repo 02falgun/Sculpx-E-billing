@@ -110,7 +110,7 @@
 | 20 | `/menu/modifier-groups/:id/options` | `POST` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
 | 21 | `/menu/modifier-options/:id` | `PATCH`, `DELETE` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
 | 14 | `/orders/validate` | `POST` | `/checkout` | Public | **Verified (Backend)** |
-| 15 | `/orders` | `POST` | `/checkout`, `/staff/pos` | Public / Staff | Verified in Client |
+| 15 | `/orders` | `POST` | `/checkout`, `/staff/pos` | Public / Staff | **Verified (Backend Phase 3B.3)** |
 | 16 | `/orders/:id` | `GET` | `/order/[orderId]` | Public (Token) / Staff | Verified in Client |
 | 17 | `/orders` | `GET` | `/orders`, `/staff/orders` | Bearer (`WAITER`+) | Verified in Client |
 | 18 | `/orders/:id/status` | `PATCH` | Staff Order Modals | Bearer (`WAITER`+) | Verified in Client |
@@ -634,21 +634,28 @@
   - `429 RATE_LIMIT_EXCEEDED`: Validation request rate limit exceeded.
 
 #### `POST /api/v1/orders`
-- **Purpose**: Submit order to kitchen.
-- **Headers**: `Idempotency-Key: <uuidv4>`
+- **Aliases**: `/api/orders`
+- **Status**: **Verified & Implemented (Backend Phase 3B.3)**
+- **Purpose**: Atomically persist a dining customer order from a validated QR context, calculate authoritative PostgreSQL pricing and GST, generate initial KOT tickets, persist durable idempotency records, and queue transactional outbox events.
+- **Auth**: Public for valid guest QR context; optional `Bearer <token>` for staff roles (`WAITER`, `CAPTAIN`, `MANAGER`, `ADMIN`).
+- **Headers**:
+  - `Idempotency-Key`: string (optional, UUID v4 or up to 255 chars). Protects against duplicate order creation and concurrent network submission retries.
+  - `Authorization`: `Bearer <token>` (optional).
 - **Request Body**:
   ```json
   {
     "qrToken": "tbl-01",
     "customerName": "Rohan Gupta",
     "customerPhone": "+91 98765 43210",
+    "specialInstructions": "Less spicy please",
     "paymentPreference": "PAY_LATER",
     "source": "CUSTOMER_QR",
     "items": [
       {
-        "menuItemId": "item-butter-chicken",
+        "menuItemId": "073fc4c7-1c61-4c64-ae4a-9f36aa81828c",
         "quantity": 2,
-        "modifierIds": ["mod-full-portion"]
+        "modifierOptionIds": ["5c8986a1-949d-4786-9a25-e01fe1f67f01"],
+        "specialInstructions": "Fresh coriander on top"
       }
     ]
   }
@@ -657,15 +664,88 @@
   ```json
   {
     "success": true,
+    "message": "Order placed successfully",
     "data": {
-      "id": "ord-1042",
-      "orderNumber": "ORD-1042",
-      "status": "PLACED",
-      "grandTotal": 924.00,
-      "createdAt": "2026-10-10T15:30:00.000Z"
+      "id": "c71be39c-48c9-4b61-9c88-66170dcb7684",
+      "orderNumber": "ORD-20261011-0001",
+      "status": "CONFIRMED",
+      "source": "CUSTOMER_QR",
+      "paymentPreference": "PAY_LATER",
+      "subtotal": 1200.00,
+      "taxTotal": 60.00,
+      "serviceCharge": 0.00,
+      "grandTotal": 1260.00,
+      "customerName": "Rohan Gupta",
+      "customerPhone": "+91 98765 43210",
+      "specialInstructions": "Less spicy please",
+      "diningContext": {
+        "type": "TABLE",
+        "identifier": "T-01",
+        "displayName": "Table 01",
+        "roomOrTableId": "f1a2b3c4-..."
+      },
+      "items": [
+        {
+          "id": "e4b2a1c0-...",
+          "menuItemId": "073fc4c7-1c61-4c64-ae4a-9f36aa81828c",
+          "itemName": "Butter Chicken Special",
+          "quantity": 2,
+          "unitPrice": 600.00,
+          "totalPrice": 1200.00,
+          "taxAmount": 60.00,
+          "modifiers": [
+            {
+              "id": "5c8986a1-...",
+              "name": "Full Portion",
+              "price": 150.00,
+              "groupName": "Portion"
+            }
+          ],
+          "specialInstructions": "Fresh coriander on top",
+          "status": "PLACED"
+        }
+      ],
+      "assignedKotIds": ["a9c8b7d6-..."],
+      "kots": [
+        {
+          "id": "a9c8b7d6-...",
+          "kotNumber": "KOT-20261011-0001",
+          "status": "NEW",
+          "station": "Main Kitchen",
+          "itemCount": 1,
+          "createdAt": "2026-10-11T02:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-10-11T02:00:00.000Z",
+      "updatedAt": "2026-10-11T02:00:00.000Z",
+      "order": {
+        "id": "c71be39c-48c9-4b61-9c88-66170dcb7684",
+        "orderNumber": "ORD-20261011-0001",
+        "status": "CONFIRMED",
+        "source": "CUSTOMER_QR",
+        "paymentPreference": "PAY_LATER",
+        "subtotal": 1200.00,
+        "taxTotal": 60.00,
+        "grandTotal": 1260.00,
+        "items": [...],
+        "createdAt": "2026-10-11T02:00:00.000Z"
+      }
+    },
+    "meta": {
+      "requestId": "9c1b...",
+      "timestamp": "2026-10-11T02:00:00.000Z",
+      "serverVersion": "1.0.0"
     }
   }
   ```
+- **Error Codes**:
+  - `400 VALIDATION_FAILED`: Malformed payload, invalid UUIDs, empty items array, zero or negative quantities.
+  - `400 QR_INACTIVE`: QR code exists but is disabled.
+  - `404 QR_NOT_FOUND`: QR token does not exist in PostgreSQL.
+  - `409 ITEM_UNAVAILABLE`: Item 86'd, sold-out modifier, cross-tenant item mismatch, or modifier selection cardinality rule violation.
+  - `409 IDEMPOTENCY_CONFLICT`: Idempotency key was previously submitted with a different request body fingerprint.
+  - `409 IDEMPOTENCY_IN_PROGRESS`: Concurrent request with identical idempotency key currently in flight.
+  - `429 RATE_LIMIT_EXCEEDED`: Order creation rate limit exceeded (30 req/min).
 
 ---
 

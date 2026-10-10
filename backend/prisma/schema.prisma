@@ -120,6 +120,19 @@ enum PrintJobStatus {
   FAILED
 }
 
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+  FAILED
+}
+
 model User {
   id           String           @id @default(uuid()) @db.Uuid
   tenantId     String           @default(uuid()) @map("tenant_id") @db.Uuid
@@ -271,6 +284,7 @@ model Order {
   taxTotal           Decimal           @map("tax_total") @db.Decimal(10, 2)
   serviceCharge      Decimal           @default(0.00) @map("service_charge") @db.Decimal(10, 2)
   grandTotal         Decimal           @map("grand_total") @db.Decimal(10, 2)
+  specialInstructions String?          @map("special_instructions")
   cancellationReason String?           @map("cancellation_reason")
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -280,6 +294,7 @@ model Order {
   items              OrderItem[]
   kots               Kot[]
   bills              Bill[]
+  idempotencyKeys    IdempotencyKey[]
 
   @@map("orders")
 }
@@ -293,6 +308,7 @@ model OrderItem {
   unitPrice           Decimal    @map("unit_price") @db.Decimal(10, 2)
   totalPrice          Decimal    @map("total_price") @db.Decimal(10, 2)
   taxAmount           Decimal    @map("tax_amount") @db.Decimal(10, 2)
+  selectedModifiers   Json?      @default("[]") @map("selected_modifiers")
   specialInstructions String?    @map("special_instructions")
   status              String     @default("PLACED") @db.VarChar(50)
   order               Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -415,4 +431,56 @@ model PrintJob {
   printer      Printer        @relation(fields: [printerId], references: [id], onDelete: Cascade)
 
   @@map("print_jobs")
+}
+
+model IdempotencyKey {
+  id             String            @id @default(uuid()) @db.Uuid
+  tenantId       String            @map("tenant_id") @db.Uuid
+  key            String            @db.VarChar(255)
+  endpoint       String            @db.VarChar(255)
+  requestHash    String            @map("request_hash") @db.VarChar(64)
+  orderId        String?           @map("order_id") @db.Uuid
+  responseStatus Int?              @map("response_status")
+  responseBody   Json?             @map("response_body")
+  status         IdempotencyStatus @default(IN_PROGRESS)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  expiresAt      DateTime          @map("expires_at") @db.Timestamptz(6)
+
+  order          Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, key, endpoint])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+model DailyCounter {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  date        String   @db.VarChar(10)
+  counterType String   @map("counter_type") @db.VarChar(50)
+  counter     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, date, counterType])
+  @@map("daily_counters")
+}
+
+model OutboxEvent {
+  id          String       @id @default(uuid()) @db.Uuid
+  tenantId    String       @map("tenant_id") @db.Uuid
+  eventType   String       @map("event_type") @db.VarChar(100)
+  topic       String       @db.VarChar(100)
+  payload     Json
+  status      OutboxStatus @default(PENDING)
+  retryCount  Int          @default(0) @map("retry_count")
+  lastError   String?      @map("last_error")
+  publishedAt DateTime?    @map("published_at") @db.Timestamptz(6)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, createdAt])
+  @@index([tenantId, eventType])
+  @@map("outbox_events")
 }

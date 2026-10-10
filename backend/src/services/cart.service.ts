@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { qrService } from "./qr.service.js";
 import type {
@@ -14,14 +14,19 @@ export class CartService {
    * Calculates authoritative Decimal prices and tax components.
    * Does NOT write to the database or create orders.
    */
-  async validateCart(payload: ValidateCartRequest): Promise<CartValidationResponse> {
+  async validateCart(
+    payload: ValidateCartRequest,
+    client?: Prisma.TransactionClient | PrismaClient
+  ): Promise<CartValidationResponse> {
+    const db = client || prisma;
+
     // 1. Resolve and verify QR context and tenant scope
-    const validatedQr = await qrService.resolveValidatedQrEntity(payload.qrToken);
+    const validatedQr = await qrService.resolveValidatedQrEntity(payload.qrToken, client);
     const tenantId = validatedQr.tenantId;
 
     // 2. Query all requested menu items belonging to the verified tenant in a single snapshot
     const requestedMenuItemIds = Array.from(new Set(payload.items.map((i) => i.menuItemId)));
-    const menuItems = await prisma.menuItem.findMany({
+    const menuItems = await db.menuItem.findMany({
       where: {
         id: { in: requestedMenuItemIds },
         category: {

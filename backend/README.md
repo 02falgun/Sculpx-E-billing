@@ -224,6 +224,23 @@ npm start
   - Strict read-only invariant: zero database writes or inventory reservations during validation.
   - Rate limited to 60 requests/minute per IP.
 
+### Order Creation & Idempotency Endpoint (`/api/v1/orders`)
+- **Endpoint**: `POST /api/v1/orders` (and alias `/api/orders`)
+- **Authentication**: Public (guest checkout with valid `qrToken`) or Authenticated staff (`Bearer <JWT>` with `tenantId` / `userId`).
+- **Headers**:
+  - `Idempotency-Key` (Optional, Recommended): UUID or client-generated unique key (up to 255 chars).
+- **Core Architecture & Guarantees**:
+  - **Durable Database Idempotency**: Stored in `idempotency_keys` table with unique constraint on `(tenant_id, key, endpoint)` and SHA-256 payload digest. Concurrent identical requests return cached responses with header `X-Cache: HIT`. Payload mismatches return HTTP 409 `IDEMPOTENCY_CONFLICT`.
+  - **Sequential Numbering**: Concurrency-safe atomic increment via `daily_counters` table for `ORD-YYYYMMDD-XXXX` and `KOT-YYYYMMDD-XXXX`.
+  - **Atomic `$transaction` Persistence**:
+    - Creates `Order` with authoritative subtotal, tax (`CGST 2.5%` + `SGST 2.5%`), service charge, and grand total.
+    - Persists `OrderItem` with unit price snapshots and JSON `selectedModifiers`.
+    - Generates initial `Kot` record and `KotItem` records.
+    - Updates dining context: Marks `Table.status = OCCUPIED` and sets `Table.currentOrderId`.
+    - Queues `order.created` and `kot.created` in `outbox_events` table.
+  - **Transactional Outbox Event Dispatch**: Dispatches WebSocket / realtime events asynchronously post-commit without blocking HTTP response or causing rollback anomalies.
+  - **Rollback Resilience**: Zero partial orders. If KOT creation, order items, or number generation fail, the entire transaction rolls back cleanly.
+
 ---
 
 ## 6. Demo Accounts & Role Authorization Matrix
@@ -242,12 +259,14 @@ The database contains seven pre-seeded demonstration staff accounts (all passwor
 
 ---
 
-## 7. Next Implementation Steps (Phase 3B.3)
+## 7. Migration & Implementation Status
 
-1. Transactional order creation (`POST /api/v1/orders`) with `$transaction` consistency.
-2. Idempotency key handling (`Idempotency-Key` header) with in-flight locking and cached response reuse.
-3. Sequential order number generation (`ORD-YYYYMMDD-XXXX`).
-4. Kitchen Order Ticket (KOT) auto-generation and station routing.
-5. Real-time WebSocket event dispatching (`order.created`, `kot.created`).
+- **Phase 3A**: Core Fastify server, Supabase PostgreSQL, Prisma ORM, health probes, structured logging. (Completed)
+- **Phase 3B.0**: JWT authentication, role-based authorization, rate limiting, and password hashing. (Completed)
+- **Phase 3B.1**: Menu catalog management & public QR context resolution. (Completed)
+- **Phase 3B.2**: Real-time cart validation, modifier cardinality checks, and authoritative GST computation. (Completed)
+- **Phase 3B.3**: Transactional order creation, durable idempotency, human-readable daily sequences, automatic initial KOT generation, and transactional outbox. (Completed)
+- **Next Phase (Phase 3B.4)**: Real-time WebSocket connection handling for KDS and Floor Captains consuming outbox events.
+
 
 

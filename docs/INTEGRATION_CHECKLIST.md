@@ -41,10 +41,9 @@ All items below have been verified directly against the frontend codebase and mu
 - [x] **Menu Items**: `GET /api/v1/menu/items` returns items with decimal prices, tax rates, dietary tags, and modifier groups (Phase 3A verified).
 - [x] **Search & Filter**: Query params (`categoryId`, `dietaryType`, `isAvailable`, `search`) and pagination filter items correctly (Phase 3A verified).
 - [x] **Menu CRUD Operations**: Category, Menu Item, Modifier Group & Option creation/update/safe-deletion guarded by `ADMIN`/`SUPER_ADMIN` (Phase 3A verified).
-- [x] **Server-Side Cart Validation**: `POST /api/v1/orders/validate` re-computes taxes, subtotal, modifier cardinality, and checks 86'd items (Phase 3B.2 verified).
-- [ ] **Order Creation**: `POST /api/v1/orders` creates an order in `PLACED` state; returns `ORD-...` order number (Phase 3B).
-- [ ] **Idempotency Verified**: Re-transmitting order with identical `Idempotency-Key` returns cached order without creating duplicate rows (Phase 3B).
-- [ ] **Order Tracking**: `GET /api/v1/orders/:id` displays live timeline on `/order/[orderId]` (Phase 3B).
+- [x] **Order Creation**: `POST /api/v1/orders` creates an order in `CONFIRMED` state; returns `ORD-YYYYMMDD-XXXX` order number and initial KOT ticket (Phase 3B.3 verified).
+- [x] **Idempotency Verified**: Re-transmitting order with identical `Idempotency-Key` returns cached order without creating duplicate rows, rejecting payload mismatches with 409 (Phase 3B.3 verified).
+- [ ] **Order Tracking**: `GET /api/v1/orders/:id` displays live timeline on `/order/[orderId]` (Phase 3B.4).
 - **Acceptance Criteria**: Staff manage menu catalog securely on backend; frontend mock mode retained until Phase 3B QR and checkout pipeline are verified end-to-end.
 
 ---

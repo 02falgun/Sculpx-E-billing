@@ -1,3 +1,4 @@
+import { pino } from "pino";
 import type { FastifyServerOptions } from "fastify";
 import { env } from "../config/env.js";
 
@@ -17,6 +18,14 @@ export const sensitiveRedactPaths = [
   "DATABASE_URL",
   "DIRECT_URL",
 ];
+
+export const logger = pino({
+  level: env.NODE_ENV === "test" && env.LOG_LEVEL === "silent" ? "silent" : env.LOG_LEVEL,
+  redact: {
+    paths: sensitiveRedactPaths,
+    censor: "[REDACTED]",
+  },
+});
 
 export function getFastifyLoggerConfig(): FastifyServerOptions["logger"] {
   if (env.NODE_ENV === "test") {

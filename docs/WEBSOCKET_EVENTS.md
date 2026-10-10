@@ -281,3 +281,29 @@ If corporate firewalls, captive portals, or mobile browser networks block WebSoc
   - Active Orders: Polls `GET /api/v1/orders` every 15 seconds.
   - Kitchen KDS: Polls `GET /api/v1/kitchen/kots` every 10 seconds.
   - Bill Settlement: Polls `GET /api/v1/bills/:id` every 5 seconds while on payment screen.
+
+---
+
+## 5. Backend Transactional Outbox Pattern (Phase 3B.3)
+
+To ensure reliable, at-least-once event delivery and prevent dual-write anomalies (e.g., database commit succeeding but socket emit failing):
+
+### 5.1 Outbox Schema (`outbox_events` table)
+Every mutating operation that triggers a business event persists an outbox record inside the same PostgreSQL transaction snapshot (`$transaction`):
+- `id`: UUID (Primary Key)
+- `tenant_id`: UUID
+- `event_type`: VARCHAR(100) (e.g. `order.created`, `kot.created`)
+- `topic`: VARCHAR(100) (e.g. `orders:all`, `kitchen:kots`)
+- `payload`: JSONB
+- `status`: ENUM (`PENDING`, `PROCESSING`, `PUBLISHED`, `FAILED`)
+- `retry_count`: INT (default 0)
+- `last_error`: TEXT (captures transport failure details)
+- `published_at`: TIMESTAMPTZ(6)
+- `created_at` / `updated_at`: TIMESTAMPTZ(6)
+
+### 5.2 Decoupled Event Dispatch Lifecycle
+1. **Commit**: Order and KOT records commit along with the `PENDING` outbox event in PostgreSQL.
+2. **Asynchronous Dispatch**: The background outbox worker (`outboxService.dispatchEvent`) fires non-blocking HTTP post-commit triggers.
+3. **Transport Resilience**: If the WebSocket transport or broker drops, the business order remains safely committed in PostgreSQL; the outbox record increments its retry counter and records the error for asynchronous replay.
+4. **Transport Bridge**: The pending `@fastify/websocket` transport daemon (Phase 3B.4) will sweep `outbox_events` with `status = PENDING` and broadcast frames to connected clients according to the subscription topic matrix.
+

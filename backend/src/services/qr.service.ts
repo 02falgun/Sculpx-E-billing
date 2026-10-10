@@ -1,7 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
 import type { PublicQrContextResponse } from "../schemas/qr.schema.js";
-import type { QrCode, Table, Room } from "@prisma/client";
+import type { PrismaClient, Prisma, QrCode, Table, Room } from "@prisma/client";
 
 export interface ValidatedQrEntity {
   qr: QrCode;
@@ -21,8 +21,12 @@ export class QrService {
    * 4. Single, unambiguous assignment (TABLE vs ROOM)
    * 5. Strict tenant boundary matching between QR record and associated entity
    */
-  async resolveValidatedQrEntity(token: string): Promise<ValidatedQrEntity> {
-    const qr = await prisma.qrCode.findUnique({
+  async resolveValidatedQrEntity(
+    token: string,
+    client?: Prisma.TransactionClient | PrismaClient
+  ): Promise<ValidatedQrEntity> {
+    const db = client || prisma;
+    const qr = await db.qrCode.findUnique({
       where: { token },
       include: {
         table: true,

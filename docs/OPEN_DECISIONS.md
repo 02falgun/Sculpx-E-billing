@@ -121,11 +121,37 @@ Each decision includes context, why it matters, a reasoned recommended default, 
 - **Status**: `DOCUMENTED GAP — PENDING MIGRATION APPROVAL`
 - **Responsible Person**: Senior Backend Engineer & Database Architect
 
+---
+
 ### Decision 10: Table / Room Status Restrictions during Cart Validation vs Order Creation
 - **Why It Matters**: In hospitality dining, customers scan table QR codes and review their carts repeatedly. Tables may be `VACANT` (first order), `OCCUPIED` (repeat ordering / adding courses to open tab), or `RESERVED`. Hotel rooms may similarly be occupied by checked-in guests.
 - **Current Behavior in Phase 3B.2**: Pre-checkout cart validation does not reject requests based on `table.status` or `room.status`, nor does it lock inventory, reserve stock, or change table state. Cart validation is strictly read-only and non-destructive. Order creation (Phase 3B.3) will govern whether an order opens a new order or appends to an active tab (`currentOrderId`).
 - **Status**: `DOCUMENTED POLICY — CART VALIDATION IS NON-DESTRUCTIVE & READ-ONLY`
 - **Responsible Person**: Senior Backend Engineer & Hospitality Operations Lead
+
+---
+
+### Decision 11: Idempotency Key Scoping & Concurrency Strategy
+- **Why It Matters**: Prevents duplicate order creation and billing anomalies caused by network timeouts, mobile reconnects, or rapid double-clicking by guests/staff.
+- **Implemented Strategy in Phase 3B.3**: Database-backed durable idempotency via `idempotency_keys` table scoped by `(tenant_id, key, endpoint)` with a PostgreSQL unique constraint. Stores a canonical SHA-256 digest of the request body. If a matching key and digest exist, returns the cached response with `X-Cache: HIT`. If the key is reused with a different request payload, immediately rejects with HTTP 409 `IDEMPOTENCY_CONFLICT`. Concurrency is protected via PostgreSQL unique constraints and row serialization.
+- **Status**: `IMPLEMENTED & VERIFIED IN PHASE 3B.3`
+- **Responsible Person**: Senior Backend Engineer & Database Architect
+
+---
+
+### Decision 12: Human-Readable Order and KOT Sequential Numbering
+- **Why It Matters**: Restaurant staff and kitchen displays rely on daily readable ticket identifiers (`ORD-YYYYMMDD-XXXX` and `KOT-YYYYMMDD-XXXX`). Simple `COUNT(*)` calculations collide under concurrent requests.
+- **Implemented Strategy in Phase 3B.3**: Monotonically increasing sequential counters managed atomically in PostgreSQL table `daily_counters` scoped by `(tenant_id, prefix, date_str)`. Uses PostgreSQL row-level locking via atomic upsert (`INSERT ... ON CONFLICT (tenant_id, prefix, date_str) DO UPDATE SET count = daily_counters.count + 1 RETURNING count`) within the order transaction snapshot.
+- **Status**: `IMPLEMENTED & VERIFIED IN PHASE 3B.3`
+- **Responsible Person**: Senior Backend Engineer
+
+---
+
+### Decision 13: Transactional Outbox for Real-Time Event Delivery
+- **Why It Matters**: Publishing WebSocket events directly before database commit creates phantom events if the transaction rolls back. Publishing events post-commit without durability causes lost events if the process crashes.
+- **Implemented Strategy in Phase 3B.3**: Transactional Outbox pattern via `outbox_events` table. `order.created` and `kot.created` events are written inside the exact same atomic PostgreSQL `$transaction` as the order and KOT. An asynchronous, non-blocking outbox worker dispatches events post-commit with automatic retry tracking, exponential backoff, and failure tolerance without blocking the HTTP response.
+- **Status**: `IMPLEMENTED & VERIFIED IN PHASE 3B.3`
+- **Responsible Person**: Senior Backend Engineer & Distributed Systems Architect
 
 ---
 
@@ -143,4 +169,8 @@ Each decision includes context, why it matters, a reasoned recommended default, 
 | D-08 | Tax & Service Charge | CGST 2.5% + SGST 2.5% + 5% SC | Pending | Finance Lead |
 | D-09 | QR Expiry & Revocation Schema | Forward-only nullable migration (`expires_at`, `revoked_at`) | Pending Approval | Backend DB Architect |
 | D-10 | Cart Validation Table/Room Status Policy | Read-only validation; status transition handled in Order Creation | Documented Policy | Senior Backend Engineer |
+| D-11 | Idempotency Scoping & Deduplication | Database-backed `idempotency_keys` with SHA-256 hash & HTTP 409 | Implemented (Phase 3B.3) | Senior Backend Engineer |
+| D-12 | Daily Order & KOT Number Sequence | Atomic `daily_counters` with row lock `ORD/KOT-YYYYMMDD-XXXX` | Implemented (Phase 3B.3) | Senior Backend Engineer |
+| D-13 | Reliable Event Delivery | Transactional Outbox (`outbox_events`) + async worker | Implemented (Phase 3B.3) | Senior Backend Engineer |
+
 

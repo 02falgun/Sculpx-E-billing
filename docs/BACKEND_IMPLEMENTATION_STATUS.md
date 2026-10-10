@@ -309,13 +309,49 @@ Idempotent dev/test seed script (`npm run db:seed`) executed:
 
 ---
 
-## 10. Next Immediate Task: Phase 3B.3
+## 10. Phase 3B.3: Transactional Order Creation, Idempotency & Automatic KOT Generation (Completed & Verified)
 
-**Phase 3B.3: Transactional Order Creation with Idempotency & Automatic KOT Generation (`POST /api/v1/orders`)**
-1. Re-validate cart against database snapshot inside an atomic Prisma transaction (`$transaction`).
-2. Deduplicate requests using client `Idempotency-Key` header with in-flight locking and cached response storage.
-3. Generate human-readable sequential order numbers (`ORD-YYYYMMDD-XXXX`).
-4. Atomically persist `Order`, `OrderItem`, and dispatch initial Kitchen Order Tickets (`KOT`).
-5. Emit real-time WebSocket events (`order.created`, `kot.created`) to kitchen and staff displays.
+Implemented full transaction-safe order placement lifecycle under `POST /api/v1/orders` and `/api/orders`:
+- **Atomic Database Persistence**: PostgreSQL transaction (`prisma.$transaction`) guarantees `Order`, `OrderItem` snapshots (with historical price and `selectedModifiers` JSON), initial `Kot` record, and `KotItem` records are created together or rolled back atomically.
+- **Server-Authoritative Pricing & Stock Revalidation**: Re-reads database catalog and verifies modifier cardinality and 86'd availability on the active transaction snapshot before commitment. Client-provided prices and taxes are completely ignored.
+- **Durable Concurrency-Safe Idempotency**:
+  - `idempotency_keys` table with unique constraint on `(tenant_id, key, endpoint)`.
+  - Canonical request hashing (SHA-256) rejects payload mismatches with HTTP 409 `IDEMPOTENCY_CONFLICT`.
+  - In-flight locking and cached response retrieval prevents duplicate order or KOT generation during mobile browser network retries.
+- **Sequential Human-Readable Order Numbers**:
+  - Database-backed atomic counter (`daily_counters`) using PostgreSQL `ON CONFLICT ("tenant_id", "date", "counter_type") DO UPDATE SET counter = counter + 1 RETURNING counter`.
+  - Formats numbers as `ORD-YYYYMMDD-XXXX` and `KOT-YYYYMMDD-XXXX` in IST timezone without gaps or race collisions.
+- **Transactional Outbox Event Queuing**:
+  - Atomically writes `order.created` and `kot.created` events to `outbox_events` table inside the business transaction.
+  - Asynchronous background dispatcher delivers events with retry tracking and error recording (`OutboxStatus: PENDING | PUBLISHED | FAILED`).
+- **Table / Room State Transitions**:
+  - Automatically transitions Table status from `VACANT` to `OCCUPIED` and links `currentOrderId`.
+  - Room orders link to `room_id` and leave `table_id` null.
+
+### Verification & Testing Results (Phase 3B.3)
+- **Backend Test Suite**: 7 test files, 95 passed (100% green, ~64s duration).
+  - `order.test.ts` (18 passed): Authoritative pricing, Room/Table context, STAFF_POS role support, 404 QR_NOT_FOUND, 400 QR_INACTIVE, 409 ITEM_UNAVAILABLE, 400 VALIDATION_FAILED, Idempotency replay, Idempotency conflict, Concurrent race safety, Sequential numbering, Atomic transaction rollback, Outbox resilience, and Historical price snapshots.
+  - `cart.test.ts` (16 passed)
+  - `menu.test.ts` (25 passed)
+  - `auth.test.ts` (16 passed)
+  - `qr.test.ts` (13 passed)
+  - `health.test.ts` (5 passed)
+  - `ready.test.ts` (2 passed)
+- **Root Frontend Test Suite**: 34 test files, 93 passed (100% green).
+- **TypeScript Typecheck**: 0 errors across root and backend.
+- **Production Builds**: Clean compilation via `tsc` (backend) and `next build` (root Turbopack).
+
+---
+
+## 11. Next Immediate Task: Phase 3B.4 / Phase 3C
+
+1. **Phase 3B.4: Realtime WebSocket Server Transport Integration**:
+   - Wire `@fastify/websocket` to the transactional outbox worker.
+   - Stream `order.created`, `order.updated`, and `kot.created` events to frontend subscribers (`orders:all`, `kitchen:kots`, `order:<id>`).
+2. **Phase 3C: Kitchen Display System (KDS) & Order Status Lifecycle**:
+   - `GET /api/v1/kitchen/kots`: Station filtering.
+   - `PATCH /api/v1/kitchen/kots/:id/status`: Transition KOT (`ACCEPTED` -> `PREPARING` -> `READY` -> `SERVED`).
+   - Order cancellation (`POST /api/v1/orders/:id/cancel`) within grace window.
+
 
 
