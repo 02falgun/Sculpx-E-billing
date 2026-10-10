@@ -10,3 +10,4 @@ export * from "./payment";
 export * from "./inventory";
 export * from "./printer";
 export * from "./websocket";
+export * from "./api";

@@ -1,4 +1,9 @@
-# Frontend Architecture
+# SCULPX E-Billing — Frontend Architecture & Service Layer
+
+> **Audience**: Frontend Developers, Full-Stack Engineers, System Architects  
+> **Topic**: Unidirectional Data Flow, Dual-Track Service Layer, State Architecture  
+
+---
 
 ## 1. Architectural Layers & Separation of Concerns
 
@@ -7,11 +12,11 @@ The application strictly follows a 5-layer unidirectional architecture. Presenta
 ```mermaid
 graph TD
     UI["1. Presentation Components (Atoms / UI / Layout)"]
-    Features["2. Feature Components (MenuGrid, CartDrawer, KOTBoard)"]
-    Hooks["3. Custom Hooks (useOrder, useCart, useKitchen)"]
-    StateService["4. State & Service Layer (TanStack Query, Zustand, Service Interfaces)"]
-    Transport["5. Transport & Network Layer (ApiClient, WebSocketManager)"]
-    Backend["Authoritative Backend (REST + WebSockets)"]
+    Features["2. Feature Components (MenuCatalog, CartReviewList, KDSBoard)"]
+    Hooks["3. Custom Hooks (useOrder, useMenu, useKitchen, useBilling)"]
+    StateService["4. Service Layer & Proxy Factory (apiClient, Service Interfaces)"]
+    Transport["5. Transport & Network Layer (REST Fetch API, WebSocketManager)"]
+    Backend["Authoritative Backend (Node.js REST + WebSockets on VPS)"]
 
     UI --> Features
     Features --> Hooks
@@ -22,80 +27,70 @@ graph TD
 
 ---
 
-## 2. Directory Responsibilities
+## 2. Dual-Track Service Layer (`src/services/api/`)
+
+The application features a standardized dual-track service layer conforming to TypeScript interfaces defined in `src/services/api/interfaces.ts`:
 
 ```text
-src/
-├── app/                  # Next.js App Router (pages, layouts, error/loading boundaries)
-├── components/           # Reusable generic UI elements
-│   ├── ui/               # Design system primitives (Button, Input, Badge, Dialog)
-│   ├── layout/           # AppShell, Navbar, Sidebar, MobileFooter
-│   └── shared/           # StatusBadges, CurrencyDisplay, EmptyStates
-├── features/             # Business domain modules (contain domain components)
-│   ├── menu/             # MenuCatalog, ItemCard, ModifierModal
-│   ├── cart/             # CartSheet, CartSummary, CartItemRow
-│   ├── checkout/         # CheckoutForm, PaymentPreferenceToggle
-│   ├── orders/           # OrderTimeline, OrderCard, CancelDialog
-│   ├── kitchen/          # KOTCard, KDSBoard, FilterBar
-│   ├── billing/          # BillReceipt, DiscountModal, SplitBill
-│   ├── payments/         # PaymentSelector, RoomFolioInput
-│   ├── rooms/            # RoomGrid, RoomStatusBadge
-│   ├── tables/           # FloorPlan, TableCard, TransferTableModal
-│   ├── inventory/        # StockTable, RecipeEditor, RestockForm
-│   ├── printers/         # PrinterList, PrintJobQueue, ReprintButton
-│   ├── users/            # UserList, RoleBadge, UserForm
-│   └── reports/          # DailySalesChart, CategoryBreakdown
-├── services/             # Concrete data providers matching service interfaces
-│   ├── api/              # REST clients (Mock implementations & Live Api implementations)
-│   └── websocket/        # Connection manager, event dispatcher, reconnection
-├── store/                # Zustand stores (Client-only state: Cart, Session, POS Draft)
-├── hooks/                # Reusable React hooks bridging UI with Services & Stores
-├── types/                # Canonical TypeScript models and interfaces
-├── schemas/              # Zod validation schemas for forms and API payloads
-├── constants/            # Routes, status definitions, navigation configs
-├── utils/                # Pure formatting, currency, date, and math helpers
-├── lib/                  # Shared utilities (cn, query-client)
-└── config/               # App configuration & environment parsing
+src/services/api/
+├── client.ts             # Unified ApiClient with auto-token injection & timeout
+├── factory.ts            # Dynamic Service Factory routing between Mock and Live HTTP
+├── interfaces.ts         # TypeScript contracts for all 11 domain services
+├── http/                 # Concrete HTTP Service implementations calling live REST API
+│   ├── auth.http.ts
+│   ├── billing.http.ts
+│   ├── inventory.http.ts
+│   ├── kitchen.http.ts
+│   ├── menu.http.ts
+│   ├── order.http.ts
+│   ├── payment.http.ts
+│   ├── printer.http.ts
+│   ├── room.http.ts
+│   ├── table.http.ts
+│   ├── user.http.ts
+│   └── index.ts
+└── mock/                 # Self-contained Mock Service implementations
+    ├── billing.mock.ts
+    ├── inventory.mock.ts
+    ├── kitchen.mock.ts
+    ├── menu.mock.ts
+    ├── order.mock.ts
+    ├── payment.mock.ts
+    ├── printer.mock.ts
+    ├── room.mock.ts
+    ├── table.mock.ts
+    └── user.mock.ts
 ```
+
+### 2.1 Dynamic Proxy Routing (`factory.ts`)
+Hooks import service singletons directly (`import { menuApi, orderApi, ... } from "@/services/api"`). Under the hood, dynamic ES6 Proxies evaluate `ENV.USE_MOCK_API`:
+- When `NEXT_PUBLIC_USE_MOCK_API=true`: Calls route to in-memory mock services.
+- When `NEXT_PUBLIC_USE_MOCK_API=false`: Calls route directly to `Http*Service` classes communicating over HTTP to the backend on the VPS.
+
+### 2.2 Automatic Bearer Token Injection (`client.ts`)
+`ApiClient` inspects outgoing requests: if `token` is not explicitly provided, it automatically extracts the authenticated employee's active JWT from `localStorage` (`restro_staff_auth`) and attaches `Authorization: Bearer <token>`.
 
 ---
 
-## 3. Data Flow Pattern
+## 3. State Management Architecture
 
-### Query Flow (Read)
-```mermaid
-sequenceDiagram
-    participant Component as Feature Component
-    participant Hook as useMenu() [TanStack Hook]
-    participant Service as MenuService
-    participant Client as ApiClient / MockApiClient
-    participant Server as Backend / Mock API
-
-    Component->>Hook: Request menu items
-    Hook->>Service: getMenuItems({ categoryId })
-    Service->>Client: get("/menu/items")
-    Client->>Server: HTTP GET
-    Server-->>Client: 200 OK + JSON { success: true, data: [...] }
-    Client-->>Service: ApiResponse<MenuItem[]>
-    Service-->>Hook: Validate / Unpack
-    Hook-->>Component: data: MenuItem[], isLoading: false
-```
-
-### Mutation Flow (Write)
-```mermaid
-sequenceDiagram
-    participant Component as CheckoutButton
-    participant Hook as useCreateOrder()
-    participant Service as OrderService
-    participant WS as WebSocket Dispatcher
-    participant Server as Backend Server
-
-    Component->>Hook: mutate(orderPayload)
-    Hook->>Service: createOrder(payload)
-    Service->>Server: HTTP POST /orders
-    Server-->>Service: 201 Created + Order
-    Service-->>Hook: Return created Order
-    Hook->>Component: Navigate to /order/[orderId]
-    Server--)WS: Broadcast ORDER_CREATED event
-    WS--)Hook: Invalidate ["orders"] & ["kot"] query caches
+```text
+┌────────────────────────────────────────────────────────┐
+│                   Server State (Async)                 │
+│                 @tanstack/react-query                  │
+│       - Menu Items & Modifiers (staleTime: 3 min)      │
+│       - Active Orders (refetchInterval: 15s)           │
+│       - Active KOTs (refetchInterval: 10s)             │
+│       - Bills & Payments (refetchInterval: 10s)        │
+└────────────────────────────────────────────────────────┘
+                            ▲
+                            │ Invalidations on WS events
+┌───────────────────────────┴────────────────────────────┐
+│                   Client State (Sync)                  │
+│                         Zustand                        │
+│       - authStore (Staff Session, JWT, Role)           │
+│       - cartStore (Guest Items, Modifiers, Quantities) │
+│       - posStore  (Waiter Table-side Draft Order)      │
+│       - uiStore   (Toasts, Global Modals)              │
+└────────────────────────────────────────────────────────┘
 ```

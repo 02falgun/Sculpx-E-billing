@@ -1,59 +1,64 @@
-# Hotel Restaurant QR E-Billing Platform — Frontend Architecture
+# SCULPX E-Billing — Master Documentation & Handover Package
 
-Welcome to the **Hotel Restaurant QR E-Billing & Operations Frontend** documentation. This system is designed as an enterprise-grade, high-performance, real-time web application built with **Next.js (App Router)**, **TypeScript**, **Tailwind CSS**, **TanStack Query**, **Zustand**, and **WebSockets**.
+Welcome to the **SCULPX E-Billing & Hospitality POS** documentation package. This comprehensive directory contains full technical specifications, API contracts, PostgreSQL data models, state machines, and handover checklists prepared specifically for the backend engineering team implementing the Node.js REST API and PostgreSQL database on the configured VPS.
 
 ---
 
-## 📖 Documentation Index
+## 📑 Master Backend Handover Directory
 
-| Category | Document | Description |
-| :--- | :--- | :--- |
-| **Overview** | [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md) | Business goals, core personas, scope & boundaries |
-| **Architecture** | [SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md) | High-level system design & service interaction diagrams |
-| **Architecture** | [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) | Layered UI architecture, data flow & module hierarchy |
-| **User Flows** | [USER_FLOWS.md](./USER_FLOWS.md) | Comprehensive overview of all operational personas |
-| **User Flows** | [CUSTOMER_FLOW.md](./CUSTOMER_FLOW.md) | QR scan, menu browsing, cart, checkout & e-bill flow |
-| **User Flows** | [STAFF_FLOW.md](./STAFF_FLOW.md) | POS, floor tables, walk-in orders & bill settlement |
-| **User Flows** | [KITCHEN_FLOW.md](./KITCHEN_FLOW.md) | Real-time Kitchen Display System (KDS) & KOT lifecycle |
-| **User Flows** | [ADMIN_FLOW.md](./ADMIN_FLOW.md) | Menu, inventory, room/table QR, user & printer management |
-| **Contracts** | [API_CONTRACT.md](./API_CONTRACT.md) | REST endpoints, request/response envelopes & payloads |
-| **Contracts** | [WEBSOCKET_CONTRACT.md](./WEBSOCKET_CONTRACT.md) | Real-time event schemas, connection lifecycle & topics |
-| **Data & Routing**| [DATA_MODELS.md](./DATA_MODELS.md) | Canonical TypeScript models and entity relationships |
-| **Data & Routing**| [ROUTES.md](./ROUTES.md) | Complete application route matrix & access permissions |
-| **Implementation**| [COMPONENT_ARCHITECTURE.md](./COMPONENT_ARCHITECTURE.md) | Design system, atomic components & domain widgets |
-| **Implementation**| [STATE_MANAGEMENT.md](./STATE_MANAGEMENT.md) | TanStack Query (server) vs Zustand (client) strategy |
-| **Governance** | [CODING_RULES.md](./CODING_RULES.md) | Standards, anti-patterns & strict TypeScript rules |
-| **Quality** | [PERFORMANCE.md](./PERFORMANCE.md) | Core Web Vitals, caching, bundle budgets & virtualization |
-| **Quality** | [SECURITY.md](./SECURITY.md) | Session security, sanitization, zero-trust frontend rules |
-| **Quality** | [ERROR_HANDLING.md](./ERROR_HANDLING.md) | Error boundaries, fallback states & network resilience |
-| **Quality** | [TESTING.md](./TESTING.md) | Vitest, React Testing Library & Playwright E2E strategy |
-| **Platform** | [PWA.md](./PWA.md) | Progressive Web App manifest, service worker & caching |
-| **Operations** | [ENVIRONMENT.md](./ENVIRONMENT.md) | Environment configuration variables & toggles |
-| **Operations** | [DEPLOYMENT.md](./DEPLOYMENT.md) | CI/CD pipelines, containerization & edge deployment |
-| **Integration** | [BACKEND_INTEGRATION.md](./BACKEND_INTEGRATION.md) | Mock-to-production backend cutover instructions |
-| **Integration** | [PRINTER_INTEGRATION.md](./PRINTER_INTEGRATION.md) | Thermal KOT and bill printer queue architecture |
-| **Standards** | [ACCESSIBILITY.md](./ACCESSIBILITY.md) | WCAG 2.1 AA compliance, keyboard navigation & ARIA |
-| **Collaboration**| [CONTRIBUTING.md](./CONTRIBUTING.md) | Branching guidelines, phase gates & commit standards |
-| **History** | [CHANGELOG.md](./CHANGELOG.md) | Version history and phase release notes |
-| **Decisions** | [adr/](./adr/) | Architecture Decision Records (ADRs) |
+### 1. High-Level Overviews & Architecture
+- [**FRONTEND_BACKEND_HANDOVER.md**](./FRONTEND_BACKEND_HANDOVER.md): **Master handover specification** covering full system architecture, modules, auth, and roadmap.
+- [**PROJECT_OVERVIEW.md**](./PROJECT_OVERVIEW.md): Executive summary, unified QR model, personas, and authority boundaries.
+- [**FRONTEND_ARCHITECTURE.md**](./FRONTEND_ARCHITECTURE.md): Unidirectional data flow, dual-track service factory, state architecture.
+- [**ROLE_ARCHITECTURE.md**](./ROLE_ARCHITECTURE.md): User roles, permission matrix, station access, and route guards.
+- [**ROUTE_INVENTORY.md**](./ROUTE_INVENTORY.md): Comprehensive inventory of all 44 Next.js App Router screens and layouts.
+
+### 2. Integration Matrices & Contracts
+- [**API_CONTRACTS.md**](./API_CONTRACTS.md): **Master REST API specification** with complete endpoint matrix, JSON schemas, headers, status codes, and curl examples.
+- [**WEBSOCKET_EVENTS.md**](./WEBSOCKET_EVENTS.md): **Authoritative realtime event bus catalog**, wire formats, topic subscriptions, and deduplication logic.
+- [**BUSINESS_RULES.md**](./BUSINESS_RULES.md): **Business invariants, state machines**, transaction boundaries, and pending agreement markers.
+- [**OPEN_DECISIONS.md**](./OPEN_DECISIONS.md): **Register of 8 critical architectural decisions** requiring backend developer agreement.
+- [**INTEGRATION_CHECKLIST.md**](./INTEGRATION_CHECKLIST.md): **Stage-by-stage acceptance criteria** and actionable integration verification checklist.
+- [**BACKEND_INTEGRATION_MATRIX.md**](./BACKEND_INTEGRATION_MATRIX.md): Master feature-by-feature integration matrix linking screens to endpoints, schemas, and WS events.
+- [**BILLING_AND_PAYMENT_CONTRACT.md**](./BILLING_AND_PAYMENT_CONTRACT.md): GST tax calculations, payment methods, receipts, and refund contracts.
+- [**ORDER_AND_KITCHEN_WORKFLOWS.md**](./ORDER_AND_KITCHEN_WORKFLOWS.md): Order and KOT state machines, transition authority, and cancellation propagation.
+
+### 3. Data Models & Business Logic
+- [**DATA_MODELS.md**](./DATA_MODELS.md): Conceptual entity relationships, PostgreSQL DDL schemas, indexes, and Mermaid ER diagram.
+- [**DATABASE_HANDOVER.md**](./DATABASE_HANDOVER.md): Schema lifecycle, migrations, transaction boundaries, and realistic seed datasets.
+- [**INVENTORY_HANDOVER.md**](./INVENTORY_HANDOVER.md): Ingredient-level tracking, recipe bill-of-materials (BOM), and stock deduction policies.
+- [**PRINTER_INTEGRATION.md**](./PRINTER_INTEGRATION.md): ESC/POS thermal printing architecture, print queues, retries, and hardware agents.
+- [**QR_SYSTEM.md**](./QR_SYSTEM.md): Table & room QR generation, canonical URLs, token resolution, and high-res SVG export.
+
+### 4. Operations, Security & Testing
+- [**AUTHENTICATION_AND_AUTHORIZATION.md**](./AUTHENTICATION_AND_AUTHORIZATION.md): JWT token lifecycle, session expiration, and zero-trust backend enforcement.
+- [**SECURITY_REVIEW.md**](./SECURITY_REVIEW.md): Multi-tenancy assumptions, injection defenses, PCI-DSS scoping, and rate limiting.
+- [**ENVIRONMENT_SETUP.md**](./ENVIRONMENT_SETUP.md): Local development vs. production VPS environment configuration.
+- [**ERROR_HANDLING.md**](./ERROR_HANDLING.md): Unified error envelopes, UI toast notifications, and idempotency safeguards.
+- [**VPS_INTEGRATION.md**](./VPS_INTEGRATION.md): VPS deployment prerequisites, Nginx reverse proxy, CORS headers, and WSS upgrades.
+- [**BACKEND_INTEGRATION_TEST_PLAN.md**](./BACKEND_INTEGRATION_TEST_PLAN.md): End-to-end integration test matrix covering Customer, Waiter, Kitchen, Cashier, and Admin.
+- [**BACKEND_HANDOVER_CHECKLIST.md**](./BACKEND_HANDOVER_CHECKLIST.md): Sign-off matrix classifying completed deliverables, backend agreements, and deployment action items.
 
 ---
 
 ## 🏛️ Quick Start
 
 ```bash
-# Install dependencies
+# 1. Install dependencies
 npm install
 
-# Run development server (runs with mock API by default)
+# 2. Run local development (operates in mock mode by default)
 npm run dev
 
-# Run TypeScript typecheck
+# 3. Verify TypeScript types
 npm run typecheck
 
-# Run unit and component tests
+# 4. Run automated test suite (Vitest)
 npm run test
 
-# Run build verification
+# 5. Check code formatting & linting
+npm run lint
+
+# 6. Verify production build
 npm run build
 ```

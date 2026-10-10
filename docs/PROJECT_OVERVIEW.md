@@ -1,27 +1,35 @@
-# Project Overview: Hotel Restaurant QR E-Billing Platform
+# Project Overview: SCULPX E-Billing & Hospitality POS
 
-## 1. Executive Summary
-The **Hotel Restaurant QR E-Billing Platform** is an omni-channel restaurant and room-service ordering system tailored for hotels, resorts, and modern dining establishments. It provides a touchless, high-speed ordering and e-billing experience for hotel guests and diners while powering staff operations via a real-time Point of Sale (POS), Kitchen Display System (KDS), and administrative back-office.
+> **Application Name**: SCULPX E-Billing & QR Ordering Platform  
+> **Frontend Stack**: Next.js 16 (App Router), React 19, TypeScript, TanStack Query, Zustand, Tailwind CSS, Zod  
+> **Planned Backend Stack**: Node.js REST API + PostgreSQL 15+ on VPS with WebSockets  
+> **Status**: Frontend UI/UX Complete; Integration Handover Ready  
 
 ---
 
-## 2. Core Personas
+## 1. Executive Summary
+SCULPX E-Billing is an omni-channel restaurant and room-service ordering system tailored for hotels, resorts, and modern fine dining establishments. It provides a touchless, high-speed ordering and e-billing experience for hotel guests and diners while powering staff operations via a real-time Point of Sale (POS), Kitchen Display System (KDS), Cashier Settlement Desk, and administrative back-office.
+
+---
+
+## 2. Core Operational Personas
+
 1. **Diners & Hotel Guests (Customer Flow)**:
-   - Scans dynamic QR code located on a restaurant dining table (e.g., `TABLE 5`) or hotel guestroom (e.g., `ROOM 301`).
+   - Scans dynamic QR code located on a restaurant dining table (e.g., `T01`) or hotel guestroom (e.g., `Room 301`).
    - Browses menu with dietary filters, item modifiers, and allergen warnings.
    - Places orders with choice of payment: **Pay Now** (UPI/Card/Gateway) or **Pay Later** (Room Charge or Cash at Counter).
    - Tracks live preparation and delivery status in real-time.
    - Accesses digitized itemized E-Bill.
 2. **Floor Staff / Waiters / Captains (Staff POS Flow)**:
-   - Views floor map with live table status (Available, Occupied, Billed, Reserved).
+   - Views floor map with live table status (Vacant, Occupied, Billed, Reserved).
    - Enters walk-in orders, takes table orders, or adds items to existing running orders.
-   - Manages table transfers and order modifications.
+   - Dispatches tickets directly to kitchen stations.
 3. **Cashier / Accounts**:
    - Manages running tabs, calculates discounts, splits bills, and processes payments (Cash, Card, UPI, Room Charge).
    - Dispatches thermal receipts to counter printers.
 4. **Kitchen Chefs & Expeditors (Kitchen KDS Flow)**:
    - Large-format touch interface showing incoming Kitchen Order Tickets (KOT).
-   - Manages live states: `NEW` ➔ `ACCEPTED` ➔ `PREPARING` ➔ `READY` ➔ `SERVED`.
+   - Manages live states: `NEW` -> `ACCEPTED` -> `PREPARING` -> `READY` -> `SERVED`.
 5. **Hotel Restaurant Manager / Admin**:
    - Manages menu items, categories, modifier groups, and live availability.
    - Manages rooms, tables, and generates dynamic QR codes.
@@ -31,21 +39,24 @@ The **Hotel Restaurant QR E-Billing Platform** is an omni-channel restaurant and
 ---
 
 ## 3. The Unified QR Model: Room QR vs Table QR
-A foundational design principle of this application is:
+
+A foundational architectural principle of this application:
 > **Do NOT build separate applications for room service and restaurant table ordering.**
 
 Both scenarios share the exact same menu browsing, cart management, checkout, and tracking mechanics. They are unified through a single polymorphic **QRContext**:
+
 ```typescript
 export interface QRContext {
-  token: string;
+  id: string;
   type: "ROOM" | "TABLE";
-  identifier: string;      // "301" or "5"
-  displayName: string;     // "Room 301" or "Table 5"
+  identifier: string;      // "301" or "T01"
+  displayName: string;     // "Room 301" or "Table 01"
   hotelId: string;
   hotelName: string;
   isActive: boolean;
 }
 ```
+
 The application dynamically adapts payment options (e.g., enabling "Room Charge / Post to Room Folio" for `ROOM` context) while keeping all core customer screens 100% reusable.
 
 ---
@@ -58,20 +69,30 @@ The application dynamically adapts payment options (e.g., enabling "Room Charge 
 | **Cart** | Client-side drafting, quantity controls, temporary session | None (cart is client state until submission) |
 | **Pricing & Taxes** | Display estimated calculation for instant feedback | **Authoritative pricing, tax rates (CGST/SGST), discounts** |
 | **Orders** | Form validation, submission, optimistic UX | **Order creation, validation, inventory allocation, ID generation** |
-| **Live Status** | Subscribes to WebSockets, renders live timeline | Order status state machine, kitchen assignments |
-| **Billing** | Displays bill breakdown, payment method selection | **Final bill generation, rounding, invoice numbering, tax compliance** |
-| **Payments** | Captures input, triggers gateway / payment payload | **Payment verification, settlement, transaction ledger** |
-| **Printers** | Displays printer status, triggers reprint/retry requests | **Direct printer communication, ESC/POS formatting, queue management** |
+| **Kitchen KOT** | Render tickets, elapsed timers, status triggers | **Ticket ordering, kitchen routing, cancellation propagation** |
+| **Billing** | Display invoice, present payment options | **Official tax invoice generation, sequence numbering, settlement** |
+| **Inventory** | Display stock levels and threshold warnings | **Ingredient deductions, BOM consumption, race-condition locking** |
+| **Printing** | Queue print job request, monitor status | **Reliable ESC/POS network transmission, retry backoff** |
 
 ---
 
-## 5. Technology Stack
-- **Framework**: Next.js (App Router, Server & Client Components)
-- **Language**: TypeScript (Strict mode, zero `any`)
-- **Styling**: Tailwind CSS (Mobile-first, responsive, accessible design tokens)
-- **Server State & Caching**: TanStack Query (React Query v5)
-- **Client State**: Zustand (Cart, POS draft, ephemeral session state)
-- **Forms & Validation**: React Hook Form + Zod
-- **Real-Time Engine**: WebSocket Connection Manager + Event Dispatcher
-- **Testing**: Vitest, React Testing Library, Playwright E2E
-- **Tooling**: ESLint, Prettier
+## 5. Master Handover Documentation Sitemap
+
+For complete technical specifications, consult the dedicated guides:
+- [Backend Integration Matrix](./BACKEND_INTEGRATION_MATRIX.md)
+- [REST API Contract Specification](./API_CONTRACT.md)
+- [PostgreSQL Data Models & DDL](./DATA_MODELS.md)
+- [Order & Kitchen Workflows](./ORDER_AND_KITCHEN_WORKFLOWS.md)
+- [Billing & Payment Contract](./BILLING_AND_PAYMENT_CONTRACT.md)
+- [Authentication & Authorization](./AUTHENTICATION_AND_AUTHORIZATION.md)
+- [WebSocket Real-Time Contract](./WEBSOCKET_CONTRACT.md)
+- [QR Code System Specification](./QR_SYSTEM.md)
+- [Inventory & Recipe BOM Handover](./INVENTORY_HANDOVER.md)
+- [Hardware Printer Integration](./PRINTER_INTEGRATION.md)
+- [Environment Configuration](./ENVIRONMENT_SETUP.md)
+- [Error Handling Standards](./ERROR_HANDLING.md)
+- [Security & Multi-Tenancy Review](./SECURITY_REVIEW.md)
+- [VPS Integration Requirements](./VPS_INTEGRATION.md)
+- [Database Handover & Seed Data](./DATABASE_HANDOVER.md)
+- [Backend Integration Test Plan](./BACKEND_INTEGRATION_TEST_PLAN.md)
+- [Backend Handover Checklist](./BACKEND_HANDOVER_CHECKLIST.md)

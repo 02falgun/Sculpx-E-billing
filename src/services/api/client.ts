@@ -41,8 +41,24 @@ export class ApiClient {
       ...(headers as Record<string, string>),
     };
 
-    if (token) {
-      reqHeaders["Authorization"] = `Bearer ${token}`;
+    // Auto-resolve token if not explicitly provided
+    const resolvedToken =
+      token ||
+      (typeof window !== "undefined"
+        ? (() => {
+            try {
+              const raw = window.localStorage.getItem("restro_staff_auth");
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                return parsed?.state?.session?.token;
+              }
+            } catch {}
+            return undefined;
+          })()
+        : undefined);
+
+    if (resolvedToken) {
+      reqHeaders["Authorization"] = `Bearer ${resolvedToken}`;
     }
 
     try {

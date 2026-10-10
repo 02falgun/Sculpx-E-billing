@@ -1,12 +1,39 @@
 "use client";
 
 import * as React from "react";
+import { useQuery } from "@tanstack/react-query";
+import { userApi } from "@/services/api";
 import { DEMO_USERS, getRoleDisplayName } from "@/utils/auth";
 import { Users, ShieldCheck, KeyRound, Mail, Phone, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 export default function AdminUsersPage() {
-  const usersList = Object.values(DEMO_USERS);
+  const { data: apiUsersResponse } = useQuery({
+    queryKey: ["users"],
+    queryFn: async () => {
+      const res = await userApi.getUsers();
+      return res.success ? res.data : [];
+    },
+  });
+
+  const usersList = React.useMemo(() => {
+    if (apiUsersResponse && apiUsersResponse.length > 0) {
+      return apiUsersResponse.map((u) => {
+        const demoCfg = Object.values(DEMO_USERS).find(
+          (d) => d.user.id === u.id || d.user.email.toLowerCase() === u.email.toLowerCase(),
+        );
+        return {
+          user: u,
+          role: u.role,
+          roleName: demoCfg?.roleName || getRoleDisplayName(u.role),
+          defaultRoute: demoCfg?.defaultRoute || "/login",
+          description: demoCfg?.description || `Access privileges for ${getRoleDisplayName(u.role)}`,
+          badgeColor: demoCfg?.badgeColor || "bg-neutral-100 text-neutral-800 border-neutral-200",
+        };
+      });
+    }
+    return Object.values(DEMO_USERS);
+  }, [apiUsersResponse]);
 
   return (
     <div className="space-y-6">

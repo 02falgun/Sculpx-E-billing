@@ -23,6 +23,8 @@ import {
   Power,
 } from "lucide-react";
 
+import { ENV } from "@/config";
+
 interface QRItem {
   id: string;
   type: "TABLE" | "ROOM";
@@ -49,12 +51,13 @@ export function QRCodeGeneratorManager() {
   // Active status local tracking
   const [statusMap, setStatusMap] = React.useState<Record<string, boolean>>({});
 
-  // Base URL for QR Links
+  // Base URL for QR Links configured via environment
   const baseUrl = React.useMemo(() => {
+    if (ENV.APP_URL) return ENV.APP_URL.replace(/\/$/, "");
     if (typeof window !== "undefined") {
       return window.location.origin;
     }
-    return "https://sculpx-e-billing.vercel.app";
+    return "http://localhost:3000";
   }, []);
 
   // Compute active item
