@@ -58,6 +58,12 @@ function loadEnv(): Env {
         "Production startup aborted: JWT_SECRET must be configured with at least 32 cryptographically secure characters."
       );
     }
+
+    if (data.ALLOW_DEMO_SEED) {
+      throw new Error(
+        "Production startup aborted: ALLOW_DEMO_SEED cannot be enabled in production environments."
+      );
+    }
   }
 
   return data;

@@ -9,9 +9,22 @@ export interface RequestOptions extends RequestInit {
 
 export class ApiClient {
   private baseUrl: string;
+  private authToken: string | null = null;
 
   constructor(baseUrl: string = ENV.API_URL) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
+  }
+
+  setAuthToken(token: string | null): void {
+    this.authToken = token;
+  }
+
+  getAuthToken(): string | null {
+    return this.authToken;
+  }
+
+  setBaseUrl(url: string): void {
+    this.baseUrl = url.replace(/\/$/, "");
   }
 
   async request<T>(endpoint: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
@@ -36,14 +49,18 @@ export class ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const reqHeaders: Record<string, string> = {
-      "Content-Type": "application/json",
       Accept: "application/json",
       ...(headers as Record<string, string>),
     };
 
-    // Auto-resolve token if not explicitly provided
+    if (rest.body !== undefined) {
+      reqHeaders["Content-Type"] = "application/json";
+    }
+
+    // Auto-resolve token: explicit option > in-memory authToken > localStorage
     const resolvedToken =
       token ||
+      this.authToken ||
       (typeof window !== "undefined"
         ? (() => {
             try {

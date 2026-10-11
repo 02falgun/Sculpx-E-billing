@@ -54,10 +54,10 @@ export function PrinterFleetManager() {
   // Form state
   const [formName, setFormName] = React.useState("");
   const [formType, setFormType] = React.useState<"KITCHEN" | "BAR" | "BILLING">("KITCHEN");
-  const [formIpAddress, setFormIpAddress] = React.useState("192.168.1.200");
+  const [formIpAddress, setFormIpAddress] = React.useState("");
   const [formPort, setFormPort] = React.useState(9100);
-  const [formStation, setFormStation] = React.useState("Hot Kitchen");
-  const [formLocation, setFormLocation] = React.useState("Kitchen Expediter Desk");
+  const [formStation, setFormStation] = React.useState("");
+  const [formLocation, setFormLocation] = React.useState("");
   const [formPaperWidth, setFormPaperWidth] = React.useState<58 | 80>(80);
 
   const printJobs = printJobsData?.data || [];
@@ -67,10 +67,10 @@ export function PrinterFleetManager() {
     setEditingPrinter(null);
     setFormName("");
     setFormType("KITCHEN");
-    setFormIpAddress("192.168.1.200");
+    setFormIpAddress("");
     setFormPort(9100);
-    setFormStation("Hot Kitchen");
-    setFormLocation("Main Kitchen Line");
+    setFormStation("");
+    setFormLocation("");
     setFormPaperWidth(80);
     setIsAddModalOpen(true);
   };
@@ -80,10 +80,10 @@ export function PrinterFleetManager() {
     setFormName(printer.name);
     const validTypes: Array<"KITCHEN" | "BAR" | "BILLING"> = ["KITCHEN", "BAR", "BILLING"];
     setFormType(validTypes.includes(printer.type as any) ? (printer.type as any) : "KITCHEN");
-    setFormIpAddress(printer.ipAddress || "192.168.1.100");
+    setFormIpAddress(printer.ipAddress || "");
     setFormPort(printer.port || 9100);
-    setFormStation(printer.station || printer.name);
-    setFormLocation(printer.location || "Station Desk");
+    setFormStation(printer.station || "");
+    setFormLocation(printer.location || "");
     setFormPaperWidth((printer.paperWidthMm as 58 | 80) || 80);
     setIsAddModalOpen(true);
   };
