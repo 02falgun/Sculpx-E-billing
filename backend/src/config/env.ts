@@ -18,7 +18,7 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
-  CORS_ORIGIN: z.string().default("http://localhost:3000"),
+  CORS_ORIGIN: z.string().default("http://localhost:3000,https://sculpx-e-billing.vercel.app"),
   DATABASE_URL: z.string().optional(),
   DIRECT_URL: z.string().optional(),
   API_PREFIX: z.string().default("/api"),

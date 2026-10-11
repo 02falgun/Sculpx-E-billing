@@ -50,6 +50,13 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       if (env.NODE_ENV === "development" && origin.startsWith("http://localhost")) {
         return cb(null, true);
       }
+      // Allow Vercel preview and production deployments
+      if (
+        origin === "https://sculpx-e-billing.vercel.app" ||
+        origin.endsWith(".vercel.app")
+      ) {
+        return cb(null, true);
+      }
       return cb(null, false);
     },
     credentials: true,
