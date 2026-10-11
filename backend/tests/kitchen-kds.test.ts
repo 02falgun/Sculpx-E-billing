@@ -204,7 +204,7 @@ describe("SCULPX E-Billing — Phase 3C: KOT Status Progression & KDS Workflow",
   });
 
   // Helper to create an order with an associated KOT
-  async function createTestOrderWithKot(tenantId = TEST_TENANT_A, initialStatus = KotStatus.NEW) {
+  async function createTestOrderWithKot(tenantId = TEST_TENANT_A, initialStatus: KotStatus = KotStatus.NEW) {
     const timestamp = Date.now();
     const orderNumber = `ORD-KDS-${timestamp}`;
     const kotNumber = `KOT-KDS-${timestamp}`;
