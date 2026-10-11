@@ -427,7 +427,11 @@ export class PrintJobService {
       });
 
       // 2. Transmit to physical hardware via adapter
-      const result = await adapter.print(job.printer, escPosBuffer);
+      const result = await adapter.print(job.printer, escPosBuffer, {
+        jobId: job.id,
+        jobType: job.jobType,
+        isReprint: job.isReprint,
+      });
 
       if (result.success) {
         // Successful transmission

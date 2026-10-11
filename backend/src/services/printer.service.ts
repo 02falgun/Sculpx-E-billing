@@ -4,6 +4,7 @@ import { AppError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import type { IPrinterAdapter, PrinterHealthResult } from "./printer-adapters/types.js";
 import { NetworkEscPosAdapter } from "./printer-adapters/network-escpos.adapter.js";
+import { HybridPrinterAdapter } from "./printer-adapters/agent.adapter.js";
 
 export interface CreatePrinterInput {
   name: string;
@@ -17,6 +18,7 @@ export interface CreatePrinterInput {
   isActive?: boolean;
   isDefault?: boolean;
   connectionType?: string;
+  agentId?: string | null;
 }
 
 export interface UpdatePrinterInput {
@@ -31,6 +33,7 @@ export interface UpdatePrinterInput {
   isActive?: boolean;
   isDefault?: boolean;
   connectionType?: string;
+  agentId?: string | null;
 }
 
 export interface ListPrintersFilter {
@@ -43,7 +46,7 @@ export class PrinterService {
   private adapter: IPrinterAdapter;
 
   constructor(adapter?: IPrinterAdapter) {
-    this.adapter = adapter || new NetworkEscPosAdapter();
+    this.adapter = adapter || new HybridPrinterAdapter();
   }
 
   /**
@@ -123,6 +126,7 @@ export class PrinterService {
         isActive: input.isActive !== undefined ? input.isActive : true,
         isDefault: Boolean(input.isDefault),
         connectionType: input.connectionType || "NETWORK_TCP",
+        agentId: input.agentId || null,
         isOnline: true,
       },
     });
@@ -172,6 +176,7 @@ export class PrinterService {
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
         ...(input.isDefault !== undefined ? { isDefault: input.isDefault } : {}),
         ...(input.connectionType !== undefined ? { connectionType: input.connectionType } : {}),
+        ...(input.agentId !== undefined ? { agentId: input.agentId } : {}),
       },
     });
 

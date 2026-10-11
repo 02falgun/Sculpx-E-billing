@@ -13,6 +13,7 @@ import { websocketRoutes } from "./routes/websocket.js";
 import { websocketService } from "./services/websocket.service.js";
 import { outboxService } from "./services/outbox.service.js";
 import { printWorkerService } from "./services/print-worker.service.js";
+import { printAgentGatewayService } from "./services/print-agent-gateway.service.js";
 
 export interface BuildAppOptions {
   fastifyOptions?: FastifyServerOptions;
@@ -98,6 +99,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   // Clean shutdown hook
   app.addHook("onClose", async () => {
+    printAgentGatewayService.shutdown();
     websocketService.shutdown();
     outboxService.stopBackgroundWorker();
     await printWorkerService.stopBackgroundWorker();

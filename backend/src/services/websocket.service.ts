@@ -98,8 +98,13 @@ export class WebSocketService {
       },
     });
 
-    // Attempt immediate handshake authentication if token or qrToken is present in query string
+    // Handshake authentication: prefer in-band AUTHENTICATE frame; warn on query tokens
     if (query.token) {
+      logger.warn({
+        event: "websocket_query_token_deprecated",
+        clientId,
+        msg: "Passing JWT in query string is deprecated for security; use in-band AUTHENTICATE message frame",
+      });
       await this.authenticateWithStaffToken(client, query.token);
     } else if (query.qrToken) {
       await this.authenticateWithQrToken(client, query.qrToken);

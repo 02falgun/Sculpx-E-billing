@@ -21,7 +21,11 @@ export interface IPrinterAdapter {
    * Transmit binary or string print payload to printer hardware.
    * Resolves with outcome, identifying definite success, definite failure, or uncertain delivery.
    */
-  print(printer: Printer, data: Buffer | string): Promise<PrinterAdapterResult>;
+  print(
+    printer: Printer,
+    data: Buffer | string,
+    context?: { jobId?: string; jobType?: string; isReprint?: boolean }
+  ): Promise<PrinterAdapterResult>;
 
   /**
    * Probe physical device readiness (e.g. TCP connect or ping).

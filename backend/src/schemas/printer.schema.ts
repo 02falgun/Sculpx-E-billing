@@ -29,6 +29,7 @@ export const createPrinterBodySchema = z.object({
   isActive: z.boolean().default(true),
   isDefault: z.boolean().default(false),
   connectionType: z.string().max(50).default("NETWORK_TCP"),
+  agentId: z.string().uuid("Invalid agent ID format").nullable().optional(),
 });
 
 export type CreatePrinterBody = z.infer<typeof createPrinterBodySchema>;
@@ -47,6 +48,7 @@ export const updatePrinterBodySchema = z.object({
   isActive: z.boolean().optional(),
   isDefault: z.boolean().optional(),
   connectionType: z.string().max(50).optional(),
+  agentId: z.string().uuid("Invalid agent ID format").nullable().optional(),
 });
 
 export type UpdatePrinterBody = z.infer<typeof updatePrinterBodySchema>;

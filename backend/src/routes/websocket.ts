@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { websocketService } from "../services/websocket.service.js";
+import { printAgentGatewayService } from "../services/print-agent-gateway.service.js";
 
 export const websocketRoutes: FastifyPluginAsync = async (fastify) => {
   /**
@@ -9,6 +10,15 @@ export const websocketRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get("/ws", { websocket: true }, (socket, req) => {
     websocketService.handleConnection(socket, req);
+  });
+
+  /**
+   * GET /ws/print-agent
+   * Dedicated authenticated WebSocket endpoint for Local Print Agent daemon.
+   * Enforces independent device credentials (never staff tokens) and routes local ESC/POS print jobs.
+   */
+  fastify.get("/ws/print-agent", { websocket: true }, (socket, req) => {
+    printAgentGatewayService.handleConnection(socket, req);
   });
 
   /**

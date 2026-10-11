@@ -633,6 +633,19 @@ Delivered full end-to-end kitchen status progression lifecycle, PostgreSQL row-l
 - **Production Policy**: Physical printer commissioning requires on-site hardware connection; mock and network loopback adapters validated 100% of the software pipeline without fabricating physical hardware telemetry.
 - **Deployment Strategy**: Documented VPN tunnel (WireGuard) and local outbound print gateway architecture to securely bridge cloud VPS to venue LAN printers without exposing port 9100.
 
+---
+
+## 17. Phase 6F: Secure Local Print Agent & Cloud Gateway
+
+### 17.1 Implementation Overview
+- **Cloud Gateway**: Implemented `PrintAgentGatewayService` handling `/ws/print-agent` WebSocket connections with independent device credentials (`X-Agent-Id`, `X-Agent-Key` or in-band `AGENT_HELLO`).
+- **Local Agent Daemon**: Built standalone Node.js/TypeScript service in `agent/` establishing outbound WSS connections with exponential backoff and jitter, local RFC 1918 LAN printer socket bridge, bounded frame limits (64 KB), and SSRF prevention.
+- **Hybrid Printer Adapter**: Implemented `HybridPrinterAdapter` and `AgentPrinterAdapter` fulfilling `IPrinterAdapter`, seamlessly dispatching jobs through connected agents without altering core queue worker semantics.
+- **REST Administration**: Registered `/api/v1/print-agents` with device enrollment, key rotation, device revocation, and printer permission binding.
+- **Security Hardening**: Eliminated long-lived staff JWTs from WebSocket URL query strings in browser client; audited and strictly separated device credentials from staff user tokens.
+- **Verification**: 15 new automated end-to-end integration tests in `backend/tests/print-agent.test.ts` (100% passing) and 17 regression tests in `backend/tests/printers.test.ts` (100% passing).
+
+
 
 
 

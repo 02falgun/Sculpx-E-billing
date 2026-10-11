@@ -15,7 +15,8 @@
     "prisma:validate": "prisma validate",
     "prisma:generate": "prisma generate",
     "db:seed": "tsx src/scripts/seed.ts",
-    "worker:outbox": "tsx src/scripts/outbox-worker.ts"
+    "worker:outbox": "tsx src/scripts/outbox-worker.ts",
+    "agent": "tsx ../agent/src/index.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.0",

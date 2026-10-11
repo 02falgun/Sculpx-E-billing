@@ -64,27 +64,31 @@ export class WebSocketManager implements IWebSocketClient {
     }
 
     try {
-      // Resolve staff authentication token if present in localStorage
-      let connectionUrl = this.url;
-      try {
-        const raw = window.localStorage.getItem("restro_staff_auth");
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const token = parsed?.state?.session?.token;
-          if (token && !connectionUrl.includes("token=")) {
-            connectionUrl +=
-              (connectionUrl.includes("?") ? "&" : "?") + `token=${encodeURIComponent(token)}`;
-          }
-        }
-      } catch {}
-
-      this.socket = new WebSocket(connectionUrl);
+      // Connect to clean WebSocket URL without leaking JWT in query string logs/proxies
+      this.socket = new WebSocket(this.url);
 
       this.socket.onopen = () => {
         const wasReconnecting = this.reconnectAttempts > 0;
         this.reconnectAttempts = 0;
         this.setState("CONNECTED");
         this.startHeartbeat();
+
+        // In-band staff authentication frame to eliminate JWT tokens from URL query strings
+        try {
+          const raw = window.localStorage.getItem("restro_staff_auth");
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const token = parsed?.state?.session?.token;
+            if (token && this.socket && this.socket.readyState === WebSocket.OPEN) {
+              this.socket.send(
+                JSON.stringify({
+                  action: "AUTHENTICATE",
+                  token,
+                })
+              );
+            }
+          }
+        } catch {}
 
         // Resubscribe to all registered topics on connection/reconnection
         this.activeTopics.forEach((topic) => {
