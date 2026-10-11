@@ -65,7 +65,7 @@ describe("SCULPX E-Billing — Live Frontend Client & Real Fastify API Integrati
     expect(res.data.user.role).toBe("ADMIN");
 
     adminToken = res.data.token;
-    tenantId = res.data.user.tenantId;
+    tenantId = (res.data.user as any).tenantId;
 
     // Attach token to ApiClient
     apiClient.setAuthToken(adminToken);
@@ -81,7 +81,7 @@ describe("SCULPX E-Billing — Live Frontend Client & Real Fastify API Integrati
     expect(categoriesRes.success).toBe(true);
     expect(Array.isArray(categoriesRes.data)).toBe(true);
 
-    const itemsRes = await menuService.getMenuItems({ limit: 10 });
+    const itemsRes = await menuService.getMenuItems();
     expect(itemsRes.success).toBe(true);
     expect(Array.isArray(itemsRes.data)).toBe(true);
     expect(itemsRes.data.length).toBeGreaterThan(0);
@@ -169,7 +169,7 @@ describe("SCULPX E-Billing — Live Frontend Client & Real Fastify API Integrati
       // Transition KOT to ACCEPTED
       const acceptRes = await kitchenService.updateKOTStatus(generatedKotId, {
         status: "ACCEPTED" as any,
-        notes: "KDS acknowledged ticket",
+        note: "KDS acknowledged ticket",
       });
       if (!acceptRes.success) {
         console.error("DEBUG ACCEPT RES:", JSON.stringify(acceptRes));
@@ -180,7 +180,7 @@ describe("SCULPX E-Billing — Live Frontend Client & Real Fastify API Integrati
       // Transition KOT to PREPARING
       const prepRes = await kitchenService.updateKOTStatus(generatedKotId, {
         status: "PREPARING" as any,
-        notes: "Chef fired ticket",
+        note: "Chef fired ticket",
       });
       expect(prepRes.success).toBe(true);
       expect(prepRes.data.status).toBe("PREPARING");
@@ -188,7 +188,7 @@ describe("SCULPX E-Billing — Live Frontend Client & Real Fastify API Integrati
       // Transition KOT to READY
       const readyRes = await kitchenService.updateKOTStatus(generatedKotId, {
         status: "READY" as any,
-        notes: "Plated and expediting",
+        note: "Plated and expediting",
       });
       expect(readyRes.success).toBe(true);
       expect(readyRes.data.status).toBe("READY");
@@ -196,7 +196,7 @@ describe("SCULPX E-Billing — Live Frontend Client & Real Fastify API Integrati
       // Transition KOT to SERVED
       const servedRes = await kitchenService.updateKOTStatus(generatedKotId, {
         status: "SERVED" as any,
-        notes: "Runner delivered to table",
+        note: "Runner delivered to table",
       });
       expect(servedRes.success).toBe(true);
       expect(servedRes.data.status).toBe("SERVED");
@@ -226,8 +226,8 @@ describe("SCULPX E-Billing — Live Frontend Client & Real Fastify API Integrati
       });
 
       expect(paymentRes.success).toBe(true);
-      expect(paymentRes.data.billStatus).toBe("PAID");
-      expect(Number(paymentRes.data.dueAmount)).toBe(0);
+      expect((paymentRes.data as any).billStatus).toBe("PAID");
+      expect(Number((paymentRes.data as any).dueAmount)).toBe(0);
     },
     60000
   );

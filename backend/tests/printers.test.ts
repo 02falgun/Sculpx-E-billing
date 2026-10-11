@@ -5,7 +5,7 @@ import { prisma } from "../src/lib/prisma.js";
 import { printerService } from "../src/services/printer.service.js";
 import { printJobService } from "../src/services/print-job.service.js";
 import { printWorkerService } from "../src/services/print-worker.service.js";
-import { MockPrinterAdapter } from "../src/services/printer-adapters/mock.adapter.ts";
+import { MockPrinterAdapter } from "../src/services/printer-adapters/mock.adapter.js";
 import { PrinterRenderer } from "../src/services/printer-renderer.js";
 import { PrinterType, PrintJobStatus } from "@prisma/client";
 
