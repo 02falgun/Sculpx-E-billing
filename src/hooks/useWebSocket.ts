@@ -29,6 +29,9 @@ export function useOrderUpdates(orderId?: string) {
   useEffect(() => {
     webSocketManager.connect();
 
+    const topic = orderId ? `order:${orderId}` : "orders:all";
+    webSocketManager.subscribeToTopic(topic);
+
     const orderEvents: WebSocketEventType[] = [
       "ORDER_CREATED",
       "ORDER_CONFIRMED",
@@ -37,12 +40,16 @@ export function useOrderUpdates(orderId?: string) {
       "ORDER_READY",
       "ORDER_SERVED",
       "ORDER_CANCELLED",
+      "KOT_READY",
+      "KOT_UPDATED",
+      "KOT_STATUS_UPDATED",
+      "RECONNECTED",
     ];
 
     const unsubs = orderEvents.map((eventType) =>
       webSocketManager.subscribe(
         eventType,
-        (msg: WebSocketMessage) => {
+        (_msg: WebSocketMessage) => {
           // If listening to a specific order
           if (orderId) {
             queryClient.invalidateQueries({ queryKey: ["orders", orderId] });
@@ -51,12 +58,13 @@ export function useOrderUpdates(orderId?: string) {
           queryClient.invalidateQueries({ queryKey: ["orders", "list"] });
           queryClient.invalidateQueries({ queryKey: ["kitchen", "kots"] });
         },
-        orderId ? `order:${orderId}` : undefined,
+        topic,
       ),
     );
 
     return () => {
       unsubs.forEach((unsub) => unsub());
+      webSocketManager.unsubscribeFromTopic(topic);
     };
   }, [orderId, queryClient]);
 }
@@ -67,18 +75,50 @@ export function useKitchenUpdates() {
   useEffect(() => {
     webSocketManager.connect();
 
-    const unsubCreated = webSocketManager.subscribe("KOT_CREATED", () => {
-      queryClient.invalidateQueries({ queryKey: ["kitchen", "kots"] });
-    });
+    const topic = "kitchen:kots";
+    webSocketManager.subscribeToTopic(topic);
 
-    const unsubUpdated = webSocketManager.subscribe("KOT_UPDATED", () => {
-      queryClient.invalidateQueries({ queryKey: ["kitchen", "kots"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-    });
+    const unsubCreated = webSocketManager.subscribe(
+      "KOT_CREATED",
+      () => {
+        queryClient.invalidateQueries({ queryKey: ["kitchen", "kots"] });
+      },
+      topic
+    );
+
+    const unsubUpdated = webSocketManager.subscribe(
+      "KOT_UPDATED",
+      () => {
+        queryClient.invalidateQueries({ queryKey: ["kitchen", "kots"] });
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+      },
+      topic
+    );
+
+    const unsubStatusUpdated = webSocketManager.subscribe(
+      "KOT_STATUS_UPDATED",
+      () => {
+        queryClient.invalidateQueries({ queryKey: ["kitchen", "kots"] });
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+      },
+      topic
+    );
+
+    // When connection is restored, immediately refetch authoritative database state
+    const unsubReconnected = webSocketManager.subscribe(
+      "RECONNECTED",
+      () => {
+        queryClient.invalidateQueries({ queryKey: ["kitchen", "kots"] });
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+      }
+    );
 
     return () => {
       unsubCreated();
       unsubUpdated();
+      unsubStatusUpdated();
+      unsubReconnected();
+      webSocketManager.unsubscribeFromTopic(topic);
     };
   }, [queryClient]);
 }
@@ -89,40 +129,44 @@ export function useBillingUpdates(billId?: string) {
   useEffect(() => {
     webSocketManager.connect();
 
-    const unsubBill = webSocketManager.subscribe("BILL_UPDATED", () => {
-      if (billId) {
-        queryClient.invalidateQueries({ queryKey: ["bills", billId] });
-      }
-      queryClient.invalidateQueries({ queryKey: ["bills"] });
-    });
+    const topic = billId ? `order:${billId}` : "billing:all";
+    webSocketManager.subscribeToTopic(topic);
 
-    const unsubPayment = webSocketManager.subscribe("PAYMENT_UPDATED", () => {
-      if (billId) {
-        queryClient.invalidateQueries({ queryKey: ["bills", billId] });
+    const unsubBill = webSocketManager.subscribe(
+      "BILL_UPDATED",
+      () => {
+        if (billId) {
+          queryClient.invalidateQueries({ queryKey: ["bills", billId] });
+        }
+        queryClient.invalidateQueries({ queryKey: ["bills"] });
+      },
+      topic
+    );
+
+    const unsubPayment = webSocketManager.subscribe(
+      "PAYMENT_UPDATED",
+      () => {
+        if (billId) {
+          queryClient.invalidateQueries({ queryKey: ["bills", billId] });
+          queryClient.invalidateQueries({ queryKey: ["orders", billId] });
+        }
+        queryClient.invalidateQueries({ queryKey: ["bills"] });
+      },
+      topic
+    );
+
+    const unsubReconnected = webSocketManager.subscribe(
+      "RECONNECTED",
+      () => {
+        queryClient.invalidateQueries({ queryKey: ["bills"] });
       }
-      queryClient.invalidateQueries({ queryKey: ["bills"] });
-    });
+    );
 
     return () => {
       unsubBill();
       unsubPayment();
+      unsubReconnected();
+      webSocketManager.unsubscribeFromTopic(topic);
     };
   }, [billId, queryClient]);
-}
-
-export function usePrintJobUpdates() {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    webSocketManager.connect();
-
-    const unsub = webSocketManager.subscribe("PRINT_JOB_UPDATED", () => {
-      queryClient.invalidateQueries({ queryKey: ["print-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["printers"] });
-    });
-
-    return () => {
-      unsub();
-    };
-  }, [queryClient]);
 }

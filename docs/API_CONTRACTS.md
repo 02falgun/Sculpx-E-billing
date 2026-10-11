@@ -109,15 +109,15 @@
 | 19 | `/menu/modifier-groups/:id` | `PATCH`, `DELETE` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
 | 20 | `/menu/modifier-groups/:id/options` | `POST` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
 | 21 | `/menu/modifier-options/:id` | `PATCH`, `DELETE` | `/admin/menu` | Bearer (`ADMIN`) | **Verified (Backend)** |
-| 14 | `/orders/validate` | `POST` | `/checkout` | Public | **Verified (Backend)** |
-| 15 | `/orders` | `POST` | `/checkout`, `/staff/pos` | Public / Staff | **Verified (Backend Phase 3B.3)** |
-| 16 | `/orders/:id` | `GET` | `/order/[orderId]` | Public (Token) / Staff | Verified in Client |
-| 17 | `/orders` | `GET` | `/orders`, `/staff/orders` | Bearer (`WAITER`+) | Verified in Client |
+| 14 | `/orders/validate` | `POST` | `/checkout` | Public | **Verified (Backend + Client)** |
+| 15 | `/orders` | `POST` | `/checkout`, `/staff/pos` | Public / Staff | **Verified (Backend + Client Phase 3B.4)** |
+| 16 | `/orders/:id` | `GET` | `/order/[orderId]` | Public (Token) / Staff | **Verified (Backend + Client)** |
+| 17 | `/orders` | `GET` | `/orders`, `/staff/orders` | Bearer (`WAITER`+) | **Verified (Backend + Client)** |
 | 18 | `/orders/:id/status` | `PATCH` | Staff Order Modals | Bearer (`WAITER`+) | Verified in Client |
 | 19 | `/orders/:id/cancel` | `POST` | Order Cancel Dialog | Public / Staff | Verified in Client |
-| 20 | `/kitchen/kots` | `GET` | `/kitchen` | Bearer (`KITCHEN`+) | Verified in Client |
-| 21 | `/kitchen/kots/:id` | `GET` | KOT Detail Drawer | Bearer (`KITCHEN`+) | Verified in Client |
-| 22 | `/kitchen/kots/:id/status` | `PATCH` | KDS Action Buttons | Bearer (`KITCHEN`+) | Verified in Client |
+| 20 | `/kitchen/kots` | `GET` | `/kitchen` | Bearer (`KITCHEN`+) | **Verified (Backend + Client Phase 3C)** |
+| 21 | `/kitchen/kots/:id` | `GET` | KOT Detail Drawer | Bearer (`KITCHEN`+) | **Verified (Backend + Client Phase 3C)** |
+| 22 | `/kitchen/kots/:id/status` | `PATCH` | KDS Action Buttons | Bearer (`KITCHEN`+) | **Verified (Backend + Client Phase 3C)** |
 | 23 | `/bills/:id` | `GET` | `/bill/[billId]` | Public / Staff | Verified in Client |
 | 24 | `/bills/order/:orderId` | `GET` | `/cashier/bills` | Bearer (`CASHIER`+) | Verified in Client |
 | 25 | `/bills` | `GET` | `/cashier/bills` | Bearer (`CASHIER`+) | Verified in Client |
@@ -751,9 +751,68 @@
 
 ### 3.3 Kitchen & KDS
 
+#### `GET /api/v1/kitchen/kots`
+- **Aliases**: `/api/kitchen/kots`
+- **Status**: **Verified & Implemented (Backend + Client Phase 3C)**
+- **Purpose**: Retrieve active kitchen order tickets (excluding SERVED and CANCELLED) for the kitchen display board.
+- **Auth**: Bearer (`KITCHEN_STAFF`, `MANAGER`, `ADMIN`, `SUPER_ADMIN`).
+- **Query Parameters**:
+  - `station`: string (optional, e.g. "Main Kitchen")
+- **Success (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "id": "c71be39c-48c9-4b61-9c88-66170dcb7684",
+        "kotNumber": "KOT-20261011-0001",
+        "orderId": "b1a2c3d4-...",
+        "orderNumber": "ORD-20261011-0001",
+        "status": "ACCEPTED",
+        "station": "Main Kitchen",
+        "urgency": "NORMAL",
+        "specialNotes": "Less spicy please",
+        "acceptedAt": "2026-10-11T12:00:00.000Z",
+        "readyAt": null,
+        "servedAt": null,
+        "createdAt": "2026-10-11T11:58:00.000Z",
+        "updatedAt": "2026-10-11T12:00:00.000Z",
+        "qrContext": {
+          "type": "TABLE",
+          "identifier": "T-01",
+          "displayName": "Table 01",
+          "roomOrTableId": "f1a2b3c4-..."
+        },
+        "items": [
+          {
+            "id": "ki-1",
+            "orderItemId": "oi-1",
+            "menuItemId": "073fc4c7-...",
+            "name": "Butter Chicken Special",
+            "quantity": 2,
+            "modifiers": [{ "name": "Full Portion" }],
+            "modifiersSummary": "Full Portion",
+            "specialInstructions": "Fresh coriander on top",
+            "status": "PLACED"
+          }
+        ]
+      }
+    ]
+  }
+  ```
+
+#### `GET /api/v1/kitchen/kots/:id`
+- **Aliases**: `/api/kitchen/kots/:id`
+- **Status**: **Verified & Implemented (Backend + Client Phase 3C)**
+- **Purpose**: Retrieve a single KOT ticket by UUID.
+- **Auth**: Bearer (`KITCHEN_STAFF`, `MANAGER`, `ADMIN`, `SUPER_ADMIN`).
+- **Success (`200 OK`)**: Standard envelope containing formatted KOT.
+
 #### `PATCH /api/v1/kitchen/kots/:id/status`
-- **Purpose**: Update kitchen preparation state.
-- **Auth**: Bearer (`KITCHEN_STAFF`, `MANAGER`).
+- **Aliases**: `/api/kitchen/kots/:id/status`
+- **Status**: **Verified & Implemented (Backend + Client Phase 3C)**
+- **Purpose**: Atomically advance KOT status across documented lifecycle (`NEW/PENDING` -> `ACCEPTED` -> `PREPARING` -> `READY` -> `SERVED`), synchronize linked `OrderItem` statuses, recalculate parent `Order` progress, record transactional outbox events, and guarantee post-commit WebSocket dispatching.
+- **Auth**: Bearer (`KITCHEN_STAFF`, `MANAGER`, `ADMIN`, `SUPER_ADMIN`).
 - **Request Body**:
   ```json
   {
@@ -765,13 +824,35 @@
   ```json
   {
     "success": true,
+    "message": "KOT #KOT-20261011-0001 status updated to PREPARING",
     "data": {
-      "id": "kot-0819",
+      "id": "c71be39c-48c9-4b61-9c88-66170dcb7684",
+      "kotNumber": "KOT-20261011-0001",
+      "orderId": "b1a2c3d4-...",
+      "orderNumber": "ORD-20261011-0001",
       "status": "PREPARING",
-      "acceptedAt": "2026-10-10T15:35:00.000Z"
+      "station": "Main Kitchen",
+      "urgency": "NORMAL",
+      "acceptedAt": "2026-10-11T12:00:00.000Z",
+      "readyAt": null,
+      "servedAt": null,
+      "createdAt": "2026-10-11T11:58:00.000Z",
+      "updatedAt": "2026-10-11T12:02:00.000Z",
+      "qrContext": {
+        "type": "TABLE",
+        "identifier": "T-01",
+        "displayName": "Table 01"
+      },
+      "items": [ ... ]
     }
   }
   ```
+- **Error Codes**:
+  - `400 VALIDATION_FAILED`: Invalid UUID path parameter, missing or unknown status enum value.
+  - `401 UNAUTHORIZED`: Missing or invalid Bearer JWT.
+  - `403 FORBIDDEN`: Insufficient role (e.g. `WAITER`, `CASHIER`).
+  - `404 KOT_NOT_FOUND`: KOT does not exist or belongs to a different tenant.
+  - `409 INVALID_STATUS_TRANSITION`: Illegal lifecycle transition (e.g., `NEW -> READY` or `SERVED -> PREPARING`). Repeated requests for the same status return `200 OK` safe replay.
 
 ---
 

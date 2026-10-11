@@ -23,6 +23,7 @@ const delay = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class MockOrderService implements IOrderService {
   private orders: Order[] = MOCK_ORDERS;
+  private idempotencyCache = new Map<string, { hash: string; order: Order }>();
 
   async validateOrder(payload: CreateOrderPayload): Promise<ApiResponse<OrderValidationResult>> {
     await delay(100);
@@ -66,8 +67,41 @@ export class MockOrderService implements IOrderService {
     };
   }
 
-  async createOrder(payload: CreateOrderPayload): Promise<ApiResponse<Order>> {
+  async createOrder(
+    payload: CreateOrderPayload,
+    options?: { idempotencyKey?: string }
+  ): Promise<ApiResponse<Order>> {
     await delay(250);
+
+    const idempotencyKey = options?.idempotencyKey;
+    const requestHash = JSON.stringify({
+      qrToken: payload.qrToken,
+      items: payload.items,
+      customerName: payload.customerName,
+      customerPhone: payload.customerPhone,
+      specialInstructions: payload.specialInstructions,
+      paymentPreference: payload.paymentPreference,
+    });
+
+    if (idempotencyKey) {
+      const cached = this.idempotencyCache.get(idempotencyKey);
+      if (cached) {
+        if (cached.hash === requestHash) {
+          return {
+            success: true,
+            data: cached.order,
+          };
+        }
+        return {
+          success: false,
+          data: null as unknown as Order,
+          error: {
+            code: "IDEMPOTENCY_CONFLICT",
+            message: "An order with this idempotency key was already submitted with different parameters",
+          },
+        };
+      }
+    }
     const context = MOCK_QR_CONTEXTS[payload.qrToken] || {
       token: payload.qrToken,
       type: "TABLE",
@@ -219,6 +253,13 @@ export class MockOrderService implements IOrderService {
         tbl.activeOrderId = newOrder.id;
         tbl.activeBillId = newBill.id;
       }
+    }
+
+    if (idempotencyKey) {
+      this.idempotencyCache.set(idempotencyKey, {
+        hash: requestHash,
+        order: newOrder,
+      });
     }
 
     return { success: true, data: newOrder, message: "Order placed successfully" };

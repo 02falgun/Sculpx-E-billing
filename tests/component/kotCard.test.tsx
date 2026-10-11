@@ -83,4 +83,38 @@ describe("KOTCard Component (Phase 7 KDS)", () => {
       screen.getByRole("button", { name: /Mark Ready to Serve/i })
     ).toBeInTheDocument();
   });
+
+  it("should render Accept Ticket action button during NEW or PENDING stage", () => {
+    const newKot: KOT = { ...mockKOT, id: "kot-new", status: "NEW" };
+    renderWithClient(<KOTCard kot={newKot} />);
+
+    expect(
+      screen.getByRole("button", { name: /Accept Ticket/i })
+    ).toBeInTheDocument();
+  });
+
+  it("should render Start Cooking action button during ACCEPTED stage", () => {
+    const acceptedKot: KOT = { ...mockKOT, id: "kot-acc", status: "ACCEPTED" };
+    renderWithClient(<KOTCard kot={acceptedKot} />);
+
+    expect(
+      screen.getByRole("button", { name: /Start Cooking/i })
+    ).toBeInTheDocument();
+  });
+
+  it("should render Expedite & Complete action button during READY stage", () => {
+    const readyKot: KOT = { ...mockKOT, id: "kot-rdy", status: "READY" };
+    renderWithClient(<KOTCard kot={readyKot} />);
+
+    expect(
+      screen.getByRole("button", { name: /Expedite & Complete/i })
+    ).toBeInTheDocument();
+  });
+
+  it("should render Served & Expedited badge when ticket status is SERVED", () => {
+    const servedKot: KOT = { ...mockKOT, id: "kot-srv", status: "SERVED" };
+    renderWithClient(<KOTCard kot={servedKot} />);
+
+    expect(screen.getByText(/Served & Expedited/i)).toBeInTheDocument();
+  });
 });

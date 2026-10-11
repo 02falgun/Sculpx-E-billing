@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useActiveKOTs } from "@/hooks/useKitchen";
-import { useKitchenUpdates } from "@/hooks/useWebSocket";
+import { useKitchenUpdates, useWebSocketConnection } from "@/hooks/useWebSocket";
+import { webSocketManager } from "@/services/websocket";
 import { KOTCard } from "./KOTCard";
 import { Spinner } from "@/components/ui/Spinner";
 import { ErrorState } from "@/components/ui/EmptyState";
@@ -13,31 +14,46 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
+  RefreshCw,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 export function KDSBoard() {
-  const { data: kots = [], isLoading, error, refetch } = useActiveKOTs();
+  const { data: kots = [], isLoading, error, refetch, isFetching } = useActiveKOTs();
   useKitchenUpdates();
+  const connectionState = useWebSocketConnection();
 
   const [filterStage, setFilterStage] = React.useState<"ALL" | "NEW" | "PREPARING" | "READY">("ALL");
 
-  const filteredKOTs = React.useMemo(() => {
+  // Prevent duplicate visual tickets when events are replayed
+  const deduplicatedKOTs = React.useMemo(() => {
+    const seen = new Set<string>();
     return kots.filter((kot) => {
+      const key = kot.id || kot.kotNumber;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [kots]);
+
+  const filteredKOTs = React.useMemo(() => {
+    return deduplicatedKOTs.filter((kot) => {
       if (filterStage === "ALL") return true;
       if (filterStage === "NEW") return kot.status === "NEW" || kot.status === "ACCEPTED";
       if (filterStage === "PREPARING") return kot.status === "PREPARING";
       if (filterStage === "READY") return kot.status === "READY";
       return true;
     });
-  }, [kots, filterStage]);
+  }, [deduplicatedKOTs, filterStage]);
 
   const stats = React.useMemo(() => {
-    const total = kots.length;
-    const newCount = kots.filter((k) => k.status === "NEW" || k.status === "ACCEPTED").length;
-    const cooking = kots.filter((k) => k.status === "PREPARING").length;
-    const ready = kots.filter((k) => k.status === "READY").length;
+    const total = deduplicatedKOTs.length;
+    const newCount = deduplicatedKOTs.filter((k) => k.status === "NEW" || k.status === "ACCEPTED").length;
+    const cooking = deduplicatedKOTs.filter((k) => k.status === "PREPARING").length;
+    const ready = deduplicatedKOTs.filter((k) => k.status === "READY").length;
     return { total, newCount, cooking, ready };
-  }, [kots]);
+  }, [deduplicatedKOTs]);
 
   if (isLoading) {
     return (
@@ -156,9 +172,39 @@ export function KDSBoard() {
           </button>
         </div>
 
-        <div className="text-xs text-neutral-400 font-mono flex items-center gap-2">
-          <span className="flex h-2 w-2 rounded-full bg-white" />
-          <span>Kitchen Live WebSocket Sync Active</span>
+        <div className="flex items-center gap-3">
+          <div className="text-xs font-mono flex items-center gap-2">
+            {connectionState === "CONNECTED" ? (
+              <>
+                <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-emerald-400/90 font-medium">Live KDS Sync</span>
+              </>
+            ) : connectionState === "RECONNECTING" ? (
+              <>
+                <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+                <span className="text-amber-400 font-medium">Reconnecting... (DB Polling)</span>
+              </>
+            ) : (
+              <>
+                <span className="flex h-2 w-2 rounded-full bg-rose-400" />
+                <span className="text-rose-400 font-medium">Offline (DB Fallback)</span>
+              </>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              webSocketManager.connect();
+              refetch();
+            }}
+            disabled={isFetching}
+            className="flex items-center gap-1 text-[11px] font-semibold text-neutral-400 hover:text-white px-2 py-1 rounded bg-neutral-900 border border-neutral-800 transition-colors cursor-pointer"
+            title="Refetch authoritative kitchen tickets from database"
+          >
+            <RefreshCw className={`h-3 w-3 ${isFetching ? "animate-spin" : ""}`} />
+            <span>Sync</span>
+          </button>
         </div>
       </div>
 

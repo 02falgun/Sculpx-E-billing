@@ -45,7 +45,10 @@ export interface IMenuService {
 
 export interface IOrderService {
   validateOrder(payload: CreateOrderPayload): Promise<ApiResponse<OrderValidationResult>>;
-  createOrder(payload: CreateOrderPayload): Promise<ApiResponse<Order>>;
+  createOrder(
+    payload: CreateOrderPayload,
+    options?: { idempotencyKey?: string }
+  ): Promise<ApiResponse<Order>>;
   getOrderById(id: string): Promise<ApiResponse<Order>>;
   getOrders(params?: {
     status?: OrderStatus;

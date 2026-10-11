@@ -44,10 +44,21 @@ export function useCreateOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: CreateOrderPayload) => {
-      const res = await orderApi.createOrder(payload);
+    mutationFn: async (
+      input: CreateOrderPayload | { payload: CreateOrderPayload; idempotencyKey?: string }
+    ) => {
+      const payload = "payload" in input ? input.payload : input;
+      const idempotencyKey = "idempotencyKey" in input ? input.idempotencyKey : undefined;
+
+      const res = await orderApi.createOrder(payload, { idempotencyKey });
       if (!res.success) {
-        throw new Error(res.error?.message || "Failed to create order");
+        const error = new Error(res.error?.message || "Failed to create order") as Error & {
+          code?: string;
+          details?: unknown;
+        };
+        error.code = res.error?.code;
+        error.details = res.error?.details;
+        throw error;
       }
       return res.data;
     },

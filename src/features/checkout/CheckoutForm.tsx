@@ -12,7 +12,7 @@ import { PaymentPreferenceSelector } from "./PaymentPreferenceSelector";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { CurrencyDisplay } from "@/components/shared";
-import { ArrowRight, ShieldCheck, AlertCircle } from "lucide-react";
+import { ArrowRight, ShieldCheck, AlertCircle, RefreshCw } from "lucide-react";
 
 export function CheckoutForm() {
   const router = useRouter();
@@ -22,8 +22,15 @@ export function CheckoutForm() {
   const getSummary = useCartStore((s) => s.getSummary);
   const addToast = useUIStore((s) => s.addToast);
 
-  const { mutateAsync: createOrder, isPending: isSubmitting } = useCreateOrder();
+  const { mutateAsync: createOrder, isPending: isMutationPending } = useCreateOrder();
+
+  // Submission state & double-click protection
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [validationError, setValidationError] = React.useState<string | null>(null);
+  const [isRetryableNetworkError, setIsRetryableNetworkError] = React.useState(false);
+
+  // Durable logical idempotency key: 1 UUID per logical submission, reused on retry
+  const idempotencyKeyRef = React.useRef<string | null>(null);
 
   const summary = getSummary();
 
@@ -32,6 +39,7 @@ export function CheckoutForm() {
     handleSubmit,
     register,
     watch,
+    getValues,
     formState: { errors },
   } = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutFormSchema),
@@ -46,7 +54,18 @@ export function CheckoutForm() {
   const selectedPaymentPref = watch("paymentPreference");
   const isRoom = qrContext?.type === "ROOM";
 
-  const onSubmit = async (data: CheckoutFormData) => {
+  // Invalidate idempotency key if user alters cart items
+  React.useEffect(() => {
+    idempotencyKeyRef.current = null;
+    setIsRetryableNetworkError(false);
+  }, [items]);
+
+  const executeOrderSubmission = async (data: CheckoutFormData) => {
+    // 1. Guard against concurrent double-clicks
+    if (isSubmitting || isMutationPending) {
+      return;
+    }
+
     if (!qrContext) {
       setValidationError("Active QR dining context not found. Please re-scan your table or room code.");
       return;
@@ -57,60 +76,150 @@ export function CheckoutForm() {
       return;
     }
 
+    setIsSubmitting(true);
     setValidationError(null);
+    setIsRetryableNetworkError(false);
 
-    try {
-      const orderPayload = {
-        qrToken: qrContext.token,
-        customerName: data.customerName?.trim() || undefined,
-        customerPhone: data.customerPhone?.trim() || undefined,
-        specialInstructions: data.specialInstructions?.trim() || undefined,
-        paymentPreference: data.paymentPreference,
-        items: items.map((cartItem) => ({
+    // 2. Generate or reuse durable UUID idempotency key for this logical submission
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `idemp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    }
+    const currentIdempotencyKey = idempotencyKeyRef.current;
+
+    const orderPayload = {
+      qrToken: qrContext.token,
+      customerName: data.customerName?.trim() || undefined,
+      customerPhone: data.customerPhone?.trim() || undefined,
+      specialInstructions: data.specialInstructions?.trim() || undefined,
+      paymentPreference: data.paymentPreference,
+      source: "CUSTOMER_QR" as const,
+      items: items.map((cartItem) => {
+        const optionIds = cartItem.selectedModifiers.map((m) => m.modifierId);
+        return {
           menuItemId: cartItem.menuItemId,
           quantity: cartItem.quantity,
           specialInstructions: cartItem.specialInstructions,
-          modifierIds: cartItem.selectedModifiers.map((m) => m.modifierId),
-        })),
-      };
+          modifierOptionIds: optionIds,
+          modifierIds: optionIds,
+        };
+      }),
+    };
 
-      // 1. Authoritative Backend Pre-validation
+    try {
+      // 3. Pre-checkout cart verification against authoritative backend snapshot
       const validationRes = await orderApi.validateOrder(orderPayload);
-      if (!validationRes.success || !validationRes.data.isValid) {
-        const unavailable = validationRes.data.unavailableItems.map((u) => u.reason).join(", ");
-        setValidationError(`Items unavailable: ${unavailable || "Please adjust your cart."}`);
+
+      if (!validationRes.success) {
+        const errCode = validationRes.error?.code;
+        if (errCode === "QR_NOT_FOUND" || errCode === "QR_INACTIVE" || errCode === "QR_INVALID_ASSIGNMENT") {
+          setValidationError("This dining QR code is no longer active or has expired. Please re-scan your table or room QR code.");
+        } else {
+          setValidationError(validationRes.error?.message || "Cart validation failed. Please review your order.");
+        }
+        setIsSubmitting(false);
         return;
       }
 
-      // 2. Submit authoritative order creation
-      const createdOrder = await createOrder(orderPayload);
+      if (validationRes.data && !validationRes.data.isValid) {
+        const unavailable = validationRes.data.unavailableItems;
+        if (unavailable && unavailable.length > 0) {
+          const reasons = unavailable.map((u) => u.reason).join("; ");
+          setValidationError(`Unavailable items detected: ${reasons}. Please adjust your cart.`);
+        } else {
+          setValidationError("The cart contains invalid items or modifier configurations. Please review your order.");
+        }
+        setIsSubmitting(false);
+        return;
+      }
 
-      // 3. Clear client cart and notify
-      clearCart();
-      addToast({
-        type: "success",
-        title: "Order Placed Successfully",
-        message: `Order #${createdOrder.orderNumber} dispatched to the kitchen!`,
+      // 4. Transactionally submit order with reused idempotency key
+      const createdOrder = await createOrder({
+        payload: orderPayload,
+        idempotencyKey: currentIdempotencyKey,
       });
 
-      // 4. Redirect to real-time live status tracking
+      // 5. Authoritative backend values confirmed
+      const orderNumber = createdOrder.orderNumber;
+      const authoritativeGrandTotal = createdOrder.grandTotal;
+
+      // 6. Reset idempotency key & cart session upon verified success
+      idempotencyKeyRef.current = null;
+      clearCart();
+
+      addToast({
+        type: "success",
+        title: `Order #${orderNumber} Confirmed`,
+        message: `Total ₹${Number(authoritativeGrandTotal).toFixed(2)} dispatched to the kitchen!`,
+      });
+
+      // 7. Transition to authoritative real-time tracking
       router.push(`/order/${createdOrder.id}`);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to place order";
-      setValidationError(msg);
+      const errorObj = err as { code?: string; message?: string };
+      const errCode = errorObj?.code;
+      const errMsg = errorObj?.message || "Failed to place order";
+
+      if (errCode === "ITEM_UNAVAILABLE") {
+        setValidationError("One or more items in your cart became unavailable or sold out. Please adjust your cart.");
+        idempotencyKeyRef.current = null; // Reset so user re-evaluates
+      } else if (errCode === "IDEMPOTENCY_IN_PROGRESS") {
+        setValidationError("Your order submission is currently being processed. Please wait a moment before checking status.");
+      } else if (errCode === "IDEMPOTENCY_CONFLICT") {
+        setValidationError("An idempotency conflict occurred. A new submission has been generated. Please try again.");
+        idempotencyKeyRef.current = null;
+      } else if (errCode === "NETWORK_ERROR" || errCode === "REQUEST_TIMEOUT") {
+        setIsRetryableNetworkError(true);
+        setValidationError(
+          "Network connection failed during submission. Your order has NOT been duplicated. You can safely retry with the same submission key."
+        );
+      } else {
+        setValidationError(errMsg);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  const handleRetry = () => {
+    const currentData = getValues();
+    executeOrderSubmission(currentData);
+  };
+
+  const isButtonBusy = isSubmitting || isMutationPending;
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {/* Validation alert banner */}
+    <form onSubmit={handleSubmit(executeOrderSubmission)} className="space-y-6">
+      {/* Validation / Network alert banner */}
       {validationError && (
-        <div className="flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800">
-          <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
-          <div className="flex-1">
-            <span className="font-bold">Unable to proceed: </span>
-            <span>{validationError}</span>
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800"
+        >
+          <div className="flex items-start gap-2.5 flex-1">
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
+            <div>
+              <span className="font-bold">Order Submission Notice: </span>
+              <span>{validationError}</span>
+            </div>
           </div>
+
+          {isRetryableNetworkError && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleRetry}
+              isLoading={isButtonBusy}
+              leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
+              className="shrink-0 border-rose-300 text-rose-800 hover:bg-rose-100"
+            >
+              Retry Submission
+            </Button>
+          )}
         </div>
       )}
 
@@ -205,13 +314,14 @@ export function CheckoutForm() {
         )}
       </div>
 
-      {/* Submit Order Button */}
+      {/* Submit Order Button with double-click guard */}
       <div className="space-y-3">
         <Button
           type="submit"
           variant="primary"
           size="lg"
-          isLoading={isSubmitting}
+          isLoading={isButtonBusy}
+          disabled={isButtonBusy}
           className="w-full font-semibold shadow-xs"
           rightIcon={<ArrowRight className="h-4 w-4" />}
         >
@@ -227,7 +337,7 @@ export function CheckoutForm() {
 
         <div className="flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400">
           <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-          <span>Encrypted transmission to hotel POS &amp; kitchen display system</span>
+          <span>Encrypted transmission with durable idempotency protection</span>
         </div>
       </div>
     </form>

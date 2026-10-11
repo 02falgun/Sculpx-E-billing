@@ -75,11 +75,14 @@ export interface CreateOrderPayload {
   customerPhone?: string;
   specialInstructions?: string;
   paymentPreference: PaymentPreference;
+  source?: OrderSource;
   items: {
     menuItemId: ID;
     quantity: number;
     specialInstructions?: string;
-    modifierIds: ID[];
+    modifierIds?: ID[];
+    modifierOptionIds?: ID[];
+    clientPrice?: number;
   }[];
 }
 

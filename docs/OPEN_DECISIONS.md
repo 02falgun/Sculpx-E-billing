@@ -151,7 +151,45 @@ Each decision includes context, why it matters, a reasoned recommended default, 
 - **Why It Matters**: Publishing WebSocket events directly before database commit creates phantom events if the transaction rolls back. Publishing events post-commit without durability causes lost events if the process crashes.
 - **Implemented Strategy in Phase 3B.3**: Transactional Outbox pattern via `outbox_events` table. `order.created` and `kot.created` events are written inside the exact same atomic PostgreSQL `$transaction` as the order and KOT. An asynchronous, non-blocking outbox worker dispatches events post-commit with automatic retry tracking, exponential backoff, and failure tolerance without blocking the HTTP response.
 - **Status**: `IMPLEMENTED & VERIFIED IN PHASE 3B.3`
-- **Responsible Person**: Senior Backend Engineer & Distributed Systems Architect
+### Decision 14: WebSocket Subscription Authorization Matrix & Tenant Isolation
+- **Why It Matters**: Allowing unrestricted WebSocket subscriptions (`*` or client-dictated topics) enables malicious actors or guests at Table 1 to intercept kitchen tickets, billing notifications, or other tables' orders.
+- **Implemented Strategy in Phase 3B.4**: Strict server-enforced topic authorization matrix:
+  - `kitchen:kots`: Restricted to `KITCHEN_STAFF`, `CHEF`, `MANAGER`, `ADMIN`.
+  - `orders:all`: Restricted to `WAITER`, `CAPTAIN`, `CASHIER`, `MANAGER`, `ADMIN`.
+  - `billing:all`: Restricted to `CASHIER`, `MANAGER`, `ADMIN`.
+  - `order:{orderId}`: Restricted to staff or guest authenticated with matching order context.
+  - Strict tenant boundary: All frames broadcast to connections matching `client.tenantId === event.tenantId`. Cross-tenant delivery is architecturally impossible.
+- **Status**: `IMPLEMENTED & VERIFIED IN PHASE 3B.4`
+- **Responsible Person**: Senior Backend Engineer & Security Architect
+
+### Decision 15: Concurrency-Safe Outbox Worker Claiming & Failure Recovery
+- **Why It Matters**: Running multiple backend instances or worker processes concurrently could lead to duplicate outbox event claiming and duplicate socket broadcasts. Furthermore, transport failures must never crash or invalidate order creation.
+- **Implemented Strategy in Phase 3B.4**:
+  - PostgreSQL row locking (`FOR UPDATE SKIP LOCKED`) inside `outboxService.claimPendingBatch()` guarantees exactly-once claim semantics across arbitrary worker processes.
+  - Stale processing claims (>60s) automatically reclaimed.
+  - Bounded retries: 5 attempts max with exponential backoff (`min(1000 * 2^(retryCount-1), 30000)` ms).
+  - Permanent failure state: `FAILED` after 5 attempts with `lastError` recorded.
+  - Administrative recovery: `npm run worker:outbox` CLI and programmatic recovery methods (`retryFailedEvent`, `retryAllFailedEvents`).
+### Decision 16: KOT Lifecycle State Machine & Parent Order Progress Synchronization
+- **Why It Matters**: Unchecked KOT transitions could allow tickets to skip critical preparation steps (e.g. jumping from NEW directly to READY or SERVED), allow race conditions between concurrent chefs, or prematurely mark an entire dining order SERVED when other kitchen stations are still cooking.
+- **Implemented Strategy in Phase 3C**:
+  - Strict server-side state machine: `NEW (PENDING) -> ACCEPTED -> PREPARING -> READY -> SERVED`.
+  - Illegal transitions rejected with HTTP 409 `INVALID_STATUS_TRANSITION`.
+  - Repeated transition requests safely return current state (idempotent 200 OK without duplicate outbox emissions).
+  - PostgreSQL row locking (`SELECT id, status FROM kots WHERE id = $1::uuid FOR UPDATE`) prevents race condition overwrites.
+  - Parent order progress is computed across all associated KOTs: Order becomes `READY` if and only if all KOTs are at least `READY`; becomes `SERVED` if and only if all KOTs are `SERVED`.
+- **Status**: `IMPLEMENTED & VERIFIED IN PHASE 3C`
+- **Responsible Person**: Senior Backend Engineer & Hospitality Workflow Architect
+
+### Decision 17: Item-Level Status Representation & Forward Migration Path
+- **Why It Matters**: The kitchen may prepare items at different times. The current Prisma schema defines `status` on `OrderItem` (`PLACED`, `PREPARING`, `READY`, `SERVED`), while `KotItem` is an immutable junction record without a dedicated status column.
+- **Implemented Strategy in Phase 3C**:
+  - In Phase 3C, advancing a KOT updates all linked `OrderItem` records to the corresponding stage (`PREPARING`, `READY`, `SERVED`).
+  - If partial bumping of individual items within a single KOT ticket is required in a future phase:
+    - Safe forward-only migration: `ALTER TABLE kot_items ADD COLUMN status VARCHAR(50) DEFAULT 'PENDING';`
+    - Preserves existing backward compatibility without altering existing ticket structures.
+- **Status**: `DOCUMENTED & VERIFIED IN PHASE 3C`
+- **Responsible Person**: Senior Backend Engineer & Database Architect
 
 ---
 
@@ -172,5 +210,9 @@ Each decision includes context, why it matters, a reasoned recommended default, 
 | D-11 | Idempotency Scoping & Deduplication | Database-backed `idempotency_keys` with SHA-256 hash & HTTP 409 | Implemented (Phase 3B.3) | Senior Backend Engineer |
 | D-12 | Daily Order & KOT Number Sequence | Atomic `daily_counters` with row lock `ORD/KOT-YYYYMMDD-XXXX` | Implemented (Phase 3B.3) | Senior Backend Engineer |
 | D-13 | Reliable Event Delivery | Transactional Outbox (`outbox_events`) + async worker | Implemented (Phase 3B.3) | Senior Backend Engineer |
+| D-14 | WebSocket Authorization & Multi-Tenant Isolation | Fastify WS on `/ws` with strict role matrix and tenant match | Implemented (Phase 3B.4) | Senior Backend Engineer |
+| D-15 | Multi-Process Outbox Claiming & Recovery | `FOR UPDATE SKIP LOCKED` + bounded 5 retries + worker script | Implemented (Phase 3B.4) | Senior Backend Engineer |
+| D-16 | KOT State Machine & Parent Order Synchronization | `NEW -> ACCEPTED -> PREPARING -> READY -> SERVED` + row lock | Implemented (Phase 3C) | Senior Backend Engineer |
+| D-17 | Item-Level Preparation Representation | Update `order_items.status`; documented `kot_items.status` migration | Documented & Verified (Phase 3C) | Senior Backend Engineer |
 
 

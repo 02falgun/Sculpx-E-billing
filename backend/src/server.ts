@@ -1,6 +1,7 @@
 import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
 import { disconnectPrisma } from "./lib/prisma.js";
+import { outboxService } from "./services/outbox.service.js";
 
 async function main(): Promise<void> {
   const app = await buildApp();
@@ -34,6 +35,10 @@ async function main(): Promise<void> {
 
   try {
     await app.listen({ port: env.PORT, host: env.HOST });
+
+    // Start in-process outbox event dispatcher worker daemon
+    outboxService.startBackgroundWorker(2000);
+
     app.log.info(
       {
         port: env.PORT,

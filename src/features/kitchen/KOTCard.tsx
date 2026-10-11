@@ -158,7 +158,7 @@ export function KOTCard({ kot }: KOTCardProps) {
 
       {/* Action Footer Button based on stage */}
       <div className="pt-3 border-t border-neutral-800">
-        {kot.status === "NEW" && (
+        {(kot.status === "NEW" || (kot.status as string) === "PENDING") && (
           <Button
             type="button"
             variant="primary"
@@ -212,6 +212,13 @@ export function KOTCard({ kot }: KOTCardProps) {
           >
             Expedite & Complete
           </Button>
+        )}
+
+        {kot.status === "SERVED" && (
+          <div className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 rounded-md">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span>Served & Expedited</span>
+          </div>
         )}
       </div>
     </div>

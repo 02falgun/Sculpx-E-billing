@@ -38,6 +38,32 @@ export class MockKitchenService implements IKitchenService {
       };
     }
 
+    // Idempotent safe replay if already in target state
+    if (kot.status === payload.status) {
+      return { success: true, data: kot, message: `KOT is already in state ${payload.status}` };
+    }
+
+    const validTransitions: Record<string, string[]> = {
+      NEW: ["ACCEPTED"],
+      ACCEPTED: ["PREPARING"],
+      PREPARING: ["READY"],
+      READY: ["SERVED"],
+      SERVED: [],
+      CANCELLED: [],
+    };
+
+    const allowed = validTransitions[kot.status] || [];
+    if (!allowed.includes(payload.status)) {
+      return {
+        success: false,
+        data: null as unknown as KOT,
+        error: {
+          code: "INVALID_STATUS_TRANSITION",
+          message: `Cannot transition KOT from '${kot.status}' to '${payload.status}'`,
+        },
+      };
+    }
+
     kot.status = payload.status;
     kot.updatedAt = new Date().toISOString();
 

@@ -11,6 +11,8 @@ export type WebSocketEventType =
   | "ORDER_CANCELLED"
   | "KOT_CREATED"
   | "KOT_UPDATED"
+  | "KOT_STATUS_UPDATED"
+  | "KOT_READY"
   | "ORDER_PREPARING"
   | "ORDER_READY"
   | "ORDER_SERVED"
@@ -19,7 +21,8 @@ export type WebSocketEventType =
   | "PRINT_JOB_UPDATED"
   | "HEARTBEAT"
   | "SUBSCRIBE"
-  | "UNSUBSCRIBE";
+  | "UNSUBSCRIBE"
+  | "RECONNECTED";
 
 export type WebSocketConnectionState =
   | "CONNECTING"

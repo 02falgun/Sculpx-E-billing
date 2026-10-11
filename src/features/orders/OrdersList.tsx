@@ -4,7 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { Order, OrderStatus } from "@/types";
 import { useOrders } from "@/hooks/useOrder";
-import { useOrderUpdates } from "@/hooks/useWebSocket";
+import { useOrderUpdates, useWebSocketConnection } from "@/hooks/useWebSocket";
+import { webSocketManager } from "@/services/websocket";
 import { StatusBadge, QRContextBadge, CurrencyDisplay } from "@/components/shared";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Button } from "@/components/ui/Button";
@@ -16,22 +17,35 @@ import {
   UtensilsCrossed,
   Clock,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 
 export function OrdersList() {
   const [selectedStatus, setSelectedStatus] = React.useState<OrderStatus | "ALL">("ALL");
   const [searchQuery, setSearchQuery] = React.useState<string>("");
 
-  const { data: orderData, isLoading, refetch } = useOrders({
+  const { data: orderData, isLoading, isFetching, refetch } = useOrders({
     status: selectedStatus === "ALL" ? undefined : selectedStatus,
   });
 
   useOrderUpdates();
+  const connectionState = useWebSocketConnection();
 
   const orders = orderData?.data || [];
 
-  const filteredOrders = React.useMemo(() => {
+  // Deduplicate orders by id or orderNumber
+  const deduplicatedOrders = React.useMemo(() => {
+    const seen = new Set<string>();
     return orders.filter((o) => {
+      const key = o.id || o.orderNumber;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [orders]);
+
+  const filteredOrders = React.useMemo(() => {
+    return deduplicatedOrders.filter((o) => {
       const query = searchQuery.toLowerCase().trim();
       if (!query) return true;
       return (
@@ -40,7 +54,7 @@ export function OrdersList() {
         (o.customerName && o.customerName.toLowerCase().includes(query))
       );
     });
-  }, [orders, searchQuery]);
+  }, [deduplicatedOrders, searchQuery]);
 
   const tabs: { label: string; value: OrderStatus | "ALL" }[] = [
     { label: "All Orders", value: "ALL" },
@@ -74,12 +88,47 @@ export function OrdersList() {
           })}
         </div>
 
-        <div className="w-full sm:w-64">
-          <SearchInput
-            placeholder="Search order #, table..."
-            value={searchQuery}
-            onChange={(val) => setSearchQuery(val)}
-          />
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
+            {connectionState === "CONNECTED" ? (
+              <>
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-slate-600 font-medium">Live</span>
+              </>
+            ) : connectionState === "RECONNECTING" ? (
+              <>
+                <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                <span className="text-amber-700 font-medium">Reconnecting...</span>
+              </>
+            ) : (
+              <>
+                <span className="flex h-2 w-2 rounded-full bg-rose-500" />
+                <span className="text-slate-500 font-medium">Polling</span>
+              </>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              webSocketManager.connect();
+              refetch();
+            }}
+            disabled={isFetching}
+            className="flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 transition-colors cursor-pointer shadow-2xs"
+            title="Refresh orders from database"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+            <span>Sync</span>
+          </button>
+
+          <div className="w-full sm:w-64">
+            <SearchInput
+              placeholder="Search order #, table..."
+              value={searchQuery}
+              onChange={(val) => setSearchQuery(val)}
+            />
+          </div>
         </div>
       </div>
 

@@ -2,9 +2,7 @@
 
 > **Document Type**: Realtime Protocol & Event Bus Specification  
 > **Audience**: Backend Realtime / Socket Engineer, Frontend Integration Engineer  
-> **Transport**: Standard WebSockets (`ws://` in dev, `wss://` in prod) / JSON Frames  
-> **Status**: Comprehensive Proposed Specification for Node.js + WebSocket Server  
-
+> **Status**: Implemented & Verified in Phase 3B.4 (`@fastify/websocket` on `/ws` + Concurrency-Safe Outbox Worker)
 ---
 
 ## 1. Connection Lifecycle & Wire Protocol
@@ -166,18 +164,47 @@ Upon establishing a connection, the client subscribes to relevant topics based o
   }
   ```
 
-### 3.4 `kot.status.updated` (`KOT_UPDATED`)
+### 3.4 `kot.status_updated` (`KOT_STATUS_UPDATED` / `KOT_UPDATED`)
 - **Direction**: Server -> Client
-- **Purpose**: Realtime sync between KDS stations when chef marks ticket `ACCEPTED`, `PREPARING`, `READY`, or `SERVED`.
-- **Required Role**: `KITCHEN_STAFF`, `WAITER`, `MANAGER`
+- **Status**: **Verified & Implemented (Phase 3C)**
+- **Purpose**: Realtime sync between KDS stations and staff interfaces when ticket progresses across `ACCEPTED`, `PREPARING`, `READY`, or `SERVED`.
+- **Required Role**: `KITCHEN_STAFF`, `MANAGER`, `ADMIN`, `SUPER_ADMIN`, `WAITER`, `CAPTAIN`
 - **Scope**: `kitchen:kots`
 - **Sample Payload**:
   ```json
   {
-    "kotId": "kot-2026-0819",
-    "kotNumber": "KOT-0819",
+    "kotId": "c71be39c-48c9-4b61-9c88-66170dcb7684",
+    "kotNumber": "KOT-20261011-0001",
+    "orderId": "b1a2c3d4-...",
+    "orderNumber": "ORD-20261011-0001",
     "status": "READY",
-    "preparedAt": "2026-10-10T15:45:00.000Z"
+    "previousStatus": "PREPARING",
+    "acceptedAt": "2026-10-11T12:00:00.000Z",
+    "readyAt": "2026-10-11T12:15:00.000Z",
+    "servedAt": null,
+    "updatedAt": "2026-10-11T12:15:00.000Z",
+    "station": "Main Kitchen",
+    "note": "Started by Chef Sanjeev"
+  }
+  ```
+
+### 3.4b `kot.ready` (`KOT_READY`)
+- **Direction**: Server -> Client
+- **Status**: **Verified & Implemented (Phase 3C)**
+- **Purpose**: Realtime floor and waiter alert indicating cooked food is hot and ready for expediting to dining tables or guest rooms.
+- **Required Role**: `WAITER`, `CAPTAIN`, `MANAGER`, `ADMIN`
+- **Scope**: `orders:all`, `order:{orderId}`
+- **Sample Payload**:
+  ```json
+  {
+    "kotId": "c71be39c-48c9-4b61-9c88-66170dcb7684",
+    "kotNumber": "KOT-20261011-0001",
+    "orderId": "b1a2c3d4-...",
+    "orderNumber": "ORD-20261011-0001",
+    "station": "Main Kitchen",
+    "tableName": "Table 01",
+    "roomNumber": null,
+    "timestamp": "2026-10-11T12:15:00.000Z"
   }
   ```
 
@@ -302,8 +329,20 @@ Every mutating operation that triggers a business event persists an outbox recor
 - `created_at` / `updated_at`: TIMESTAMPTZ(6)
 
 ### 5.2 Decoupled Event Dispatch Lifecycle
-1. **Commit**: Order and KOT records commit along with the `PENDING` outbox event in PostgreSQL.
-2. **Asynchronous Dispatch**: The background outbox worker (`outboxService.dispatchEvent`) fires non-blocking HTTP post-commit triggers.
-3. **Transport Resilience**: If the WebSocket transport or broker drops, the business order remains safely committed in PostgreSQL; the outbox record increments its retry counter and records the error for asynchronous replay.
-4. **Transport Bridge**: The pending `@fastify/websocket` transport daemon (Phase 3B.4) will sweep `outbox_events` with `status = PENDING` and broadcast frames to connected clients according to the subscription topic matrix.
+1. **Commit**: Order and KOT records commit along with the `PENDING` outbox event in PostgreSQL within the same atomic `$transaction`.
+2. **Post-Commit Dispatch**: After database transaction commits, the application immediately attempts non-blocking dispatch via `outboxService.dispatchEvent(eventId)`.
+3. **Multi-Process Background Worker**:
+   - `outboxService.claimPendingBatch()` claims pending events using PostgreSQL `FOR UPDATE SKIP LOCKED`.
+   - Prevents duplicate claims across multiple Node.js worker processes or container replicas.
+   - Reclaims stale processing events older than 60 seconds.
+4. **Bounded Retries with Exponential Backoff**:
+   - Exponential backoff: `min(1000 * 2^(retryCount-1), 30000)` ms (1s, 2s, 4s, 8s, 16s, capped at 30s).
+   - Maximum retries: 5 attempts.
+   - After 5 failures, event status transitions permanently to `FAILED` with `lastError` logged.
+5. **Transport Decoupling & Invariant Safety**:
+   - If the WebSocket server or subscriber sockets fail, the business order remains safely committed in PostgreSQL.
+   - Failure is completely isolated from HTTP client responses.
+6. **Recovery & Operational Scripting**:
+   - Standalone worker: `npm run worker:outbox` (`backend/src/scripts/outbox-worker.ts`).
+   - Management APIs: `outboxService.getFailedEvents()`, `outboxService.retryFailedEvent(id)`, `outboxService.retryAllFailedEvents()`, `outboxService.getOutboxStats()`.
 

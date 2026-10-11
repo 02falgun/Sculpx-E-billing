@@ -75,13 +75,28 @@ An order must strictly transition along the agreed state machine:
 
 ### 3.2 KOT Status Transitions
 ```text
-[NEW] -> [ACCEPTED] -> [PREPARING] -> [READY] -> [SERVED]
+[NEW / PENDING] -> [ACCEPTED] -> [PREPARING] -> [READY] -> [SERVED]
 ```
-- When all items in a KOT reach `READY`, the associated Order items update to `READY`.
-- Elapsed cooking timers trigger visual warnings on the KDS display:
-  - Normal: < 15 minutes
-  - Warning (Amber): 15–20 minutes
-  - Urgent (Red): > 20 minutes
+- **Lifecycle Transition Guards**:
+  - `NEW (PENDING) -> ACCEPTED`: Chef accepts the ticket on the KDS display; records `acceptedAt`.
+  - `ACCEPTED -> PREPARING`: Kitchen starts cooking; updates linked `OrderItem` status to `PREPARING`; parent `Order` transitions to `PREPARING`.
+  - `PREPARING -> READY`: Kitchen marks food ready for expediting; records `readyAt`; updates linked `OrderItem` status to `READY`; emits `kot.ready` notification to `orders:all` for waitstaff.
+  - `READY -> SERVED`: Food is picked up and delivered to table; records `servedAt`; updates linked `OrderItem` status to `SERVED`.
+- **Repeated Requests (Idempotency)**:
+  - If a staff member submits a transition to the state the ticket is already in, the backend returns HTTP 200 OK without errors or redundant outbox emissions.
+- **Illegal Transition Rejection**:
+  - Out-of-order state transitions (e.g., `NEW -> READY`, `SERVED -> PREPARING`) are rejected with HTTP 409 `INVALID_STATUS_TRANSITION`.
+- **Multi-KOT Parent Order Synchronization**:
+  - A parent `Order` is marked `READY` if and only if **all** KOT tickets belonging to the order are in `READY` or `SERVED` state.
+  - A parent `Order` is marked `SERVED` if and only if **all** KOT tickets belonging to the order are in `SERVED` state.
+  - If one KOT ticket is `READY` or `SERVED` while other KOTs for the order are still `NEW`, `ACCEPTED`, or `PREPARING`, the parent `Order` status remains `PREPARING`.
+- **Item-Level Status Representation**:
+  - Item status is maintained on `OrderItem.status` (`PLACED`, `PREPARING`, `READY`, `SERVED`).
+  - `KotItem` functions as the immutable junction ticket record linking items to physical tickets.
+- **Elapsed Cooking Timers & Urgency**:
+  - Normal: < 15 minutes (`NORMAL`)
+  - Warning (Amber): 15–20 minutes (`HIGH`)
+  - Urgent (Red): > 20 minutes (`URGENT`)
 
 ---
 

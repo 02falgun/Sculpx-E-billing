@@ -41,22 +41,21 @@ All items below have been verified directly against the frontend codebase and mu
 - [x] **Menu Items**: `GET /api/v1/menu/items` returns items with decimal prices, tax rates, dietary tags, and modifier groups (Phase 3A verified).
 - [x] **Search & Filter**: Query params (`categoryId`, `dietaryType`, `isAvailable`, `search`) and pagination filter items correctly (Phase 3A verified).
 - [x] **Menu CRUD Operations**: Category, Menu Item, Modifier Group & Option creation/update/safe-deletion guarded by `ADMIN`/`SUPER_ADMIN` (Phase 3A verified).
-- [x] **Order Creation**: `POST /api/v1/orders` creates an order in `CONFIRMED` state; returns `ORD-YYYYMMDD-XXXX` order number and initial KOT ticket (Phase 3B.3 verified).
-- [x] **Idempotency Verified**: Re-transmitting order with identical `Idempotency-Key` returns cached order without creating duplicate rows, rejecting payload mismatches with 409 (Phase 3B.3 verified).
-- [ ] **Order Tracking**: `GET /api/v1/orders/:id` displays live timeline on `/order/[orderId]` (Phase 3B.4).
-- **Acceptance Criteria**: Staff manage menu catalog securely on backend; frontend mock mode retained until Phase 3B QR and checkout pipeline are verified end-to-end.
+- [x] **Order Creation**: `POST /api/v1/orders` creates an order in `CONFIRMED` state; returns `ORD-YYYYMMDD-XXXX` order number and initial KOT ticket (Phase 3B.3 & 3B.4 frontend integration verified).
+- [x] **Idempotency Verified**: Re-transmitting order with identical `Idempotency-Key` returns cached order without creating duplicate rows, rejecting payload mismatches with 409 (Phase 3B.3 & 3B.4 verified).
+- [x] **Order Tracking**: `GET /api/v1/orders/:id` displays live timeline on `/order/[orderId]` (Phase 3B.4 verified).
+- **Acceptance Criteria**: Staff manage menu catalog securely on backend; frontend checkout integrated with single UUID idempotency key, double-click protection, authoritative pricing, and retry resilience.
 
 ---
 
 ### Stage 3: Staff & Kitchen Operations (KDS & Realtime)
-- [ ] **Staff Order List**: `GET /api/v1/orders` lists active orders filtered by status or table.
-- [ ] **KOT Auto-Generation**: Order placement fires `kot.created` WebSocket event.
-- [ ] **Kitchen KDS List**: `GET /api/v1/kitchen/kots` populates active tickets on `/kitchen`.
-- [ ] **KOT Status Progression**: `PATCH /api/v1/kitchen/kots/:id/status` moves ticket to `PREPARING` and `READY`.
-- [ ] **Order Sync**: Updating KOT items to `READY` updates corresponding Order items in real time.
-- [ ] **Realtime WebSocket Bus**: Waiter screen, kitchen display, and customer mobile update within 500ms of status changes without page refresh.
-- [ ] **Disconnection Recovery**: Reconnecting after network drop automatically resynchronizes state without duplicate cards.
-- **Acceptance Criteria**: Waiter submits order on POS; kitchen KDS displays new card instantly; chef taps "Prepare" and customer phone updates to "Preparing".
+- [x] **Staff Order List**: `GET /api/v1/orders` lists active orders filtered by status or table with live WebSocket updates and deduplication.
+- [x] **KOT Auto-Generation**: Order placement fires `kot.created` WebSocket event via transactional outbox.
+- [x] **KOT Status Progression**: `PATCH /api/v1/kitchen/kots/:id/status` moves ticket through `NEW/PENDING` -> `ACCEPTED` -> `PREPARING` -> `READY` -> `SERVED` with row locking and idempotent safe replay (Phase 3C verified).
+- [x] **Order Sync**: Updating KOT tickets to `PREPARING`, `READY`, or `SERVED` updates corresponding OrderItems and parent Order progress in real time (Phase 3C verified).
+- [x] **Realtime WebSocket Bus**: Waiter screen (`orders:all`), kitchen display (`kitchen:kots`), and guest view (`order:{orderId}`) update within 500ms of status changes without page refresh.
+- [x] **Disconnection Recovery**: Reconnecting after network drop automatically resynchronizes state without duplicate cards.
+- **Acceptance Criteria**: Waiter submits order on POS; kitchen KDS displays new card instantly; chef taps "Accept", "Start Cooking", "Mark Ready", and floor staff receive instant ready notifications.
 
 ---
 

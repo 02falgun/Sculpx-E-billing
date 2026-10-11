@@ -6,8 +6,12 @@ import crypto from "node:crypto";
 import { env } from "./config/env.js";
 import { getFastifyLoggerConfig } from "./lib/logger.js";
 import { fastifyErrorHandler } from "./lib/errors.js";
+import fastifyWebsocket from "@fastify/websocket";
 import { healthRoutes } from "./routes/health.js";
 import { apiRoutes } from "./routes/index.js";
+import { websocketRoutes } from "./routes/websocket.js";
+import { websocketService } from "./services/websocket.service.js";
+import { outboxService } from "./services/outbox.service.js";
 
 export interface BuildAppOptions {
   fastifyOptions?: FastifyServerOptions;
@@ -79,11 +83,23 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   // Global Error Handler
   app.setErrorHandler(fastifyErrorHandler);
 
+  // Register WebSocket plugin
+  await app.register(fastifyWebsocket);
+
+  // Register WebSocket routes (/ws)
+  await app.register(websocketRoutes);
+
   // Register Root Health Endpoints: /health and /ready
   await app.register(healthRoutes);
 
   // Register API Endpoints: /api/health, /api/ready, /api/v1/...
   await app.register(apiRoutes, { prefix: env.API_PREFIX });
+
+  // Clean shutdown hook
+  app.addHook("onClose", async () => {
+    websocketService.shutdown();
+    outboxService.stopBackgroundWorker();
+  });
 
   return app;
 }

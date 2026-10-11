@@ -4,6 +4,7 @@ import { authRoutes } from "./auth.js";
 import { menuRoutes } from "./menu.js";
 import { qrRoutes } from "./qr.js";
 import { orderRoutes } from "./order.js";
+import { kitchenRoutes } from "./kitchen.js";
 
 export const apiRoutes: FastifyPluginAsync = async (fastify) => {
   // Direct /api/health and /api/ready
@@ -21,6 +22,9 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
   // Direct /api/orders endpoints (/api/orders/validate)
   await fastify.register(orderRoutes, { prefix: "/orders" });
 
+  // Direct /api/kitchen endpoints (/api/kitchen/kots)
+  await fastify.register(kitchenRoutes, { prefix: "/kitchen" });
+
   // Mount under /v1 for versioned API contract (/api/v1/...)
   await fastify.register(
     async (v1) => {
@@ -29,6 +33,7 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
       await v1.register(menuRoutes, { prefix: "/menu" });
       await v1.register(qrRoutes, { prefix: "/public" });
       await v1.register(orderRoutes, { prefix: "/orders" });
+      await v1.register(kitchenRoutes, { prefix: "/kitchen" });
     },
     { prefix: "/v1" }
   );

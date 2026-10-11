@@ -17,12 +17,12 @@ export class WebSocketManager implements IWebSocketClient {
   private listeners = new Map<string, Set<WebSocketEventHandler>>();
   private stateListeners = new Set<WebSocketStateListener>();
   private processedMessageIds = new Set<string>();
+  private activeTopics = new Set<string>();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private isExplicitlyClosed = false;
-  private mockIntervalTimer: NodeJS.Timeout | null = null;
 
   constructor(url: string = ENV.WS_URL) {
     this.url = url;
@@ -35,32 +35,66 @@ export class WebSocketManager implements IWebSocketClient {
   private setState(newState: WebSocketConnectionState) {
     if (this.state !== newState) {
       this.state = newState;
-      this.stateListeners.forEach((listener) => listener(newState));
+      this.stateListeners.forEach((listener) => {
+        try {
+          listener(newState);
+        } catch (err) {
+          console.error("Error in WebSocket state listener:", err);
+        }
+      });
     }
   }
 
   public connect(): void {
     if (typeof window === "undefined") return;
-    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+    if (
+      this.socket &&
+      (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)
+    ) {
       return;
     }
 
     this.isExplicitlyClosed = false;
     this.setState("CONNECTING");
 
-    // If using mock API or running in mock mode, provide a simulated real-time WebSocket connection
+    // If using mock API mode, provide simulated connected real-time transport
     if (ENV.USE_MOCK_API) {
       this.initMockConnection();
       return;
     }
 
     try {
-      this.socket = new WebSocket(this.url);
+      // Resolve staff authentication token if present in localStorage
+      let connectionUrl = this.url;
+      try {
+        const raw = window.localStorage.getItem("restro_staff_auth");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const token = parsed?.state?.session?.token;
+          if (token && !connectionUrl.includes("token=")) {
+            connectionUrl +=
+              (connectionUrl.includes("?") ? "&" : "?") + `token=${encodeURIComponent(token)}`;
+          }
+        }
+      } catch {}
+
+      this.socket = new WebSocket(connectionUrl);
 
       this.socket.onopen = () => {
+        const wasReconnecting = this.reconnectAttempts > 0;
         this.reconnectAttempts = 0;
         this.setState("CONNECTED");
         this.startHeartbeat();
+
+        // Resubscribe to all registered topics on connection/reconnection
+        this.activeTopics.forEach((topic) => {
+          this.sendSubscription(topic);
+        });
+
+        // Trigger refetch notification if reconnected
+        if (wasReconnecting) {
+          this.notifyReconnectReconciliation();
+        }
       };
 
       this.socket.onmessage = (event) => {
@@ -68,7 +102,7 @@ export class WebSocketManager implements IWebSocketClient {
           const message: WebSocketMessage = JSON.parse(event.data);
           this.handleIncomingMessage(message);
         } catch {
-          // Ignore unparseable frames
+          // Ignore non-JSON frames
         }
       };
 
@@ -92,31 +126,35 @@ export class WebSocketManager implements IWebSocketClient {
   private initMockConnection() {
     setTimeout(() => {
       this.setState("CONNECTED");
-    }, 300);
+    }, 200);
   }
 
   private handleIncomingMessage(message: WebSocketMessage) {
-    // Deduplication check
+    // 1. Message Deduplication check
     if (message.id && this.processedMessageIds.has(message.id)) {
       return;
     }
     if (message.id) {
       this.processedMessageIds.add(message.id);
-      // Keep deduplication set bounded
       if (this.processedMessageIds.size > 1000) {
         const oldest = this.processedMessageIds.values().next().value;
         if (oldest) this.processedMessageIds.delete(oldest);
       }
     }
 
-    // Dispatch to specific topic/event listeners
-    const specificKey = `${message.type}:${message.topic || "*"}`;
-    const wildcardKey = `${message.type}:*`;
-    const typeKey = message.type;
+    // 2. Normalize event type (e.g. "order.created" -> "ORDER_CREATED")
+    const rawType = String(message.type || "");
+    const normalizedType = rawType.toUpperCase().replace(/\./g, "_") as WebSocketEventType;
+
+    // 3. Dispatch to listeners
+    const specificKey = `${normalizedType}:${message.topic || "*"}`;
+    const wildcardKey = `${normalizedType}:*`;
+    const typeKey = normalizedType;
+    const rawKey = rawType;
 
     const handlersToInvoke = new Set<WebSocketEventHandler>();
 
-    [specificKey, wildcardKey, typeKey, "*"].forEach((key) => {
+    [specificKey, wildcardKey, typeKey, rawKey, "*"].forEach((key) => {
       const handlers = this.listeners.get(key);
       if (handlers) {
         handlers.forEach((h) => handlersToInvoke.add(h));
@@ -130,6 +168,16 @@ export class WebSocketManager implements IWebSocketClient {
         console.error("Error in WebSocket handler:", err);
       }
     });
+  }
+
+  private notifyReconnectReconciliation() {
+    const reconciliationMessage: WebSocketMessage = {
+      id: `reconnect-${Date.now()}`,
+      type: "RECONNECTED",
+      payload: null,
+      timestamp: new Date().toISOString(),
+    };
+    this.handleIncomingMessage(reconciliationMessage);
   }
 
   public dispatchSimulatedEvent<T>(type: WebSocketEventType, payload: T, topic?: string) {
@@ -183,7 +231,6 @@ export class WebSocketManager implements IWebSocketClient {
   public disconnect(): void {
     this.isExplicitlyClosed = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    if (this.mockIntervalTimer) clearInterval(this.mockIntervalTimer);
     this.cleanupSocket();
     this.setState("DISCONNECTED");
   }
@@ -193,7 +240,9 @@ export class WebSocketManager implements IWebSocketClient {
     handler: WebSocketEventHandler<T>,
     topic?: string,
   ): () => void {
-    const key = topic ? `${eventType}:${topic}` : eventType;
+    const normalizedType = String(eventType).toUpperCase().replace(/\./g, "_");
+    const key = topic ? `${normalizedType}:${topic}` : normalizedType;
+
     if (!this.listeners.has(key)) {
       this.listeners.set(key, new Set());
     }
@@ -201,6 +250,10 @@ export class WebSocketManager implements IWebSocketClient {
     const set = this.listeners.get(key)!;
     const typedHandler = handler as WebSocketEventHandler;
     set.add(typedHandler);
+
+    if (topic) {
+      this.subscribeToTopic(topic);
+    }
 
     return () => {
       set.delete(typedHandler);
@@ -211,14 +264,24 @@ export class WebSocketManager implements IWebSocketClient {
   }
 
   public subscribeToTopic(topic: string): void {
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify({ type: "SUBSCRIBE", topic }));
-    }
+    this.activeTopics.add(topic);
+    this.sendSubscription(topic);
   }
 
   public unsubscribeFromTopic(topic: string): void {
+    this.activeTopics.delete(topic);
+    this.sendUnsubscription(topic);
+  }
+
+  private sendSubscription(topic: string): void {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify({ type: "UNSUBSCRIBE", topic }));
+      this.socket.send(JSON.stringify({ action: "SUBSCRIBE", topic }));
+    }
+  }
+
+  private sendUnsubscription(topic: string): void {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ action: "UNSUBSCRIBE", topic }));
     }
   }
 

@@ -15,7 +15,15 @@ export class HttpOrderService implements IOrderService {
     return apiClient.post<OrderValidationResult>("/orders/validate", payload);
   }
 
-  async createOrder(payload: CreateOrderPayload): Promise<ApiResponse<Order>> {
+  async createOrder(
+    payload: CreateOrderPayload,
+    options?: { idempotencyKey?: string }
+  ): Promise<ApiResponse<Order>> {
+    if (options?.idempotencyKey) {
+      return apiClient.post<Order>("/orders", payload, {
+        headers: { "Idempotency-Key": options.idempotencyKey },
+      });
+    }
     return apiClient.post<Order>("/orders", payload);
   }
 

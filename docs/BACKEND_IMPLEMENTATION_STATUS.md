@@ -343,15 +343,115 @@ Implemented full transaction-safe order placement lifecycle under `POST /api/v1/
 
 ---
 
-## 11. Next Immediate Task: Phase 3B.4 / Phase 3C
+## 11. Phase 3B.4: Realtime WebSocket Server Transport, Outbox Concurrency Worker & Frontend Order Integration (Completed & Verified)
 
-1. **Phase 3B.4: Realtime WebSocket Server Transport Integration**:
-   - Wire `@fastify/websocket` to the transactional outbox worker.
-   - Stream `order.created`, `order.updated`, and `kot.created` events to frontend subscribers (`orders:all`, `kitchen:kots`, `order:<id>`).
-2. **Phase 3C: Kitchen Display System (KDS) & Order Status Lifecycle**:
-   - `GET /api/v1/kitchen/kots`: Station filtering.
-   - `PATCH /api/v1/kitchen/kots/:id/status`: Transition KOT (`ACCEPTED` -> `PREPARING` -> `READY` -> `SERVED`).
-   - Order cancellation (`POST /api/v1/orders/:id/cancel`) within grace window.
+Delivered full end-to-end integration between frontend checkout, Fastify WebSocket transport, transactional outbox worker, and kitchen/staff display workspaces:
+
+### Key Architectural Deliverables:
+- **Fastify WebSocket Server Transport (`backend/src/services/websocket.service.ts` & `backend/src/routes/websocket.ts`)**:
+  - Registered `@fastify/websocket` on `/ws` route.
+  - Authenticates connections via `token` query param (Fastify JWT for staff) or `qrToken` (public guest context).
+  - Enforces strict subscription authorization matrix:
+    - `kitchen:kots`: Restricted to `KITCHEN_STAFF`, `CHEF`, `MANAGER`, `ADMIN`.
+    - `orders:all`: Restricted to `WAITER`, `CAPTAIN`, `CASHIER`, `MANAGER`, `ADMIN`.
+    - `billing:all`: Restricted to `CASHIER`, `MANAGER`, `ADMIN`.
+    - `order:{orderId}`: Permitted for guests holding authorized order or staff.
+  - Strict tenant isolation: prevents any cross-tenant event broadcast.
+  - Event versioning: standard wire envelope (`version: "1.0"`).
+- **Concurrency-Safe Outbox Worker (`backend/src/services/outbox.service.ts` & `backend/src/scripts/outbox-worker.ts`)**:
+  - Safe multi-process claiming using PostgreSQL row locking (`FOR UPDATE SKIP LOCKED`).
+  - Stale processing claim reclamation (>60s).
+  - Bounded retries (5 max) with exponential backoff (1s -> 30s) before marking `FAILED`.
+  - Transport failure decoupling: WebSocket broker or socket failure never invalidates or rolls back already-committed PostgreSQL orders.
+  - Manual recovery APIs and CLI script: `npm run worker:outbox`, `getFailedEvents()`, `retryFailedEvent()`, `retryAllFailedEvents()`, `getOutboxStats()`.
+  - In-process daemon starts on `server.listen()` and stops gracefully on `SIGINT`/`SIGTERM`.
+- **Frontend Order Checkout Integration (`src/features/checkout/CheckoutForm.tsx`)**:
+  - Connects to `POST /api/v1/orders` with pre-checkout cart validation via `POST /api/v1/orders/validate`.
+  - Generates durable UUID v4 idempotency key per logical submission in ref; reuses key for network retries.
+  - Double-click prevention (`isSubmitting` flag disabling action buttons).
+  - Handles validation errors, 86'd unavailable items (409), expired/invalid QR contexts (400/404), idempotency conflicts (409), and network failures with dedicated retry UI.
+  - Displays authoritative backend order number and grand total; client prices are never trusted.
+- **KDS & Waiter Realtime UX (`src/features/kitchen/KDSBoard.tsx` & `src/features/orders/OrdersList.tsx`)**:
+  - Visual ticket deduplication preventing duplicate tickets during event replay.
+  - Connection status badge (`Live` green, `Reconnecting` amber, `Offline` zinc).
+  - Manual "Sync from DB" button ensuring database remains authoritative source of truth.
+  - Automatic re-subscription and state reconciliation upon reconnection.
+
+### Verification & Testing Results (Phase 3B.4)
+- **Backend Test Suite**: 8 test files, 103 passed:
+  - `websocket-outbox.test.ts` (8 passed): Concurrency-safe batch claiming via `FOR UPDATE SKIP LOCKED`, bounded retries transitioning to `FAILED` after 5 attempts, stale processing event recovery, manual failed event retry, decoupling order commit from WS failures, role-based topic filtering, guest topic authorization restriction, and cross-tenant leakage prevention.
+  - `order.test.ts` (18 passed)
+  - `cart.test.ts` (16 passed)
+  - `menu.test.ts` (25 passed)
+  - `auth.test.ts` (16 passed)
+  - `qr.test.ts` (13 passed)
+  - `health.test.ts` (5 passed)
+  - `ready.test.ts` (2 passed)
+- **Frontend Test Suite**: 35 test files, 98 passed (100% green):
+  - `checkoutIntegration.test.tsx` (5 passed): Happy path order submission with authoritative pricing, idempotency key reuse on retry, double-click prevention, 409 unavailable item handling, and network drop recovery.
+- **TypeScript Typecheck**: 0 errors across root (`npx tsc --noEmit`) and backend (`tsc --noEmit`).
+- **Production Builds**: Clean compilation via `npm run build` in backend and `next build` (all 44 routes static/prerendered).
+
+---
+
+## 12. Phase 3C: KOT Status Progression & KDS Workflow (Completed & Verified)
+
+Delivered full end-to-end kitchen status progression lifecycle, PostgreSQL row-locking concurrency safety, linked `OrderItem` synchronization, parent `Order` progress recalculation, transactional outbox events, and KDS/waiter frontend coordination:
+
+### Key Architectural Deliverables:
+- **Kitchen Controller & Service (`backend/src/routes/kitchen.ts` & `backend/src/services/kitchen.service.ts`)**:
+  - `PATCH /api/v1/kitchen/kots/:id/status` (and alias `/api/kitchen/kots/:id/status`):
+    - Lifecycle: `NEW (PENDING) -> ACCEPTED -> PREPARING -> READY -> SERVED`.
+    - Server-side state transition enforcement: invalid transitions rejected with HTTP 409 `INVALID_STATUS_TRANSITION`.
+    - Idempotent safe replay: duplicate requests for the same status return HTTP 200 OK without errors or redundant outbox emissions.
+    - Concurrency row locking: `SELECT id, status FROM kots WHERE id = $1::uuid FOR UPDATE` inside `prisma.$transaction` guarantees atomic serial execution without race condition overwrites.
+    - Role authorization: `requireRoles("KITCHEN_STAFF", "MANAGER", "ADMIN", "SUPER_ADMIN")`. Public and unauthorized requests rejected with 401/403.
+    - Tenant isolation: strictly scoped to authenticated user's `tenantId`. Cross-tenant tickets return 404 `KOT_NOT_FOUND`.
+  - `GET /api/v1/kitchen/kots`: active KOTs query with item modifier details, urgency indicators, and table/room context.
+  - `GET /api/v1/kitchen/kots/:id`: single KOT query by UUID.
+- **Item & Parent Order Synchronization**:
+  - Automatically updates linked `OrderItem.status` to `PREPARING`, `READY`, or `SERVED`.
+  - Recalculates parent `Order.status` across all KOTs on the order:
+    - Order is marked `READY` if and only if **all** KOTs for the order are `READY` or `SERVED`.
+    - Order is marked `SERVED` if and only if **all** KOTs for the order are `SERVED`.
+    - Order remains `PREPARING` if any KOT is still cooking or pending.
+- **Transactional Outbox & Realtime WebSocket Events**:
+  - Emits `kot.status_updated` on topic `kitchen:kots`.
+  - Emits `kot.ready` on topic `orders:all` when food is cooked and ready for waitstaff pickup.
+  - Emits `order.updated` on topic `orders:all` when parent order progress transitions.
+  - Outbox events dispatched post-commit with automatic retry tracking.
+- **KDS & Waiter Frontend Workflow**:
+  - Updated `KOTCard.tsx` with stage actions (`Accept Ticket`, `Start Cooking`, `Mark Ready to Serve`, `Expedite & Complete`, `Served & Expedited`).
+  - Added support for `KOT_STATUS_UPDATED` and `KOT_READY` in `useWebSocket.ts`.
+
+### Verification & Testing Results (Phase 3C)
+- **Backend Test Suite**: 9 test files, 119 passed:
+  - `kitchen-kds.test.ts` (16 passed): Valid lifecycle transitions, PENDING normalization, 409 illegal transition rejections, idempotent replay, 401 unauthenticated, 403 unauthorized roles (WAITER, CASHIER), allowed MANAGER, 404 multi-tenant boundary, multi-KOT parent order rules, concurrency-safe row locking, transactional outbox events, active KOTs and single KOT queries.
+  - `websocket-outbox.test.ts` (8 passed)
+  - `order.test.ts` (18 passed)
+  - `cart.test.ts` (16 passed)
+  - `menu.test.ts` (25 passed)
+  - `auth.test.ts` (16 passed)
+  - `qr.test.ts` (13 passed)
+  - `health.test.ts` (5 passed)
+  - `ready.test.ts` (2 passed)
+- **Frontend Test Suite**: 35 test files, 102 passed (100% green).
+- **TypeScript Typecheck**: 0 errors across root (`npx tsc --noEmit`) and backend (`tsc --noEmit`).
+- **Production Builds**: Clean compilation via `npm run build` in backend and `next build` (all 44 routes static/prerendered).
+
+---
+
+## 13. Next Immediate Task: Phase 4 (Billing Desk & Payment Settlement)
+
+1. **Tax Invoice Generation**:
+   - `POST /api/v1/bills/order/:id/generate`: immutable invoice snapshot with CGST + SGST calculation and sequential number sequence (`INV-YYYY-XXXX`).
+   - `GET /api/v1/bills/:id` & `GET /api/v1/bills/order/:orderId`.
+2. **Discounts & Bill Adjustments**:
+   - `POST /api/v1/bills/:id/discount`: flat or percentage discount with authorized staff ID.
+   - `POST /api/v1/bills/:id/void`: manager void with audit reason.
+3. **Payment Recording & Settlement**:
+   - `POST /api/v1/bills/:id/payments`: tender recording (`CASH`, `CARD`, `UPI`, `ROOM_CHARGE`).
+   - Partial payment support, `dueAmount` decrementing, table status release on settlement.
 
 
 
