@@ -151,17 +151,18 @@ Supported methods: `CASH`, `CARD`, `UPI`, `ROOM_CHARGE`, `NET_BANKING`.
 - The PostgreSQL database is the single source of truth for stock levels.
 - Every stock adjustment MUST insert an immutable row into `inventory_transactions`. Direct updates to `current_stock` without an audit log are forbidden.
 
-### 5.2 Recipe Bill of Materials (BOM) & Consumption Timing
+### 5.2 Recipe Bill of Materials (BOM) & Consumption Timing (Phase 5 Verified)
 - Each menu item can be linked to a `Recipe` containing `RecipeIngredient` rows:
   - Example: *Paneer Butter Masala (1 portion)* consumes:
     - 0.200 kg Paneer
     - 0.050 kg Butter
     - 0.150 kg Tomato Gravy
-- `[PENDING BACKEND AGREEMENT]`: When does automatic inventory stock deduction occur?
-  - **Option A (Recommended)**: Upon order confirmation / KOT dispatch (`ORDER_CONFIRMED` / `KOT_CREATED`).
-  - **Option B**: Upon bill settlement (`BILL_PAID`).
-  - **Option C**: Manual end-of-day kitchen variance entry.
-  *(Suggested default: Option A for accurate real-time low-stock alerts, with auto-restoration if order cancelled before cooking).*
+- **Adopted Policy (Implemented & Verified in Phase 5)**:
+  - Stock is deducted **atomically upon Order Confirmation / KOT Creation (`KOT_CREATED`)** within the database transaction in `OrderService.createOrder`.
+  - **Idempotency Protection**: Subsequent HTTP retries, outbox worker redeliveries, or WebSocket reconnection events check existing `inventory_transactions` by `referenceOrderId` / `referenceKotId` before applying any deduction.
+  - **Unit Conversion**: Automatic unit conversion between mass units (`KG` <-> `GRAM`) and volume units (`LITRE` <-> `ML`) with dimensional incompatibility protection.
+  - **Auto-86 Availability**: When an ingredient reaches `current_stock = 0`, the backend automatically marks all linked menu items as `is_available = false` and emits `menu.item_unavailable` via the transactional outbox.
+  - **Concurrency Safety**: Stock balance updates and adjustments utilize PostgreSQL row-level locks (`SELECT ... FOR UPDATE`), preventing race conditions and negative inventory balances.
 
 ### 5.3 Stock Depletion & Concurrent Orders
 - When an inventory item reaches `current_stock <= minimum_threshold`, the backend emits an `inventory.stock.updated` WebSocket event and marks `is_low_stock = true`.
@@ -188,13 +189,62 @@ Supported methods: `CASH`, `CARD`, `UPI`, `ROOM_CHARGE`, `NET_BANKING`.
 
 ---
 
-## 7. Summary of Unresolved Backend Decisions
+## 7. Hardware Printing, Duplicate-Print Prevention & Uncertain Delivery (Phase 6 Verified)
+
+### 7.1 Printing Is Non-Authoritative For Financial State
+- **Critical Invariant**: A print job completing (`COMPLETED`) or failing (`FAILED`) does NOT alter the lifecycle state of bills or orders:
+  - Printing an invoice does NOT mark it paid or settled.
+  - Printing a KOT does NOT mark an order served or completed.
+  - Printing errors or hardware outages do NOT roll back committed order transactions.
+
+### 7.2 Durable Print Intent & Outbox Decoupling
+- Print jobs are queued transactionally in PostgreSQL `print_jobs` with immutable snapshot payloads.
+- If physical printers are offline, paper-out, or unreachable, orders and bills remain fully committed and operational.
+- Background worker claims jobs atomically via `SELECT ... FOR UPDATE SKIP LOCKED` without holding long-lived database locks during slow hardware I/O.
+- Database transactions commit BEFORE physical hardware transmission begins.
+
+### 7.3 Uncertain Hardware Outcomes & Duplicate-Print Safety (Phase 6E Hardened)
+- Physical printing cannot guarantee exactly-once delivery over raw TCP sockets.
+- **Classification Invariants**:
+  1. **Pre-transmission failure**: Connection refused, host unreachable, or payload size exceeded -> marked `FAILED` or retried according to bounded exponential backoff.
+  2. **Post-write ambiguity**: TCP socket error or write timeout AFTER bytes have been written -> marked `UNCERTAIN`.
+  3. **Stale Lease / Worker Crash Recovery**: Any job lingering in `PRINTING` status past the lease window (> 60 seconds) MUST transition to `UNCERTAIN` with `errorMessage: "Worker heartbeat expired during transmission..."`. It is NEVER blindly reset to `QUEUED`.
+- Background workers NEVER automatically claim or retry `UNCERTAIN` jobs.
+- Authorized operators (`ADMIN`, `MANAGER`, `CASHIER`) must inspect physical hardware output before resolving:
+  - If ticket did not print: Call `POST /api/v1/print-jobs/:id/retry` to re-enqueue.
+  - If ticket did print: Call `POST /api/v1/print-jobs/:id/cancel` to dismiss and clear the alert.
+
+### 7.4 Cloud-to-Printer Network Connectivity & Security
+- **Zero-Public-Port Invariant**: Raw TCP port 9100 on venue thermal printers must NEVER be exposed or port-forwarded to the public internet.
+- **Architectural Topologies**:
+  - **On-Premise Server**: Fastify runs within the venue LAN; connects directly to printer static IPs (`192.168.1.x:9100`).
+  - **Cloud VPS + VPN Tunnel**: Cloud Fastify connects over WireGuard / Tailscale site-to-site VPN to the private venue subnet.
+  - **Cloud VPS + Outbound Gateway Agent**: Dedicated local daemon on venue PC/Pi initiates outbound HTTPS/WSS connection to Cloud backend. Backend pushes rendered ESC/POS binaries; gateway spools locally. No inbound ports required on venue router.
+
+### 7.5 Authorized Reprint Watermark Guarantee
+- Reprints must never print indistinguishable duplicates of original tickets.
+- Reprints create a NEW distinct `PrintJob` with `isReprint: true` and audited reason.
+- Both plain text and ESC/POS renderers inject a prominent header:
+  ```text
+  ================================================
+  *** DUPLICATE / REPRINT COPY ***
+  Reason: Guest misplaced ticket
+  ================================================
+  ```
+- This prevents kitchen staff from accidentally preparing food twice or billing staff from issuing duplicate fiscal receipts.
+
+---
+
+## 8. Summary of Unresolved Backend Decisions
 
 | Domain | Decision Required | Recommended Default | Status |
 |---|---|---|---|
-| QR Context | QR Token Expiry Policy | Permanent table hardware token; ephemeral session token on scan | `PENDING BACKEND AGREEMENT` |
-| Orders | Service Charge Discretionary Policy | 5% default, configurable per tenant, waivable by Cashier | `PENDING BACKEND AGREEMENT` |
-| Kitchen | KOT Multi-Station Splitting | Single KOT per dispatch with item station tags | `PENDING BACKEND AGREEMENT` |
-| Billing | PMS Room Charge Folio Endpoint | Mocked in Stage 1; REST adapter in Stage 4 | `PENDING BACKEND AGREEMENT` |
-| Inventory | Recipe BOM Stock Deduction Timing | Deduct upon Order Confirmation / KOT dispatch | `PENDING BACKEND AGREEMENT` |
-| Security | Table Spoofing Prevention | Cryptographically signed ephemeral QR session JWT | `PENDING BACKEND AGREEMENT` |
+| QR Context | QR Token Expiry Policy | Permanent table hardware token; ephemeral session token on scan | `IMPLEMENTED & VERIFIED (PHASE 3B.1)` |
+| Orders | Service Charge Discretionary Policy | 5% default, configurable per tenant, waivable by Cashier | `IMPLEMENTED & VERIFIED (PHASE 4A)` |
+| Kitchen | KOT Multi-Station Splitting | Single KOT per dispatch with item station tags | `IMPLEMENTED & VERIFIED (PHASE 3C)` |
+| Billing | PMS Room Charge Folio Endpoint | Mocked in Stage 1; REST adapter in Stage 4 | `IMPLEMENTED & VERIFIED (PHASE 4C)` |
+| Inventory | Recipe BOM Stock Deduction Timing | Deduct upon Order Confirmation / KOT dispatch inside DB transaction | `IMPLEMENTED & VERIFIED (PHASE 5)` |
+| Printing | Thermal Printing Queue & Concurrency | PostgreSQL FOR UPDATE SKIP LOCKED + Network ESC/POS Adapter | `IMPLEMENTED & VERIFIED (PHASE 6)` |
+| Connectivity | Cloud-to-Printer Network Architecture | WireGuard VPN tunnel or Outbound Local Print Gateway | `IMPLEMENTED & VERIFIED (PHASE 6E)` |
+| Security | Table Spoofing Prevention | Cryptographically signed ephemeral QR session JWT | `IMPLEMENTED & VERIFIED (PHASE 3B.1)` |
+

@@ -441,17 +441,198 @@ Delivered full end-to-end kitchen status progression lifecycle, PostgreSQL row-l
 
 ---
 
-## 13. Next Immediate Task: Phase 4 (Billing Desk & Payment Settlement)
+## 13. Phase 4: Billing, Tax Invoices, Payments, Settlement & Frontend Integration
 
-1. **Tax Invoice Generation**:
-   - `POST /api/v1/bills/order/:id/generate`: immutable invoice snapshot with CGST + SGST calculation and sequential number sequence (`INV-YYYY-XXXX`).
-   - `GET /api/v1/bills/:id` & `GET /api/v1/bills/order/:orderId`.
-2. **Discounts & Bill Adjustments**:
-   - `POST /api/v1/bills/:id/discount`: flat or percentage discount with authorized staff ID.
-   - `POST /api/v1/bills/:id/void`: manager void with audit reason.
-3. **Payment Recording & Settlement**:
-   - `POST /api/v1/bills/:id/payments`: tender recording (`CASH`, `CARD`, `UPI`, `ROOM_CHARGE`).
-   - Partial payment support, `dueAmount` decrementing, table status release on settlement.
+> **Status**: Completed & Verified  
+> **Date**: 2026-10-11  
+> **Scope**: Phase 4A (Invoice Generation & Snapshots), Phase 4B (Bill Inspection & Management: Discounts, Voids), Phase 4C (Payment Recording, Partial Settlement, Idempotency, Room Charges, Table Release), and Phase 4D (Frontend Integration, Mock API parity, Verification).
+
+### 13.1 Key Architectural Deliverables:
+- **Billing Schemas & Validation (`backend/src/schemas/billing.schema.ts`)**:
+  - Zod schemas validating order IDs, discount inputs (`PERCENTAGE` / `FLAT`), void audit reasons (minimum 5 chars), pagination parameters, and payment tenders (`CASH`, `CARD`, `UPI`, `ROOM_CHARGE`).
+- **Sequential Invoice Number Allocation (`backend/src/services/sequence.service.ts`)**:
+  - Added `allocateInvoiceNumber(tx, tenantId)` utilizing atomic PostgreSQL upsert on `daily_counters` with counter type `"INVOICE"` and scope `YYYYMMDD`.
+  - Format: `INV-YYYYMMDD-XXXX` (e.g. `INV-20261011-0001`), concurrency-safe, non-colliding across date boundaries and tenant boundaries.
+- **Authoritative Billing Service (`backend/src/services/billing.service.ts`)**:
+  - **Phase 4A: Immutable Tax Invoices**:
+    - Atomic row locking (`SELECT id, status FROM orders WHERE id = $1::uuid FOR UPDATE`).
+    - Validates order eligibility (`SERVED`, `READY`, `CONFIRMED`, `PREPARING`); rejects cancelled orders (`400 ORDER_NOT_ELIGIBLE`).
+    - Calculates GST using Decimal arithmetic: CGST 2.5% + SGST 2.5% on F&B.
+    - Idempotent invoice replay: returns existing invoice on repeated requests without duplicate creation.
+    - Creates immutable item snapshots in `bill_items` storing item name, quantity, unit price, and line totals; protects financial history against subsequent menu catalog edits.
+    - Transitions dining table status to `BILL_REQUESTED`.
+  - **Phase 4B: Discounts & Voiding**:
+    - Role authorization: `MANAGER`, `ADMIN`, `SUPER_ADMIN` only. Rejects `CASHIER` (`403 FORBIDDEN`).
+    - Recalculates taxable subtotal, CGST, SGST, and updates `dueAmount`. Rejects discounts exceeding subtotal (`400 INVALID_DISCOUNT`).
+    - Voiding requires mandatory non-empty reason. Enforces that bills with settled payments cannot be voided (`400 CANNOT_VOID_PAID_BILL`).
+  - **Phase 4C: Payment Recording, Settlement & Concurrency**:
+    - Tenders: `CASH`, `CARD`, `UPI`, `ROOM_CHARGE`.
+    - Partial payments decrement `dueAmount` and transition bill status to `PARTIALLY_PAID`.
+    - Idempotent payment execution: repeated requests with the same `Idempotency-Key` return previously confirmed payment; key reuse with mismatched payload returns `409 IDEMPOTENCY_CONFLICT`.
+    - Overpayment protection: rejects tender amounts exceeding outstanding due balance (`400 PAYMENT_EXCEEDS_DUE`).
+    - Hotel room charge guards: `ROOM_CHARGE` accepted only for orders bound to a verified hotel room context; rejected for dining tables (`400 INVALID_ROOM_CHARGE`).
+    - Conditional Table Release: When a bill is fully settled (`PAID`), the dining table status transitions to `VACANT` **only if** no other active orders remain for that table.
+    - Transactional outbox events emitted: `bill.updated`, `payment.updated`, `order.completed`.
+- **Fastify Billing Routes (`backend/src/routes/billing.ts`)**:
+  - Mounted at `/api/v1/bills` and root `/api/bills`.
+  - Role-protected: `CASHIER`, `MANAGER`, `ADMIN`, `SUPER_ADMIN`.
+  - Strict tenant boundary isolation on all routes.
+
+### 13.2 Frontend & Mock Parity (Phase 4D)
+- **Mock Billing & Payment Services**:
+  - Updated `src/services/api/mock/billing.mock.ts` and `src/services/api/mock/payment.mock.ts` with full contract and business rule parity (over-discount protection, settled void rejection, payment idempotency cache, room charge validation, and due amount tracking).
+- **Unit & Component Tests**:
+  - Created `tests/unit/paymentSettlement.test.ts` testing partial payments, idempotency replay, overpayment rejections, discount recalculation, and voiding (7/7 passed).
+  - All 35 frontend test files (107 tests) passing 100% green.
+
+### 13.3 Automated Verification Results
+- **Backend Tests**:
+  - `backend/tests/billing.test.ts`: **20 / 20 passed** (100% green, including concurrency tests against live Supabase PostgreSQL).
+  - `backend/tests/order.test.ts`: **18 / 18 passed** (Regression verified).
+  - `backend/tests/kitchen-kds.test.ts`: **16 / 16 passed** (Regression verified).
+  - `backend/tests/ready.test.ts`: **3 / 3 passed** (Readiness probe verified).
+- **Frontend Tests**:
+  - `npm test -- --run`: **35 / 35 test files passed, 107 / 107 tests passed** (100% green).
+- **TypeScript Typecheck**:
+  - Root: `npm run typecheck` (`tsc --noEmit`) -> **0 errors**.
+  - Backend: `npm run typecheck` (`tsc --noEmit`) -> **0 errors**.
+- **Production Builds**:
+  - Root: `npm run build` (`next build`) -> **Compiled successfully, 44/44 pages prerendered**.
+  - Backend: `npm run build` (`rimraf dist && tsc`) -> **Clean compilation to `dist/`**.
+
+---
+
+## 14. Phase 4 Hardening & Phase 5 Inventory Implementation Results (Completed & Verified)
+
+### 14.1 Phase 4 Concurrency Hardening
+- **Concurrent Invoice Generation**:
+  - Verified concurrent requests generating an invoice for the same order acquire the PostgreSQL row lock and return the identical bill snapshot and bill number without duplicate records.
+- **Concurrent Payment Over-Allocation Protection**:
+  - Verified concurrent requests attempting to pay more than the outstanding balance are safely guarded by `SELECT ... FOR UPDATE` row locks; one transaction commits and the concurrent request fails with `400 PAYMENT_EXCEEDS_DUE`.
+
+### 14.2 Phase 5 Inventory & Recipe BOM Architecture
+- **Database Models & Enums**:
+  - `InventoryUnit`: `KG`, `GRAM`, `LITRE`, `ML`, `PIECE`, `PACKET`, `CAN`, `PORTION`, `BOTTLE`.
+  - `InventoryTransactionType`: `RESTOCK`, `USAGE`, `WASTAGE`, `ADJUSTMENT`, `RETURN`.
+  - `InventoryItem`: Multi-tenant item with base unit of measurement, current stock, reorder threshold, unit cost, and composite unique constraint on `(tenantId, sku)`.
+  - `Recipe`: Bill of Materials header bound to `menuItemId` with multi-tenant isolation.
+  - `RecipeIngredient`: Child ingredient mapping specifying required quantity and unit.
+  - `InventoryTransaction`: Immutable stock ledger tracking quantity delta, unit, remaining stock, reference order/KOT ID, actor ID, and audit reason.
+- **Database Migration**:
+  - Migration `20261011125208_add_inventory_and_recipes` applied cleanly to Supabase PostgreSQL (`npx prisma migrate status` confirms database is up to date).
+- **Decimal-Safe Unit Conversion Engine**:
+  - `InventoryService.convertQuantity` handles mass (`KG` <-> `GRAM`) and volume (`LITRE` <-> `ML`) conversions safely using `Prisma.Decimal` arithmetic with strict dimensional incompatibility guards.
+- **Stock Adjustments & Concurrency**:
+  - All stock modifications (restocks, adjustments, wastage, usages) acquire PostgreSQL row locks (`SELECT ... FOR UPDATE`).
+  - Guards against negative stock levels (`INSUFFICIENT_STOCK`).
+  - Emits transactional outbox event `inventory.low_stock` when `currentStock <= minimumThreshold`.
+- **Atomic Order Deduction & Idempotency**:
+  - Order creation in `OrderService.createOrder` executes `InventoryService.deductStockForOrder` within the primary database transaction.
+  - Deductions are protected by idempotency checks against `inventory_transactions` by `referenceOrderId` / `referenceKotId`, ensuring no duplicate stock deductions on HTTP retries or outbox redeliveries.
+  - Automatic 86ing: When an ingredient reaches 0 stock, linked menu items are automatically updated to `isAvailable: false` and `menu.item_unavailable` is emitted via the transactional outbox.
+- **Fastify Route Integration (`backend/src/routes/inventory.ts`)**:
+  - Mounted at `/api/v1/inventory` and `/api/inventory`.
+  - Zod request validation and strict role guards (`ADMIN`, `MANAGER`).
+  - Full multi-tenant context enforcement.
+
+### 14.3 Full Automated Verification
+- **Backend Tests (`backend`)**:
+  - `tests/inventory.test.ts`: **14 / 14 passed** (100% green).
+  - `tests/billing.test.ts`: **20 / 20 passed** (100% green).
+  - `tests/order.test.ts`: **18 / 18 passed** (100% green).
+  - `tests/kitchen-kds.test.ts`: **16 / 16 passed** (100% green).
+  - `tests/ready.test.ts`: **3 / 3 passed** (100% green).
+  - **Total Backend Integration Tests**: **71 / 71 passed against live Supabase PostgreSQL**.
+- **Frontend Tests (`root`)**:
+  - `npm test -- --run`: **35 / 35 test files passed, 107 / 107 tests passed** (100% green).
+- **TypeScript Typecheck**:
+  - Root: `npm run typecheck` (`tsc --noEmit`) -> **0 errors**.
+  - Backend: `npm run typecheck` (`tsc --noEmit`) -> **0 errors**.
+---
+
+## 15. Phase 6 Hardware Printing, Print Queue, Printer Routing & Fleet Management (Completed & Verified)
+
+### 15.1 Phase 6A: Printer Registry, Routing & Multi-Tenant Isolation
+- **Database Models & Enums**:
+  - `PrinterType`: `THERMAL_RECEIPT`, `THERMAL_KOT`, `LABEL`, `INVOICE`.
+  - `PrintJobStatus`: `QUEUED`, `PRINTING`, `COMPLETED`, `FAILED`, `UNCERTAIN`, `CANCELLED`.
+  - `Printer`: Tenant-scoped hardware registry supporting network raw TCP socket (port 9100) and USB/Bluetooth connections, station routing (`KITCHEN`, `BAR`, `BILLING`, `GENERAL`), paper width formatting (80mm vs 58mm), enabled/disabled status, and active socket ping monitoring.
+- **Security & Multi-Tenant Boundaries**:
+  - Strict tenant scoping enforced on every query (`where: { tenantId }`).
+  - Sensitive connection credentials/secrets never exposed to unauthorized roles or browser bundles.
+  - Role-based authorization: `ADMIN` for printer configuration mutations; `ADMIN`, `MANAGER`, `CASHIER` for printer queue read, manual retries, and reprints. `WAITER` requests are strictly rejected with HTTP 403 `FORBIDDEN`.
+
+### 15.2 Phase 6B: Durable Print Jobs & Background Worker Concurrency
+- **Durable Queueing & Transactional Order Print Intent**:
+  - `PrintJob`: Durable snapshot payload containing immutable document representations, retry counters, exponential backoff timestamps (`nextRetryAt`), and duplicate reprint flags.
+  - Order creation automatically registers KOT print jobs in PostgreSQL without requiring printers to be online and without rolling back committed orders on hardware outages.
+  - Deduplication via `idempotencyKey` prevents duplicate jobs from network retries or outbox replays.
+- **Atomic Batch Claiming (`FOR UPDATE SKIP LOCKED`)**:
+  - Multi-worker safe batch claiming in PostgreSQL prevents race conditions and eliminates double-printing.
+  - Automatic recovery of abandoned `PRINTING` jobs older than 60 seconds (recovers worker crashes).
+  - Background worker daemon (`printWorkerService`) runs every 3000ms with bounded exponential backoff (`delayMs = min(60000, 2000 * 2^(retry-1))`).
+- **Uncertain Delivery vs Definite Failure Handling**:
+  - Distinguishes network socket transmission drops from offline hardware errors.
+  - Ambiguous hardware outcomes transition to `UNCERTAIN` and require operator confirmation to prevent duplicate physical prints.
+- **Authorized Reprints with Watermark Guarantee**:
+  - Reprints generate a NEW distinct `PrintJob` with `isReprint: true` and output a prominent `*** DUPLICATE / REPRINT COPY ***` watermark.
+
+### 15.3 Phase 6C: Hardware Adapters & Authoritative Document Rendering
+- **Adapters**:
+  - `NetworkEscPosAdapter`: Direct TCP socket client on port 9100 with bounded connect (3s) and write (5s) timeouts, payload size enforcement (max 128KB), and graceful socket closure.
+  - `MockPrinterAdapter`: In-memory deterministic mock adapter supporting simulated offline, connection refusal, and uncertain delivery modes for automated testing and CI environments.
+- **ESC/POS Binary & Plain-Text Document Renderers**:
+  - `PrinterRenderer`: Pure deterministic renderers for KOT, Customer Receipt, and Diagnostic Self-Test Slips.
+  - Monospace layout support for 80mm (48 columns) and 58mm (32 columns) thermal paper widths.
+  - Preserves exact items, quantities, modifiers, special instructions, tax breakdowns, discounts, and payment methods from authoritative snapshots.
+
+### 15.4 Phase 6D: Next.js Frontend Integration
+- **Components & Pages**:
+  - `PrinterFleetManager` (`src/features/admin/PrinterFleetManager.tsx`): Fleet overview, printer registration modal, edit configuration modal, socket ping test, diagnostic self-test, and station routing tags.
+  - Print Queue Drawer / Page (`src/app/admin/print-jobs/page.tsx`): Real-time print job table with status filtering, job payload inspection drawer, manual retry button, and duplicate reprint modal.
+  - Centralized API client integration with full mock and live HTTP implementations (`src/services/api/http/printer.http.ts`, `src/services/api/mock/printer.mock.ts`).
+  - React Query hooks (`src/hooks/usePrinters.ts`) with cache invalidation on mutations.
+
+### 15.5 Full Automated Verification Results
+- **Phase 6 Test Suite (`backend/tests/printers.test.ts`)**:
+  - **17 / 17 passed** (100% green).
+  - Verifies printer registry CRUD, multi-tenant isolation, station routing, atomic batch claiming, bounded retries, uncertain delivery safety, stale PRINTING recovery to UNCERTAIN, authorized cancellation, reprint watermark generation, and ESC/POS binary buffer rendering.
+- **Full Backend Regression Suite**:
+  - **12 / 12 test files passed**, **170 / 170 tests passed** (100% green).
+  - Covers auth, billing, cart, health, inventory, kitchen-kds, menu, orders, printers, qr, ready, and websocket outbox.
+- **Full Frontend Unit Suite**:
+  - **35 / 35 test files passed**, **107 / 107 tests passed** (100% green).
+- **TypeScript Typecheck**:
+  - Root: `npm run typecheck` (`tsc --noEmit`) -> **0 errors**.
+  - Backend: `npm run typecheck` (`tsc --noEmit`) -> **0 errors**.
+- **Production Builds**:
+  - Root: `npm run build` (`next build`) -> **Compiled successfully, 44/44 pages prerendered**.
+  - Backend: `npm run build` (`rimraf dist && tsc`) -> **Clean compilation to `dist/`**.
+
+---
+
+## 16. Phase 6E: Live API Integration, Recovery Hardening & Hardware Readiness
+
+### 16.1 Live API Verification on Port 8000
+- Fastify backend started on port 8000 and tested against live Supabase PostgreSQL:
+  - `GET /api/v1/health` -> HTTP 200 `HEALTHY`.
+  - `GET /api/v1/ready` -> HTTP 200 `READY` (database connected, latency 305ms).
+  - `POST /api/v1/auth/login` -> HTTP 200 `Login successful` with Bearer JWT token.
+  - `GET /api/v1/printers` -> HTTP 200 returning live tenant printers with station and connection metadata.
+  - `POST /api/v1/printers/:id/ping` -> HTTP 200 executing real socket probe with 2000ms timeout; detected offline printer at `192.168.1.201:9100` and updated DB status.
+  - `POST /api/v1/printers/:id/test` -> HTTP 201 enqueuing diagnostic test slip.
+  - Background worker sweep automatically claimed the job, attempted TCP delivery, handled offline timeout, updated bounded retry backoff, and emitted WebSocket event over `printers:jobs`.
+
+### 16.2 Print-Worker Recovery Hardening
+- **Stale Lease Recovery**: Any job lingering in `PRINTING` status for more than 60 seconds (due to process crash or network stall) is now recovered as `UNCERTAIN` rather than blindly requeued, preventing physical duplicate prints.
+- **Worker Drain on Shutdown**: `PrintWorkerService.stopBackgroundWorker(drainTimeoutMs)` is asynchronous and waits up to 5000ms for active sweeps to complete before process exit.
+- **Cancellation / Dismissal**: Authorized staff can cancel or dismiss `UNCERTAIN` and `FAILED` jobs after visual inspection.
+
+### 16.3 Physical Hardware Commissioning Status & Blockers
+- **Hardware Audit**: Local system probed via `lpstat` and ARP table scan. Only office laser printer `Brother_DCP_L2530DW_series` detected; no thermal receipt printers (Epson, Star, POS-80) active on port 9100 on local subnet.
+- **Production Policy**: Physical printer commissioning requires on-site hardware connection; mock and network loopback adapters validated 100% of the software pipeline without fabricating physical hardware telemetry.
+- **Deployment Strategy**: Documented VPN tunnel (WireGuard) and local outbound print gateway architecture to securely bridge cloud VPS to venue LAN printers without exposing port 9100.
+
 
 
 

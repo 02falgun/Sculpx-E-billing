@@ -2,6 +2,7 @@ import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
 import { disconnectPrisma } from "./lib/prisma.js";
 import { outboxService } from "./services/outbox.service.js";
+import { printWorkerService } from "./services/print-worker.service.js";
 
 async function main(): Promise<void> {
   const app = await buildApp();
@@ -38,6 +39,9 @@ async function main(): Promise<void> {
 
     // Start in-process outbox event dispatcher worker daemon
     outboxService.startBackgroundWorker(2000);
+
+    // Start in-process print queue worker daemon
+    printWorkerService.startBackgroundWorker(3000);
 
     app.log.info(
       {

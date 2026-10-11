@@ -118,21 +118,21 @@
 | 20 | `/kitchen/kots` | `GET` | `/kitchen` | Bearer (`KITCHEN`+) | **Verified (Backend + Client Phase 3C)** |
 | 21 | `/kitchen/kots/:id` | `GET` | KOT Detail Drawer | Bearer (`KITCHEN`+) | **Verified (Backend + Client Phase 3C)** |
 | 22 | `/kitchen/kots/:id/status` | `PATCH` | KDS Action Buttons | Bearer (`KITCHEN`+) | **Verified (Backend + Client Phase 3C)** |
-| 23 | `/bills/:id` | `GET` | `/bill/[billId]` | Public / Staff | Verified in Client |
-| 24 | `/bills/order/:orderId` | `GET` | `/cashier/bills` | Bearer (`CASHIER`+) | Verified in Client |
-| 25 | `/bills` | `GET` | `/cashier/bills` | Bearer (`CASHIER`+) | Verified in Client |
-| 26 | `/bills/order/:orderId/generate` | `POST` | Cashier Bill Drawer | Bearer (`CASHIER`+) | Verified in Client |
-| 27 | `/bills/:id/discount` | `POST` | Cashier Discount Modal| Bearer (`CASHIER`+) | Verified in Client |
-| 28 | `/bills/:id/void` | `POST` | Manager Void Modal | Bearer (`MANAGER`+) | Verified in Client |
-| 29 | `/bills/:id/payments` | `POST` | Cashier / Customer Pay| Public / Cashier | Verified in Client |
+| 23 | `/bills/:id` | `GET` | `/bill/[billId]` | Public / Staff | **Verified (Backend + Mock Phase 4)** |
+| 24 | `/bills/order/:orderId` | `GET` | `/cashier/bills` | Bearer (`CASHIER`+) | **Verified (Backend + Mock Phase 4)** |
+| 25 | `/bills` | `GET` | `/cashier/bills` | Bearer (`CASHIER`+) | **Verified (Backend + Mock Phase 4)** |
+| 26 | `/bills/order/:orderId/generate` | `POST` | Cashier Bill Drawer | Bearer (`CASHIER`+) | **Verified (Backend + Mock Phase 4)** |
+| 27 | `/bills/:id/discount` | `POST` | Cashier Discount Modal| Bearer (`MANAGER`+) | **Verified (Backend + Mock Phase 4)** |
+| 28 | `/bills/:id/void` | `POST` | Manager Void Modal | Bearer (`MANAGER`+) | **Verified (Backend + Mock Phase 4)** |
+| 29 | `/bills/:id/payments` | `POST` | Cashier / Customer Pay| Public / Cashier | **Verified (Backend + Mock Phase 4)** |
 | 30 | `/payments/:id/refund` | `POST` | Cashier Ledger | Bearer (`MANAGER`+) | Verified in Client |
-| 31 | `/inventory/items` | `GET` | `/admin/inventory` | Bearer (`ADMIN`+) | Verified in Client |
-| 32 | `/inventory/adjustments` | `POST` | Inventory Modal | Bearer (`ADMIN`+) | Verified in Client |
-| 33 | `/inventory/transactions` | `GET` | `/admin/inventory/transactions` | Bearer (`ADMIN`+) | Verified in Client |
-| 34 | `/inventory/recipes` | `GET` | `/admin/inventory/recipes` | Bearer (`ADMIN`+) | Verified in Client |
-| 35 | `/printers` | `GET` | `/admin/printers` | Bearer (`ADMIN`+) | Verified in Client |
-| 36 | `/print-jobs` | `GET` | `/admin/print-jobs` | Bearer (`ADMIN`+) | Verified in Client |
-| 37 | `/print-jobs/:id/retry` | `POST` | Print Job Drawer | Bearer (`ADMIN`+) | Verified in Client |
+| 31 | `/inventory/items` | `GET` | `/admin/inventory` | Bearer (`ADMIN`, `MANAGER`) | **Verified (Backend Phase 5 + Client)** |
+| 32 | `/inventory/adjustments` | `POST` | Inventory Modal | Bearer (`ADMIN`, `MANAGER`) | **Verified (Backend Phase 5 + Client)** |
+| 33 | `/inventory/transactions` | `GET` | `/admin/inventory/transactions` | Bearer (`ADMIN`, `MANAGER`) | **Verified (Backend Phase 5 + Client)** |
+| 34 | `/inventory/recipes` | `GET` | `/admin/inventory/recipes` | Bearer (`ADMIN`, `MANAGER`) | **Verified (Backend Phase 5 + Client)** |
+| 35 | `/printers` | `GET` | `/admin/printers` | Bearer (`ADMIN`, `MANAGER`, `CASHIER`) | **Verified (Backend Phase 6 + Client)** |
+| 36 | `/print-jobs` | `GET` | `/admin/print-jobs` | Bearer (`ADMIN`, `MANAGER`, `CASHIER`) | **Verified (Backend Phase 6 + Client)** |
+| 37 | `/print-jobs/:id/retry` | `POST` | Print Job Drawer | Bearer (`ADMIN`, `MANAGER`, `CASHIER`) | **Verified (Backend Phase 6 + Client)** |
 | 38 | `/tables` | `GET` | `/tables`, `/staff/tables` | Bearer (`WAITER`+) | Verified in Client |
 | 39 | `/tables/:id/status` | `PATCH` | Table Grid Action | Bearer (`WAITER`+) | Verified in Client |
 | 40 | `/rooms` | `GET` | `/admin/rooms` | Bearer (`WAITER`+) | Verified in Client |
@@ -859,83 +859,352 @@
 ### 3.4 Billing Desk & Payments
 
 #### `POST /api/v1/bills/order/:orderId/generate`
-- **Purpose**: Generate tax invoice for completed dining order.
-- **Auth**: Bearer (`CASHIER`, `MANAGER`).
+- **Purpose**: Generate authoritative tax invoice snapshot for a completed or served dining order.
+- **Auth**: Bearer (`CASHIER`, `MANAGER`, `ADMIN`, `SUPER_ADMIN`).
+- **Eligibility**: Order status must be eligible (`SERVED`, `READY`, `CONFIRMED`, `PREPARING`). Rejects `CANCELLED` orders (`400 ORDER_NOT_ELIGIBLE`).
+- **Concurrency & Idempotency**: Atomic row locking with sequential numbering (`INV-YYYYMMDD-XXXX`). If an invoice already exists for the order, idempotently returns the existing invoice (`200 OK`) without creating duplicates.
+- **Table State**: Transitions dining table status to `BILL_REQUESTED`.
+- **Success (`201 Created` or `200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "c71bf9e2-8924-4f51-b0f9-bf5541e411b0",
+      "billNumber": "INV-20261011-0001",
+      "orderId": "ord-1042-uuid",
+      "status": "ISSUED",
+      "subtotal": 800.00,
+      "discounts": [],
+      "totalDiscount": 0.00,
+      "taxes": [
+        { "name": "CGST (2.5%)", "ratePercentage": 2.5, "amount": 20.00 },
+        { "name": "SGST (2.5%)", "ratePercentage": 2.5, "amount": 20.00 }
+      ],
+      "totalTax": 40.00,
+      "grandTotal": 840.00,
+      "paidAmount": 0.00,
+      "dueAmount": 840.00,
+      "items": [
+        {
+          "id": "bi-uuid",
+          "name": "Chicken Tikka",
+          "quantity": 2,
+          "unitPrice": 400.00,
+          "totalPrice": 800.00
+        }
+      ]
+    },
+    "message": "Bill generated successfully"
+  }
+  ```
+
+#### `GET /api/v1/bills/:id`
+- **Purpose**: Retrieve immutable bill snapshot and payment history by bill UUID or bill number.
+- **Auth**: Bearer (`CASHIER`, `MANAGER`, `ADMIN`, `SUPER_ADMIN`).
+- **Success (`200 OK`)**: Returns Bill detail matching envelope with `items`, `taxes`, `discounts`, and `payments`.
+
+#### `GET /api/v1/bills/order/:orderId`
+- **Purpose**: Retrieve active invoice for an order.
+- **Auth**: Bearer (`CASHIER`, `MANAGER`, `ADMIN`, `SUPER_ADMIN`).
+- **Success (`200 OK`)**: Returns Bill entity. Returns `404 BILL_NOT_FOUND` if unbilled.
+
+#### `GET /api/v1/bills`
+- **Purpose**: Paginated tenant-scoped listing of bills for cashier ledger and reporting.
+- **Auth**: Bearer (`CASHIER`, `MANAGER`, `ADMIN`, `SUPER_ADMIN`).
+- **Query Params**: `page` (default 1), `limit` (default 20), `status` (`ISSUED`, `PARTIALLY_PAID`, `PAID`, `VOID`).
+
+#### `POST /api/v1/bills/:id/discount`
+- **Purpose**: Apply authorized discount to an unfinalized bill with automatic tax recalculation.
+- **Auth**: Bearer (`MANAGER`, `ADMIN`, `SUPER_ADMIN`). Rejects `CASHIER` (`403 FORBIDDEN`).
+- **Request Body**:
+  ```json
+  {
+    "type": "PERCENTAGE", // or "FLAT"
+    "value": 10,
+    "reason": "Manager Loyalty Privilege"
+  }
+  ```
+- **Rules**: Cannot exceed bill subtotal (`400 INVALID_DISCOUNT`). Recomputes taxable base, CGST, SGST, and updates `dueAmount`.
+
+#### `POST /api/v1/bills/:id/void`
+- **Purpose**: Void an uncollected bill with mandatory manager audit trail.
+- **Auth**: Bearer (`MANAGER`, `ADMIN`, `SUPER_ADMIN`).
+- **Request Body**:
+  ```json
+  {
+    "reason": "Guest disputed order charges prior to settlement"
+  }
+  ```
+- **Rules**: Reason must be non-empty (`400 VOID_REASON_REQUIRED`). Bills with settled payments cannot be voided (`400 CANNOT_VOID_PAID_BILL`).
+
+#### `POST /api/v1/bills/:id/payments`
+- **Purpose**: Record tender payment against bill with atomic balance calculation and conditional table release.
+- **Auth**: Bearer (`CASHIER`, `MANAGER`, `ADMIN`, `SUPER_ADMIN`).
+- **Headers**: Supports `Idempotency-Key: <string>`.
+- **Request Body**:
+  ```json
+  {
+    "amount": 400.00,
+    "method": "CASH", // "CASH" | "CARD" | "UPI" | "ROOM_CHARGE"
+    "reference": "TXN-981240182",
+    "notes": "Desk Cash Payment"
+  }
+  ```
+- **Settlement & Table Release**:
+  - Overpayment exceeding `dueAmount` rejected (`400 PAYMENT_EXCEEDS_DUE`).
+  - Partial tender updates status to `PARTIALLY_PAID`.
+  - Full settlement transitions bill to `PAID`, order to `COMPLETED`.
+  - Dining table transitioned to `VACANT` **only if** no other active orders remain for that table.
+  - `ROOM_CHARGE` accepted only for verified hotel room orders; dining table orders rejected (`400 INVALID_ROOM_CHARGE`).
+- **Idempotency**: Replaying with the same key returns previously confirmed payment; key reuse with mismatched payload returns `409 IDEMPOTENCY_CONFLICT`.
 - **Success (`201 Created`)**:
   ```json
   {
     "success": true,
     "data": {
-      "id": "bill-2026-0419",
-      "billNumber": "INV-2026-0419",
-      "orderId": "ord-1042",
-      "status": "ISSUED",
-      "subtotal": 880.00,
-      "taxes": [
-        { "name": "CGST (2.5%)", "ratePercentage": 2.5, "amount": 22.00 },
-        { "name": "SGST (2.5%)", "ratePercentage": 2.5, "amount": 22.00 }
-      ],
-      "totalTax": 44.00,
-      "grandTotal": 924.00,
-      "dueAmount": 924.00
-    }
-  }
-  ```
-
-#### `POST /api/v1/bills/:id/payments`
-- **Purpose**: Record settlement against open bill.
-- **Request Body**:
-  ```json
-  {
-    "billId": "bill-2026-0419",
-    "amount": 924.00,
-    "method": "UPI",
-    "transactionReference": "UPI-TXN-981240182"
-  }
-  ```
-- **Success (`200 OK`)**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "id": "pay-9021",
-      "billId": "bill-2026-0419",
-      "amount": 924.00,
-      "status": "SUCCESS",
-      "method": "UPI"
-    }
+      "payment": {
+        "id": "pay-uuid",
+        "billId": "bill-uuid",
+        "amount": 400.00,
+        "method": "CASH",
+        "status": "COMPLETED"
+      },
+      "bill": {
+        "id": "bill-uuid",
+        "paidAmount": 400.00,
+        "dueAmount": 440.00,
+        "status": "PARTIALLY_PAID"
+      }
+    },
+    "message": "Payment recorded successfully"
   }
   ```
 
 ---
 
-### 3.5 Inventory & Hardware
+### 3.5 Inventory & Recipe BOM Management (Phase 5 Verified)
 
-#### `POST /api/v1/inventory/adjustments`
-- **Purpose**: Record stock movement (restock, usage, wastage).
+#### `GET /api/v1/inventory/items`
+- **Purpose**: List paginated inventory items with low-stock status and category filters.
 - **Auth**: Bearer (`ADMIN`, `MANAGER`).
-- **Request Body**:
-  ```json
-  {
-    "itemId": "inv-041",
-    "quantityChange": -1.5,
-    "type": "USAGE",
-    "reason": "Used in banquet banquet dinner",
-    "referenceOrderId": "ord-1042"
-  }
-  ```
-
-#### `POST /api/v1/print-jobs/:id/retry`
-- **Purpose**: Re-spool failed print job.
-- **Auth**: Bearer (`CASHIER`, `ADMIN`).
+- **Query Params**: `page`, `limit`, `category`, `search`, `isLowStock` (`true` / `false`).
 - **Success (`200 OK`)**:
   ```json
   {
     "success": true,
     "data": {
-      "id": "job-1092",
-      "status": "PROCESSING",
-      "retryCount": 2
+      "items": [
+        {
+          "id": "e1b1d1f0-...",
+          "tenantId": "e1b1d1f0-...",
+          "name": "Fresh Paneer",
+          "sku": "PANEER-01",
+          "category": "Dairy",
+          "unit": "KG",
+          "currentStock": 12.5,
+          "minimumThreshold": 5.0,
+          "costPerUnit": 320.0,
+          "isLowStock": false,
+          "isActive": true,
+          "createdAt": "2026-10-11T12:00:00.000Z",
+          "updatedAt": "2026-10-11T12:00:00.000Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "totalItems": 45,
+        "totalPages": 3,
+        "hasNextPage": true,
+        "hasPrevPage": false
+      }
     }
   }
   ```
+
+#### `POST /api/v1/inventory/items`
+- **Purpose**: Create a new inventory raw item.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`).
+- **Request Body**:
+  ```json
+  {
+    "name": "Basmati Rice",
+    "sku": "RICE-BAS-01",
+    "category": "Grains",
+    "unit": "KG",
+    "currentStock": 50.0,
+    "minimumThreshold": 15.0,
+    "costPerUnit": 85.0
+  }
+  ```
+- **Success (`201 Created`)**: Returns newly created item object.
+- **Errors**: `409 SKU_COLLISION`, `403 FORBIDDEN` for non-authorized roles.
+
+#### `GET /api/v1/inventory/items/:id`
+- **Purpose**: Fetch a single inventory item by ID.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`).
+- **Success (`200 OK`)**: Returns item object.
+- **Errors**: `404 NOT_FOUND` for non-existent or foreign tenant items.
+
+#### `POST /api/v1/inventory/adjustments`
+- **Purpose**: Authoritatively adjust inventory stock (RESTOCK, USAGE, WASTAGE, ADJUSTMENT, RETURN).
+- **Auth**: Bearer (`ADMIN`, `MANAGER`).
+- **Concurrency**: Guaranteed safe via PostgreSQL row-level locking (`SELECT ... FOR UPDATE`).
+- **Request Body**:
+  ```json
+  {
+    "itemId": "e1b1d1f0-...",
+    "quantityChange": 10.0,
+    "type": "RESTOCK",
+    "reason": "Supplier shipment received invoice #PO-9021",
+    "unit": "KG"
+  }
+  ```
+- **Success (`201 Created`)**: Returns `{ transaction: InventoryTransaction, remainingStockAfter: number }`.
+- **Errors**: `400 INSUFFICIENT_STOCK` (if deduction exceeds stock), `404 NOT_FOUND`.
+
+#### `GET /api/v1/inventory/transactions`
+- **Purpose**: Retrieve historical audit log of stock movements.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`).
+- **Query Params**: `page`, `limit`, `itemId`, `type`.
+- **Success (`200 OK`)**: Paginated list of inventory transactions with associated item names.
+
+#### `GET /api/v1/inventory/recipes`
+- **Purpose**: List all recipes and ingredient mappings for tenant menu items.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`).
+- **Success (`200 OK`)**: List of Recipe objects with ingredients.
+
+#### `GET /api/v1/inventory/recipes/:menuItemId`
+- **Purpose**: Get recipe specification for a specific menu item.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`).
+- **Success (`200 OK`)**: Returns Recipe object or null.
+
+#### `POST /api/v1/inventory/recipes`
+- **Purpose**: Upsert Recipe Bill of Materials (BOM) for a menu item.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`).
+- **Request Body**:
+  ```json
+  {
+    "menuItemId": "c2b1d1f0-...",
+    "notes": "Standard portion for Paneer Tikka",
+    "ingredients": [
+      {
+        "inventoryItemId": "e1b1d1f0-...",
+        "quantity": 200,
+        "unit": "GRAM"
+      },
+      {
+        "inventoryItemId": "f1b1d1f0-...",
+        "quantity": 30,
+        "unit": "ML"
+      }
+    ]
+  }
+  ```
+- **Success (`201 Created` / `200 OK`)**: Returns recipe object with ingredients.
+- **Errors**: `400 INVALID_INGREDIENTS` (if ingredient IDs do not exist or belong to another tenant).
+
+---
+
+### 3.6 Hardware & Print Jobs
+
+#### `GET /api/v1/printers`
+- **Purpose**: List all printers configured for the authenticated tenant.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`, `CASHIER`).
+- **Query Params**: `station` (optional filter).
+- **Success (`200 OK`)**: List of `Printer` objects with operational metrics (`isOnline`, `lastPingAt`).
+
+#### `POST /api/v1/printers`
+- **Purpose**: Register a new thermal network or USB printer.
+- **Auth**: Bearer (`ADMIN`).
+- **Request Body**:
+  ```json
+  {
+    "name": "Main Kitchen Thermal KOT",
+    "type": "THERMAL_KOT",
+    "connectionType": "NETWORK_TCP",
+    "ipAddress": "192.168.1.200",
+    "port": 9100,
+    "station": "KITCHEN",
+    "location": "Main Hot Line",
+    "paperWidthMm": 80,
+    "isActive": true,
+    "isDefault": false
+  }
+  ```
+- **Success (`201 Created`)**: Returns newly created `Printer` object.
+- **Errors**: `400 VALIDATION_ERROR`, `403 FORBIDDEN` (non-admin).
+
+#### `GET /api/v1/printers/:id`
+- **Purpose**: Retrieve details of a specific printer.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`, `CASHIER`).
+- **Success (`200 OK`)**: Single `Printer` object.
+- **Errors**: `404 PRINTER_NOT_FOUND`.
+
+#### `PATCH /api/v1/printers/:id`
+- **Purpose**: Update printer configuration, paper width, or enable/disable state.
+- **Auth**: Bearer (`ADMIN`).
+- **Success (`200 OK`)**: Updated `Printer` object.
+
+#### `DELETE /api/v1/printers/:id`
+- **Purpose**: Remove a printer from the registry (rejects if active pending jobs exist).
+- **Auth**: Bearer (`ADMIN`).
+- **Success (`200 OK`)**: `{ message: "Printer deleted successfully" }`.
+
+#### `POST /api/v1/printers/:id/ping`
+- **Purpose**: Execute active network socket probe on port 9100 to verify physical reachability.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`).
+- **Success (`200 OK`)**: `{ isOnline: boolean, latencyMs?: number, error?: string }`.
+
+#### `POST /api/v1/printers/:id/test-print`
+- **Purpose**: Transmit a standard diagnostic self-test slip to verify ESC/POS rendering and cutter.
+- **Auth**: Bearer (`ADMIN`).
+- **Success (`201 Created`)**: Queues a `TEST_PAGE` print job returning the created job.
+
+#### `GET /api/v1/printers/summary`
+- **Purpose**: Operational dashboard metrics (totalPrinters, onlinePrinters, offlinePrinters, pendingJobs, failedJobs, uncertainJobs).
+- **Auth**: Bearer (`ADMIN`, `MANAGER`, `CASHIER`).
+- **Success (`200 OK`)**: Aggregated metrics object.
+
+#### `GET /api/v1/print-jobs`
+- **Purpose**: List print queue jobs with status and printer filters.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`, `CASHIER`).
+- **Query Params**: `status`, `printerId`, `page`, `limit`.
+- **Success (`200 OK`)**: Paginated list of print jobs with nested printer metadata.
+
+#### `POST /api/v1/print-jobs`
+- **Purpose**: Enqueue a durable print job (KOT, BILL_RECEIPT, TEST_PAGE) with idempotency key.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`, `CASHIER`).
+- **Headers**: `X-Idempotency-Key` (optional).
+- **Request Body**:
+  ```json
+  {
+    "printerId": "1f522b19-...",
+    "type": "KOT",
+    "referenceId": "KOT-20261011-0042",
+    "payload": {
+      "kotNumber": "KOT-20261011-0042",
+      "tableOrRoom": "Table 04",
+      "items": [{ "name": "Chicken Tikka", "quantity": 2 }]
+    },
+    "idempotencyKey": "kot-print-20261011-0042"
+  }
+  ```
+- **Success (`201 Created`)**: Returns queued `PrintJob` object. Suppresses duplicates if key matches existing job.
+
+#### `POST /api/v1/print-jobs/:id/retry`
+- **Purpose**: Controlled manual retry for eligible `FAILED` or `UNCERTAIN` print jobs.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`, `CASHIER`).
+- **Success (`200 OK`)**: Resets status to `QUEUED`, resets error message, clears exponential backoff.
+- **Errors**: `400 INVALID_JOB_STATE_FOR_RETRY` (if job is already `COMPLETED` or `QUEUED`).
+
+#### `POST /api/v1/print-jobs/:id/reprint`
+- **Purpose**: Authorized duplicate reprint copy. Creates a NEW job with `isReprint = true` and `*** DUPLICATE / REPRINT COPY ***` watermark.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`, `CASHIER`).
+- **Request Body**: `{ "reason": "Guest misplaced invoice copy" }`.
+- **Success (`201 Created`)**: Newly created reprint `PrintJob` object.
+
+#### `POST /api/v1/print-jobs/:id/cancel`
+- **Purpose**: Abort an unprinted `QUEUED` job before hardware transmission.
+- **Auth**: Bearer (`ADMIN`, `MANAGER`).
+- **Success (`200 OK`)**: Updated `PrintJob` with status `CANCELLED`.

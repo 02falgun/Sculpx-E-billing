@@ -40,13 +40,13 @@ Each decision includes context, why it matters, a reasoned recommended default, 
 
 ### Decision 3: Recipe Bill of Materials (BOM) Stock Deduction Trigger
 - **Why It Matters**: Determines when raw ingredients (flour, paneer, oil, spices) are deducted from `inventory_items` and how cancellations affect inventory accuracy and wastage metrics.
-- **Suggested Default**: **Deduct on Order Confirmation / KOT Creation (`KOT_CREATED`)**.
-  - *Rationale*: Kitchen immediately begins using stock once ticket is fired. If an order is cancelled prior to cooking, stock is restored with transaction reason `CANCELLED_RETURN`. If cancelled after cooking starts, it is recorded as `WASTAGE`.
-- **Alternatives**:
-  - *Option B*: Deduct upon bill payment. *Drawback*: During busy rushes, inventory alerts are delayed by 1-2 hours until guests settle tabs.
-  - *Option C*: Manual end-of-shift reconciliation variance.
-- **Status**: `PENDING BACKEND AGREEMENT`
-- **Responsible Person**: Backend Developer & Operations Manager
+- **Adopted Policy**: **Deduct on Order Confirmation / KOT Creation (`KOT_CREATED`) inside the Database Transaction**.
+  - *Rationale*: Kitchen immediately begins using stock once ticket is fired. Stock deduction is executed atomically inside `OrderService.createOrder` transaction via `InventoryService.deductStockForOrder`.
+  - *Idempotency*: Re-evaluations, network retries, or duplicate outbox runs check existing `inventory_transactions` by `referenceOrderId` / `referenceKotId` to prevent duplicate deductions.
+  - *Insufficient Stock Policy*: Orders are rejected with HTTP 400 `INSUFFICIENT_STOCK` if required stock cannot be fulfilled. If stock reaches zero, `menu_items.is_available` is automatically updated to `false` (Auto-86).
+  - *Unit Conversion*: Authoritative mass (`KG` <-> `GRAM`) and volume (`LITRE` <-> `ML`) conversions are performed using Decimal arithmetic with dimension-incompatibility guards.
+- **Status**: `AGREED, IMPLEMENTED & VERIFIED IN PHASE 5`
+- **Responsible Person**: Backend Database Architect & Kitchen Ops Lead
 
 ---
 
@@ -74,12 +74,14 @@ Each decision includes context, why it matters, a reasoned recommended default, 
 
 ### Decision 6: Physical Thermal Printing Architecture
 - **Why It Matters**: Web browsers cannot directly communicate with local ESC/POS network thermal printers via raw TCP socket (port 9100) due to browser sandbox restrictions.
-- **Suggested Default**: **Backend Cloud Queue + Local Gateway Agent**.
-  - The frontend submits print jobs to `POST /api/v1/print-jobs`. A lightweight local Node.js or Python daemon on the restaurant LAN polls or receives WebSocket events to dispatch raw ESC/POS commands directly to printers.
-- **Alternatives**:
-  - *Option B*: Client-side browser print dialog (`window.print()`). *Drawback*: Cannot perform silent auto-cut, open cash drawer, or format 58mm/80mm receipt headers reliably.
-- **Status**: `PENDING BACKEND AGREEMENT`
-- **Responsible Person**: Hardware Integration Engineer / Backend Developer
+- **Implemented Architecture in Phase 6**: **Backend Queue with FOR UPDATE SKIP LOCKED Concurrency & Network ESC/POS Adapter**.
+  - All print requests (KOTs, Bill Receipts, Reprints) are transactionally queued in PostgreSQL `print_jobs` table with durable snapshots.
+  - A background worker (`printWorkerService`) claims batches atomically using PostgreSQL `FOR UPDATE SKIP LOCKED`.
+  - The worker dispatches ESC/POS binary buffers directly over raw TCP sockets (`NetworkEscPosAdapter` on port 9100) with bounded connect/write timeouts and uncertain-delivery detection, or via `MockPrinterAdapter` for test/mock modes.
+  - Ambiguous hardware outcomes transition to `UNCERTAIN` and require operator confirmation to prevent duplicate physical prints.
+  - Reprints generate new distinct jobs marked with `isReprint: true` and a visible `*** DUPLICATE / REPRINT COPY ***` watermark.
+- **Status**: `IMPLEMENTED & VERIFIED IN PHASE 6`
+- **Responsible Person**: Senior Backend Engineer & Hardware Integration Lead
 
 ---
 
@@ -193,19 +195,65 @@ Each decision includes context, why it matters, a reasoned recommended default, 
 
 ---
 
+### Decision 18: Sequential Invoice Numbering & Daily Counter Reuse
+- **Why It Matters**: Indian GST regulations require unique, consecutive tax invoice numbers within a financial period.
+- **Implemented Strategy in Phase 4A**: Reuses existing `daily_counters` table with `counter_type = 'INVOICE'` and `scope = YYYYMMDD`. Atomic PostgreSQL upsert allocates sequential numbers formatted as `INV-YYYYMMDD-XXXX` (e.g. `INV-20261011-0001`). Protected against date rollover and concurrent race conditions.
+- **Status**: `IMPLEMENTED & VERIFIED IN PHASE 4A`
+- **Responsible Person**: Senior Backend Engineer & Database Architect
+
+---
+
+### Decision 19: Immutable Invoice Snapshot & Separation from Live Catalog
+- **Why It Matters**: Adjusting a menu item price or description in the admin portal must not alter already generated historical invoices.
+- **Implemented Strategy in Phase 4A**: `bill_items` table stores an immutable snapshot of item names, quantities, unit prices, and line totals at the instant of invoice creation. Historical queries read from `bill_items`, completely decoupled from future menu adjustments.
+- **Status**: `IMPLEMENTED & VERIFIED IN PHASE 4A`
+- **Responsible Person**: Senior Backend Engineer & Product Lead
+
+---
+
+### Decision 20: Room Charge Settlement Policy
+- **Why It Matters**: Dining orders can be billed to guest hotel rooms (`ROOM_CHARGE`).
+- **Implemented Strategy in Phase 4C**: `ROOM_CHARGE` is accepted only for orders bound to a verified hotel room (`type === "ROOM"`). Rejects dining table orders with HTTP 400 `INVALID_ROOM_CHARGE`. External PMS ledger synchronization is dispatched via transactional outbox (`payment.updated`) until direct PMS vendor adapter credentials are configured.
+- **Status**: `IMPLEMENTED & VERIFIED IN PHASE 4C`
+- **Responsible Person**: Senior Backend Engineer & Hospitality Systems Integrator
+
+---
+
+### Decision 21: Conditional Dining Table Occupancy Release
+- **Why It Matters**: Releasing a dining table merely because one bill was settled risks marking a table vacant while guests are still dining on a second active tab.
+- **Implemented Strategy in Phase 4C**: When an order bill is fully paid, the dining table status is updated to `VACANT` **only if** `otherActiveOrders === 0`. If another active order is pending on that table, the table remains occupied. Hotel room status is never altered by restaurant bill settlement.
+- **Status**: `IMPLEMENTED & VERIFIED IN PHASE 4C`
+- **Responsible Person**: Senior Backend Engineer & Operations Lead
+
+---
+
+### Decision 22: Cloud-to-Printer Network Architecture & Hardware Commissioning
+- **Why It Matters**: When the backend runs on a Cloud VPS while physical thermal printers sit on a private restaurant LAN, opening raw TCP sockets (port 9100) over the public internet poses severe security risks and is blocked by NAT/firewalls.
+- **Adopted Architecture & Hardening Strategy (Phase 6E)**:
+  1. **Strict Zero-Public-Port Invariant**: Raw printer TCP port 9100 must NEVER be port-forwarded or exposed to the public internet.
+  2. **Production Cloud Architecture**:
+     - **Option A (VPN Tunnel)**: WireGuard / Tailscale site-to-site mesh VPN interconnecting Cloud VPS to venue router/subnet. Fastify's `NetworkEscPosAdapter` communicates directly over private VPN IP space (`10.x.x.x` or `192.168.x.x`).
+     - **Option B (Outbound Local Print Gateway)**: Lightweight Node.js/Go daemon on venue billing PC or Raspberry Pi that establishes an authenticated, outbound WSS/HTTPS connection to Cloud VPS. Backend pushes rendered ESC/POS binaries to gateway, which spools locally to LAN or USB thermal printers.
+  3. **Hardened Print-Worker Recovery**: Abandoned `PRINTING` jobs (> 60s) are recovered as `UNCERTAIN` rather than blindly reset to `QUEUED`, preventing duplicate physical tickets or bills.
+  4. **Physical Hardware Commissioning Policy**: Formal commissioning requires physical hardware on-site; mock/loopback adapters provide 100% automated test coverage without fabricating physical hardware telemetry.
+- **Status**: `IMPLEMENTED & VERIFIED IN PHASE 6E`
+- **Responsible Person**: Senior Full-Stack & Deployment Engineer
+
+---
+
 ## 3. Decision Sign-Off Summary Table
 
 | ID | Title | Recommendation | Status | Owner |
 |---|---|---|---|---|
-| D-01 | Auth Mechanism | Bearer JWT Header | Pending | Backend Lead |
-| D-02 | QR Security | Ephemeral Signed JWT Session | Pending | Backend + Frontend |
-| D-03 | Stock Deduction Timing | On KOT Creation (`KOT_CREATED`) | Pending | Backend + Ops |
-| D-04 | KOT Station Split | Single KOT with station tags | Pending | Backend + Chef |
-| D-05 | Room Charge Folio | Asynchronous PMS Adapter | Pending | Systems Integrator |
-| D-06 | Hardware Printing | Backend Queue + LAN Print Agent | Pending | Hardware Lead |
-| D-07 | Multi-Tenancy | `tenant_id` on all tables | Pending | DB Architect |
-| D-08 | Tax & Service Charge | CGST 2.5% + SGST 2.5% + 5% SC | Pending | Finance Lead |
-| D-09 | QR Expiry & Revocation Schema | Forward-only nullable migration (`expires_at`, `revoked_at`) | Pending Approval | Backend DB Architect |
+| D-01 | Auth Mechanism | Bearer JWT Header | Implemented (Phase 1) | Backend Lead |
+| D-02 | QR Security | Ephemeral Signed JWT Session | Implemented (Phase 3B.1) | Backend + Frontend |
+| D-03 | Stock Deduction Timing | On KOT Creation (`KOT_CREATED`) | Implemented (Phase 5) | Backend + Ops |
+| D-04 | KOT Station Split | Single KOT with station tags | Implemented (Phase 3C) | Backend + Chef |
+| D-05 | Room Charge Folio | Asynchronous PMS Adapter | Implemented (Phase 4C) | Systems Integrator |
+| D-06 | Hardware Printing | Backend Queue + LAN Print Agent | Implemented (Phase 6) | Hardware Lead |
+| D-07 | Multi-Tenancy | `tenant_id` on all tables | Implemented | DB Architect |
+| D-08 | Tax & Service Charge | CGST 2.5% + SGST 2.5% + 5% SC | Implemented (Phase 4A) | Finance Lead |
+| D-09 | QR Expiry & Revocation Schema | Forward-only nullable migration (`expires_at`, `revoked_at`) | Documented Policy | Backend DB Architect |
 | D-10 | Cart Validation Table/Room Status Policy | Read-only validation; status transition handled in Order Creation | Documented Policy | Senior Backend Engineer |
 | D-11 | Idempotency Scoping & Deduplication | Database-backed `idempotency_keys` with SHA-256 hash & HTTP 409 | Implemented (Phase 3B.3) | Senior Backend Engineer |
 | D-12 | Daily Order & KOT Number Sequence | Atomic `daily_counters` with row lock `ORD/KOT-YYYYMMDD-XXXX` | Implemented (Phase 3B.3) | Senior Backend Engineer |
@@ -214,5 +262,11 @@ Each decision includes context, why it matters, a reasoned recommended default, 
 | D-15 | Multi-Process Outbox Claiming & Recovery | `FOR UPDATE SKIP LOCKED` + bounded 5 retries + worker script | Implemented (Phase 3B.4) | Senior Backend Engineer |
 | D-16 | KOT State Machine & Parent Order Synchronization | `NEW -> ACCEPTED -> PREPARING -> READY -> SERVED` + row lock | Implemented (Phase 3C) | Senior Backend Engineer |
 | D-17 | Item-Level Preparation Representation | Update `order_items.status`; documented `kot_items.status` migration | Documented & Verified (Phase 3C) | Senior Backend Engineer |
+| D-18 | Sequential Invoice Numbering Scope | Atomic `daily_counters` with `INV-YYYYMMDD-XXXX` | Implemented (Phase 4A) | Senior Backend Engineer |
+| D-19 | Immutable Invoice Snapshot & History | Snapshot in `bill_items` protecting financial history | Implemented (Phase 4A) | Senior Backend Engineer |
+| D-20 | Room Charge Tender Validation | Restricted to hotel room orders; outbox event dispatch | Implemented (Phase 4C) | Senior Backend Engineer |
+| D-21 | Conditional Dining Table Release | Table to `VACANT` only if zero remaining active orders | Implemented (Phase 4C) | Senior Backend Engineer |
+| D-22 | Cloud-to-Printer Network Architecture & Recovery Hardening | Strict zero-public-port policy; VPN/Gateway; UNCERTAIN recovery on stale leases | Implemented & Verified (Phase 6E) | Senior Deployment Engineer |
+
 
 

@@ -389,6 +389,19 @@ export class WebSocketService {
         return;
       }
     }
+    // 4. Hardware Printer stream
+    else if (topic === "printers:jobs" || topic === "printers:all") {
+      const allowedRoles = ["ADMIN", "SUPER_ADMIN", "MANAGER", "CASHIER"];
+      if (!allowedRoles.includes(role)) {
+        this.sendError(
+          client,
+          "FORBIDDEN",
+          `Role '${role}' is not authorized to subscribe to hardware printer stream '${topic}'`,
+          { topic }
+        );
+        return;
+      }
+    }
     // 4. Specific Order stream (e.g. order:c71be39c-...)
     else if (topic.startsWith("order:")) {
       const orderId = topic.replace(/^order:/, "").trim();

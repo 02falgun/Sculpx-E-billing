@@ -25,6 +25,8 @@ import {
   Recipe,
   Printer,
   PrintJob,
+  CreatePrinterDto,
+  UpdatePrinterDto,
 } from "@/types";
 
 export interface IAuthService {
@@ -111,16 +113,27 @@ export interface IInventoryService {
 
 export interface IPrinterService {
   getPrinters(): Promise<ApiResponse<Printer[]>>;
+  getPrinterById?(id: string): Promise<ApiResponse<Printer>>;
+  createPrinter?(data: CreatePrinterDto): Promise<ApiResponse<Printer>>;
+  updatePrinter?(id: string, data: UpdatePrinterDto): Promise<ApiResponse<Printer>>;
+  deletePrinter?(id: string): Promise<ApiResponse<{ deleted: boolean; deactivated: boolean }>>;
+  pingPrinter?(id: string): Promise<ApiResponse<{ isOnline: boolean; latencyMs?: number; printer: Printer }>>;
+  testPrint?(printerId: string): Promise<ApiResponse<PrintJob>>;
   getPrintJobs(params?: {
     status?: string;
+    printerId?: string;
     pagination?: PaginationParams;
   }): Promise<ApiResponse<PaginatedResult<PrintJob>>>;
+  getPrintJobById?(id: string): Promise<ApiResponse<PrintJob>>;
   retryPrintJob(id: string): Promise<ApiResponse<PrintJob>>;
-  reprintJob(id: string): Promise<ApiResponse<PrintJob>>;
+  reprintJob(id: string, reason?: string): Promise<ApiResponse<PrintJob>>;
+  cancelPrintJob?(id: string, reason?: string): Promise<ApiResponse<PrintJob>>;
   createPrintJob(payload: {
-    printerId: string;
-    type: "KOT" | "BILL_RECEIPT" | "DAY_END_REPORT";
-    referenceId: string;
+    printerId?: string;
+    type: "KOT" | "BILL_RECEIPT" | "DAY_END_REPORT" | "TEST_PAGE";
+    referenceId?: string;
+    station?: string;
+    payload?: Record<string, unknown>;
   }): Promise<ApiResponse<PrintJob>>;
 }
 

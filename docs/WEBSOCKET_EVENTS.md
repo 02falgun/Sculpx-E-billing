@@ -87,6 +87,7 @@ Upon establishing a connection, the client subscribes to relevant topics based o
 | `billing:all` | Bill generation & settlements | `CASHIER`, `MANAGER`, `ADMIN` | Billing Desks |
 | `inventory:alerts` | Low stock and item 86 alerts | `ADMIN`, `MANAGER`, `KITCHEN_STAFF` | Inventory Ops |
 | `printers:all` | Hardware status & spool alerts | `ADMIN`, `MANAGER` | Hardware Fleet |
+| `printers:jobs` | Real-time print job status updates | `ADMIN`, `MANAGER`, `CASHIER` | Print Queue |
 
 > [!CAUTION]
 > The backend server MUST reject unauthorized subscription attempts. A customer scanning Table 01 must NEVER be permitted to subscribe to `billing:all`, `kitchen:kots`, or `order:ord-999` belonging to another table.
@@ -265,19 +266,23 @@ Upon establishing a connection, the client subscribes to relevant topics based o
   }
   ```
 
-### 3.8 `print_job.status.updated` (`PRINT_JOB_UPDATED`)
+### 3.8 `print_job.status_updated` (`PRINT_JOB_STATUS`)
 - **Direction**: Server -> Client
-- **Purpose**: Notify admin or cashier of hardware spool status (`COMPLETED`, `FAILED`, `OFFLINE`).
+- **Purpose**: Notify admin, cashier, or manager of hardware queue and transmission state (`QUEUED`, `PRINTING`, `COMPLETED`, `FAILED`, `UNCERTAIN`, `CANCELLED`).
 - **Required Role**: `ADMIN`, `CASHIER`, `MANAGER`
-- **Scope**: `printers:all`
+- **Scope**: `printers:jobs`
 - **Sample Payload**:
   ```json
   {
-    "jobId": "job-1092",
-    "printerId": "prn-01",
-    "printerName": "Kitchen Station 1",
-    "status": "FAILED",
-    "errorMessage": "Hardware out of paper (cutter open)"
+    "jobId": "2825e6a8-82ee-46aa-9d69-7d201706c054",
+    "printerId": "1f522b19-26e4-47cf-9431-43e7b6659baa",
+    "printerName": "Main Kitchen Thermal KOT",
+    "jobType": "KOT",
+    "status": "COMPLETED",
+    "retryCount": 0,
+    "isReprint": false,
+    "completedAt": "2026-10-11T13:30:00.000Z",
+    "errorMessage": null
   }
   ```
 

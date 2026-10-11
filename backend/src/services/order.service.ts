@@ -5,6 +5,8 @@ import { cartService } from "./cart.service.js";
 import { sequenceService } from "./sequence.service.js";
 import { idempotencyService } from "./idempotency.service.js";
 import { outboxService } from "./outbox.service.js";
+import { inventoryService } from "./inventory.service.js";
+import { logger } from "../lib/logger.js";
 import { AppError } from "../lib/errors.js";
 import type {
   CreateOrderRequest,
@@ -203,7 +205,10 @@ export class OrderService {
             ? validatedQr.table!.displayName || `Table ${validatedQr.table!.tableNumber}`
             : `Room ${validatedQr.room!.roomNumber}`;
 
-        // J. Transactional Outbox Events
+        // J. Automatic Inventory Consumption (Decision 3: Deduct on Order Confirmation / KOT Creation)
+        await inventoryService.deductStockForOrder(tx, tenantId, order.id, kot.id);
+
+        // K. Transactional Outbox Events
         const orderCreatedEvent = await outboxService.createEvent(tx, {
           tenantId,
           eventType: "order.created",
@@ -235,7 +240,54 @@ export class OrderService {
           },
         });
 
-        // K. Format final API response structure
+        // L. Persist KOT Hardware Print Intent (Phase 6)
+        try {
+          const kitchenPrinter = await tx.printer.findFirst({
+            where: {
+              tenantId,
+              isActive: true,
+              OR: [
+                { station: kot.station },
+                { type: "KITCHEN" },
+              ],
+            },
+            orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+          });
+
+          if (kitchenPrinter) {
+            await tx.printJob.create({
+              data: {
+                tenantId,
+                printerId: kitchenPrinter.id,
+                jobType: "KOT",
+                referenceId: kot.id,
+                payload: {
+                  kotNumber: kot.kotNumber,
+                  orderNumber: order.orderNumber,
+                  station: kot.station,
+                  tableOrRoom: diningDisplayName,
+                  serverName: validatedQr.type === "TABLE" ? "Customer QR" : "Room QR",
+                  createdAt: kot.createdAt.toISOString(),
+                  items: createdOrderItems.map(({ orderItem, lineItem }) => ({
+                    name: orderItem.itemName,
+                    quantity: orderItem.quantity,
+                    modifiers: lineItem.modifiers?.map((m: any) => typeof m === "string" ? m : m.name) || [],
+                    specialInstructions: orderItem.specialInstructions,
+                  })),
+                  notes: validatedQr.type === "TABLE" ? "Customer QR Order" : "Room QR Order",
+                },
+                status: "QUEUED",
+                idempotencyKey: `kot-print-${kot.id}`,
+                initiatedBy: "Order Confirmation (Auto-KOT)",
+              },
+            });
+          }
+        } catch (printErr) {
+          // A print queue setup issue must NEVER abort order commitment
+          logger.warn({ msg: "Could not auto-queue KOT print job", err: printErr });
+        }
+
+        // M. Format final API response structure
         const formattedItems: CreatedOrderItemResponse[] = createdOrderItems.map(
           ({ orderItem, lineItem }) => ({
             id: orderItem.id,

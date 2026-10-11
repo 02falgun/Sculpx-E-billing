@@ -67,3 +67,31 @@ NEXT_PUBLIC_CURRENCY_CODE="INR"
 - [x] `NEXT_PUBLIC_USE_MOCK_API` is set to `false`.
 - [x] Production URLs utilize secure HTTPS and WSS protocols.
 - [x] Canonical `NEXT_PUBLIC_APP_URL` is set to the official production domain to ensure printed QR codes resolve correctly.
+
+---
+
+## 4. Cloud-to-Printer Network Deployment Architecture
+
+### 4.1 Strict Invariant: Zero Public Raw TCP Ports
+Raw printer TCP port 9100 must **NEVER** be port-forwarded, NAT-exposed, or reachable over the public internet. Thermal printers have no authentication, encryption, or hardened TCP stacks; exposing port 9100 exposes hardware to Denial of Service, unauthorized buffer dumping, and paper exhaustion.
+
+### 4.2 Architecture Options for Production Venues
+
+#### Option A: On-Premise Fastify Server (Single Venue)
+- **Deployment**: Backend runs on a dedicated POS server / Mac mini / Linux terminal on the restaurant LAN (`192.168.1.50`).
+- **Communication**: Fastify's `NetworkEscPosAdapter` establishes direct TCP socket connections to thermal printers at `192.168.1.200:9100`.
+- **Latency**: Sub-millisecond; zero cloud internet dependency for physical ticket printing.
+
+#### Option B: Cloud VPS with Site-to-Site VPN Tunnel (Recommended for Multi-Location)
+- **Deployment**: Backend runs on Cloud VPS (AWS/DigitalOcean/Hetzner). Venue router or dedicated on-premise gateway runs WireGuard or Tailscale.
+- **Topology**: VPS communicates over private encrypted overlay interface (`wg0` or `tailscale0` subnet `10.8.0.0/24`).
+- **Routing**: Static route routes printer subnet (`192.168.1.0/24`) through the secure tunnel.
+- **Security**: Only the Cloud VPS can route to the printer subnet; zero inbound public IP exposure.
+
+#### Option C: Cloud VPS with Outbound Local Print Gateway Agent
+- **Deployment**: A lightweight Node.js/Go print agent runs on the cashier terminal or a Raspberry Pi within the restaurant LAN.
+- **Outbound Connection**: The agent initiates an authenticated, outbound WSS/HTTPS connection to Cloud Fastify (`wss://api.yourdomain.com/ws/gateway` or polling).
+- **Authentication**: Venue-scoped API Key or mTLS certificate passed in handshake headers. Never exposed to browser bundles.
+- **Dispatch**: Backend generates ESC/POS binary buffers and pushes them to the connected gateway. The gateway spools them locally to LAN TCP or USB printers (`/dev/usb/lp0`).
+- **Advantage**: Requires zero router firewall changes or public static IP at the restaurant.
+

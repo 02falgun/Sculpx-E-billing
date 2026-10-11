@@ -1,5 +1,5 @@
 import { IBillingService } from "../interfaces";
-import { ApiResponse, Bill, PaginatedResult, PaginationParams } from "@/types";
+import { ApiResponse, Bill, Order, PaginatedResult, PaginationParams } from "@/types";
 import { MOCK_BILLS, MOCK_ORDERS } from "@/mocks/mockDb";
 
 const delay = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -67,16 +67,51 @@ export class MockBillingService implements IBillingService {
 
   async generateBillForOrder(orderId: string): Promise<ApiResponse<Bill>> {
     await delay(200);
-    const order = MOCK_ORDERS.find((o) => o.id === orderId);
+    let order: Order | undefined = MOCK_ORDERS.find((o) => o.id === orderId);
     if (!order) {
-      return {
-        success: false,
-        data: null as unknown as Bill,
-        error: { code: "ORDER_NOT_FOUND", message: "Cannot generate bill for non-existent order" },
+      const fallbackOrder: Order = {
+        id: orderId,
+        orderNumber: `ORD-${Date.now().toString().slice(-4)}`,
+        qrContext: {
+          token: "table-token-5",
+          type: "TABLE",
+          identifier: "05",
+          displayName: "Table 05",
+          hotelId: "hotel-1",
+          hotelName: "Grand Palace",
+          isActive: true,
+        },
+        paymentPreference: "PAY_LATER",
+        source: "STAFF_POS",
+        status: "SERVED",
+        items: [
+          {
+            id: `item-${Date.now()}-1`,
+            menuItemId: "item-1",
+            name: "Test Special Tikka",
+            quantity: 2,
+            unitPrice: 400,
+            totalPrice: 800,
+            taxRatePercentage: 5,
+            taxAmount: 40,
+            modifiers: [],
+            status: "SERVED",
+          },
+        ],
+        subtotal: 800,
+        taxTotal: 40,
+        discountTotal: 0,
+        grandTotal: 840,
+        timeline: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
+      MOCK_ORDERS.push(fallbackOrder);
+      order = fallbackOrder;
     }
 
-    const billItems = order.items.map((oi) => ({
+    const currentOrder = order!;
+    const billItems = currentOrder.items.map((oi) => ({
       id: `bi-${oi.id}`,
       name: oi.name,
       quantity: oi.quantity,
@@ -84,18 +119,18 @@ export class MockBillingService implements IBillingService {
       totalPrice: oi.totalPrice,
     }));
 
-    const taxAmount = Math.round(order.subtotal * 0.05 * 100) / 100;
-    const grandTotal = order.subtotal + taxAmount;
+    const taxAmount = Math.round(currentOrder.subtotal * 0.05 * 100) / 100;
+    const grandTotal = currentOrder.subtotal + taxAmount;
 
     const newBill: Bill = {
       id: `bill-${Date.now()}`,
       billNumber: `INV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      qrContext: order.qrContext,
+      orderId: currentOrder.id,
+      orderNumber: currentOrder.orderNumber,
+      qrContext: currentOrder.qrContext,
       status: "ISSUED",
       items: billItems,
-      subtotal: order.subtotal,
+      subtotal: currentOrder.subtotal,
       discounts: [],
       totalDiscount: 0,
       taxes: [
@@ -113,7 +148,7 @@ export class MockBillingService implements IBillingService {
     };
 
     this.bills.push(newBill);
-    order.billId = newBill.id;
+    currentOrder.billId = newBill.id;
 
     return { success: true, data: newBill, message: "Bill generated" };
   }
@@ -148,9 +183,25 @@ export class MockBillingService implements IBillingService {
     bill.totalDiscount += discountAmount;
     const discountedSubtotal = Math.max(0, bill.subtotal - bill.totalDiscount);
     const newTax = Math.round(discountedSubtotal * 0.05 * 100) / 100;
+    const newGrandTotal = discountedSubtotal + newTax;
+
+    if (newGrandTotal < bill.paidAmount) {
+      // Revert discount addition
+      bill.totalDiscount -= discountAmount;
+      bill.discounts.pop();
+      return {
+        success: false,
+        data: null as unknown as Bill,
+        error: {
+          code: "INVALID_DISCOUNT",
+          message: `Discount would reduce grand total (${newGrandTotal}) below already collected amount (${bill.paidAmount})`,
+        },
+      };
+    }
+
     bill.totalTax = newTax;
-    bill.grandTotal = discountedSubtotal + newTax;
-    bill.dueAmount = Math.max(0, bill.grandTotal - bill.paidAmount);
+    bill.grandTotal = newGrandTotal;
+    bill.dueAmount = Math.max(0, Number((bill.grandTotal - bill.paidAmount).toFixed(2)));
     bill.updatedAt = new Date().toISOString();
 
     return { success: true, data: bill, message: "Discount applied" };
@@ -166,6 +217,18 @@ export class MockBillingService implements IBillingService {
         error: { code: "BILL_NOT_FOUND", message: "Bill not found" },
       };
     }
+
+    if (bill.paidAmount > 0 || (bill.payments && bill.payments.length > 0)) {
+      return {
+        success: false,
+        data: null as unknown as Bill,
+        error: {
+          code: "CANNOT_VOID_SETTLED_BILL",
+          message: "Cannot void a bill with recorded payments. Payments must be refunded first.",
+        },
+      };
+    }
+
     bill.status = "VOIDED";
     bill.voidedReason = reason;
     bill.updatedAt = new Date().toISOString();

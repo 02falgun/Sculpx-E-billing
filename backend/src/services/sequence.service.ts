@@ -31,7 +31,7 @@ export class SequenceService {
    */
   async getNextCounter(
     tenantId: string,
-    counterType: "ORDER" | "KOT",
+    counterType: "ORDER" | "KOT" | "INVOICE",
     tx?: Prisma.TransactionClient | PrismaClient,
     targetDate?: string
   ): Promise<{ dateStr: string; counter: number }> {
@@ -75,6 +75,18 @@ export class SequenceService {
     const { dateStr, counter } = await this.getNextCounter(tenantId, "KOT", tx);
     const padded = String(counter).padStart(4, "0");
     return `KOT-${dateStr}-${padded}`;
+  }
+
+  /**
+   * Allocate human-readable invoice number: INV-YYYYMMDD-XXXX (e.g. INV-20261011-0001)
+   */
+  async allocateInvoiceNumber(
+    tenantId: string,
+    tx?: Prisma.TransactionClient | PrismaClient
+  ): Promise<string> {
+    const { dateStr, counter } = await this.getNextCounter(tenantId, "INVOICE", tx);
+    const padded = String(counter).padStart(4, "0");
+    return `INV-${dateStr}-${padded}`;
   }
 }
 

@@ -6,15 +6,69 @@ const delay = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class MockPaymentService implements IPaymentService {
   private payments: Payment[] = [];
+  private idempotencyCache: Map<string, Payment> = new Map();
 
-  async recordPayment(payload: RecordPaymentPayload): Promise<ApiResponse<Payment>> {
+  async recordPayment(payload: RecordPaymentPayload & { idempotencyKey?: string }): Promise<ApiResponse<Payment>> {
     await delay(200);
+
+    // Idempotency replay check
+    if (payload.idempotencyKey && this.idempotencyCache.has(payload.idempotencyKey)) {
+      const cached = this.idempotencyCache.get(payload.idempotencyKey)!;
+      return { success: true, data: cached, message: "Payment recorded successfully" };
+    }
+
     const bill = MOCK_BILLS.find((b) => b.id === payload.billId);
     if (!bill) {
       return {
         success: false,
         data: null as unknown as Payment,
         error: { code: "BILL_NOT_FOUND", message: "Bill not found" },
+      };
+    }
+
+    if (bill.status === "VOIDED") {
+      return {
+        success: false,
+        data: null as unknown as Payment,
+        error: { code: "BILL_VOIDED", message: "Cannot record payment on a voided bill" },
+      };
+    }
+
+    if (bill.status === "PAID" || bill.dueAmount <= 0) {
+      return {
+        success: false,
+        data: null as unknown as Payment,
+        error: { code: "BILL_ALREADY_PAID", message: "Bill is already fully settled" },
+      };
+    }
+
+    if (payload.amount <= 0) {
+      return {
+        success: false,
+        data: null as unknown as Payment,
+        error: { code: "INVALID_AMOUNT", message: "Payment amount must be greater than 0" },
+      };
+    }
+
+    if (payload.amount > bill.dueAmount + 0.01) {
+      return {
+        success: false,
+        data: null as unknown as Payment,
+        error: {
+          code: "PAYMENT_EXCEEDS_DUE",
+          message: `Payment amount (₹${payload.amount}) exceeds outstanding balance of ₹${bill.dueAmount.toFixed(2)}`,
+        },
+      };
+    }
+
+    if (payload.method === "ROOM_CHARGE" && bill.qrContext?.type !== "ROOM") {
+      return {
+        success: false,
+        data: null as unknown as Payment,
+        error: {
+          code: "INVALID_ROOM_CHARGE",
+          message: "Room charge is only permitted for hotel room dining orders",
+        },
       };
     }
 
@@ -38,13 +92,17 @@ export class MockPaymentService implements IPaymentService {
     this.payments.push(newPayment);
     bill.payments.push(newPayment);
     bill.paidAmount += payload.amount;
-    bill.dueAmount = Math.max(0, bill.grandTotal - bill.paidAmount);
+    bill.dueAmount = Math.max(0, Number((bill.grandTotal - bill.paidAmount).toFixed(2)));
 
     if (bill.dueAmount === 0) {
       bill.status = "PAID";
       bill.settledAt = new Date().toISOString();
     } else {
       bill.status = "PARTIALLY_PAID";
+    }
+
+    if (payload.idempotencyKey) {
+      this.idempotencyCache.set(payload.idempotencyKey, newPayment);
     }
 
     return { success: true, data: newPayment, message: "Payment recorded successfully" };

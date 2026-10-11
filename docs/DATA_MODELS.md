@@ -315,51 +315,101 @@ CREATE TABLE refunds (
 );
 ```
 
-### 3.6 Inventory, Recipes & Audit
+### 3.6 Inventory, Recipes & Audit (Phase 5 Verified Schema)
 
 ```sql
 -- Inventory Raw Ingredients
-CREATE TABLE inventory_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    sku VARCHAR(100) NOT NULL UNIQUE,
-    category VARCHAR(100) NOT NULL,
-    current_stock NUMERIC(10, 3) NOT NULL CHECK (current_stock >= 0),
-    minimum_threshold NUMERIC(10, 3) NOT NULL,
-    unit VARCHAR(50) NOT NULL CHECK (unit IN ('KG', 'LITER', 'PORTION', 'GRAMS', 'PIECE', 'BOTTLE')),
-    unit_cost NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
-    supplier VARCHAR(255),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE "inventory_items" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "tenant_id" UUID NOT NULL REFERENCES "tenants"("id") ON DELETE CASCADE,
+    "name" VARCHAR(255) NOT NULL,
+    "sku" VARCHAR(100) NOT NULL,
+    "category" VARCHAR(100) NOT NULL,
+    "current_stock" DECIMAL(12, 4) NOT NULL DEFAULT 0.0000,
+    "minimum_threshold" DECIMAL(12, 4) NOT NULL DEFAULT 0.0000,
+    "unit" "InventoryUnit" NOT NULL, -- KG, GRAM, LITRE, ML, PIECE, PACKET, CAN, PORTION, BOTTLE
+    "cost_per_unit" DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT NOW(),
+    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT NOW(),
+    CONSTRAINT "inventory_items_tenant_id_sku_key" UNIQUE ("tenant_id", "sku")
 );
 
 -- Recipes (Bill of Materials)
-CREATE TABLE recipes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    menu_item_id UUID NOT NULL UNIQUE REFERENCES menu_items(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE "recipes" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "tenant_id" UUID NOT NULL REFERENCES "tenants"("id") ON DELETE CASCADE,
+    "menu_item_id" UUID NOT NULL UNIQUE REFERENCES "menu_items"("id") ON DELETE CASCADE,
+    "name" VARCHAR(255),
+    "notes" TEXT,
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT NOW(),
+    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT NOW()
 );
 
 -- Recipe Ingredients
-CREATE TABLE recipe_ingredients (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    recipe_id UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
-    inventory_item_id UUID NOT NULL REFERENCES inventory_items(id),
-    quantity_required NUMERIC(10, 3) NOT NULL CHECK (quantity_required > 0),
-    unit VARCHAR(50) NOT NULL
+CREATE TABLE "recipe_ingredients" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "recipe_id" UUID NOT NULL REFERENCES "recipes"("id") ON DELETE CASCADE,
+    "inventory_item_id" UUID NOT NULL REFERENCES "inventory_items"("id") ON DELETE CASCADE,
+    "quantity" DECIMAL(12, 4) NOT NULL,
+    "unit" "InventoryUnit" NOT NULL,
+    CONSTRAINT "recipe_ingredients_recipe_id_inventory_item_id_key" UNIQUE ("recipe_id", "inventory_item_id")
 );
 
 -- Immutable Inventory Transaction Ledger
-CREATE TABLE inventory_transactions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    inventory_item_id UUID NOT NULL REFERENCES inventory_items(id),
-    quantity_change NUMERIC(10, 3) NOT NULL, -- negative for usage/wastage, positive for restock
-    type VARCHAR(50) NOT NULL CHECK (type IN ('RESTOCK', 'USAGE', 'WASTAGE', 'ADJUSTMENT', 'RETURN')),
-    reason TEXT NOT NULL,
-    order_id UUID REFERENCES orders(id),
-    created_by UUID REFERENCES users(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE "inventory_transactions" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "tenant_id" UUID NOT NULL REFERENCES "tenants"("id") ON DELETE CASCADE,
+    "inventory_item_id" UUID NOT NULL REFERENCES "inventory_items"("id") ON DELETE CASCADE,
+    "type" "InventoryTransactionType" NOT NULL, -- RESTOCK, USAGE, WASTAGE, ADJUSTMENT, RETURN
+    "quantity_delta" DECIMAL(12, 4) NOT NULL,
+    "unit" "InventoryUnit" NOT NULL,
+    "remaining_stock_after" DECIMAL(12, 4) NOT NULL,
+    "reason" TEXT NOT NULL,
+    "reference_order_id" UUID REFERENCES "orders"("id") ON DELETE SET NULL,
+    "reference_kot_id" UUID REFERENCES "kots"("id") ON DELETE SET NULL,
+    "created_by" UUID REFERENCES "users"("id") ON DELETE SET NULL,
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT NOW()
+);
+-- Hardware Printers Fleet
+CREATE TABLE "printers" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "tenant_id" UUID NOT NULL REFERENCES "tenants"("id") ON DELETE CASCADE,
+    "name" VARCHAR(255) NOT NULL,
+    "type" "PrinterType" NOT NULL, -- THERMAL_RECEIPT, THERMAL_KOT, LABEL, INVOICE
+    "connection_type" VARCHAR(50) NOT NULL DEFAULT 'NETWORK_TCP', -- NETWORK_TCP, USB, BLUETOOTH
+    "ip_address" VARCHAR(100),
+    "port" INTEGER NOT NULL DEFAULT 9100,
+    "station" VARCHAR(50) NOT NULL DEFAULT 'GENERAL', -- KITCHEN, BAR, BILLING, GENERAL
+    "location" VARCHAR(100),
+    "paper_width_mm" INTEGER NOT NULL DEFAULT 80, -- 80 or 58
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "is_online" BOOLEAN NOT NULL DEFAULT false,
+    "is_default" BOOLEAN NOT NULL DEFAULT false,
+    "last_ping_at" TIMESTAMPTZ(6),
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT NOW(),
+    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT NOW()
+);
+
+-- Durable Print Jobs Queue
+CREATE TABLE "print_jobs" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "tenant_id" UUID NOT NULL REFERENCES "tenants"("id") ON DELETE CASCADE,
+    "printer_id" UUID NOT NULL REFERENCES "printers"("id") ON DELETE RESTRICT,
+    "job_type" VARCHAR(50) NOT NULL, -- KOT, BILL_RECEIPT, TEST_PAGE
+    "reference_id" VARCHAR(100),
+    "payload" JSONB NOT NULL,
+    "status" "PrintJobStatus" NOT NULL DEFAULT 'QUEUED', -- QUEUED, PRINTING, COMPLETED, FAILED, UNCERTAIN, CANCELLED
+    "retry_count" INTEGER NOT NULL DEFAULT 0,
+    "max_retries" INTEGER NOT NULL DEFAULT 3,
+    "next_retry_at" TIMESTAMPTZ(6),
+    "error_message" TEXT,
+    "idempotency_key" VARCHAR(255),
+    "is_reprint" BOOLEAN NOT NULL DEFAULT false,
+    "reprint_reason" TEXT,
+    "initiated_by" VARCHAR(100),
+    "completed_at" TIMESTAMPTZ(6),
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT NOW()
 );
 ```
 
@@ -377,4 +427,8 @@ CREATE INDEX idx_payments_bill_id ON payments(bill_id);
 CREATE INDEX idx_inventory_item_low_stock ON inventory_items(tenant_id) WHERE current_stock <= minimum_threshold;
 CREATE INDEX idx_inv_tx_item_date ON inventory_transactions(inventory_item_id, created_at DESC);
 CREATE INDEX idx_qr_codes_token ON qr_codes(token);
+CREATE INDEX idx_printers_tenant_station ON printers(tenant_id, station, is_active);
+CREATE INDEX idx_print_jobs_claim ON print_jobs(status, next_retry_at, created_at);
+CREATE INDEX idx_print_jobs_tenant_status ON print_jobs(tenant_id, status);
+CREATE INDEX idx_print_jobs_idempotency ON print_jobs(tenant_id, idempotency_key);
 ```
