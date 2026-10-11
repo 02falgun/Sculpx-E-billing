@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { AlertCircle, ArrowRight } from "lucide-react";
 
+import { authApi } from "@/services/api";
+import { ENV } from "@/config";
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -17,20 +20,53 @@ function LoginForm() {
 
   const setSession = useAuthStore((s) => s.setSession);
 
-  const [email, setEmail] = React.useState("admin@demo.com");
-  const [password, setPassword] = React.useState("••••••••");
+  const [email, setEmail] = React.useState("admin@ebilling.com");
+  const [password, setPassword] = React.useState("demo-secure-pass");
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
 
-  const doLogin = (targetEmail: string) => {
+  const doLogin = async (targetEmail: string, targetPass?: string) => {
     setLoading(true);
     setError(null);
 
+    const effectivePass =
+      targetPass && targetPass !== "••••••••"
+        ? targetPass
+        : "demo-secure-pass";
+
+    if (!ENV.USE_MOCK_API) {
+      try {
+        const res = await authApi.login({
+          email: targetEmail.trim(),
+          pinOrPassword: effectivePass,
+        });
+
+        if (!res.success || !res.data) {
+          setError(
+            res.error?.message ||
+              "Invalid credentials. Use a registered pilot staff account (e.g. admin@ebilling.com, manager@ebilling.com, cashier@ebilling.com, waiter@ebilling.com)."
+          );
+          setLoading(false);
+          return;
+        }
+
+        setSession(res.data);
+        const destination = redirectPath || getDefaultRouteForRole(res.data.user.role);
+        router.replace(destination);
+        return;
+      } catch (err: any) {
+        setError(err?.message || "Authentication failed. Could not reach backend server.");
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Mock API fallback when explicitly configured for mock-only testing
     setTimeout(() => {
       const session = mockAuthenticate(targetEmail);
       if (!session) {
         setError(
-          "Unrecognized staff account. Use a registered hospitality email (e.g. admin@demo.com, waiter@demo.com, kitchen@demo.com, cashier@demo.com).",
+          "Unrecognized staff account. Use a registered hospitality email (e.g. admin@demo.com, waiter@demo.com, kitchen@demo.com, cashier@demo.com)."
         );
         setLoading(false);
         return;
@@ -48,7 +84,7 @@ function LoginForm() {
       setError("Please enter your staff email.");
       return;
     }
-    doLogin(email);
+    doLogin(email, password);
   };
 
   return (

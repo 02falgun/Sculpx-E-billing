@@ -31,9 +31,55 @@ function validate<T>(schema: { safeParse: (data: unknown) => { success: true; da
   return result.data;
 }
 
+import { qrService } from "../services/qr.service.js";
+
 export const menuRoutes: FastifyPluginAsync = async (fastify) => {
-  // All menu operations require an authenticated staff context to resolve tenantId safely
-  fastify.addHook("preHandler", authenticate);
+  // Menu operations require authenticated staff context or valid QR token context for reads
+  fastify.addHook("preHandler", async (request, reply) => {
+    // 1. Context endpoint is always public
+    if (request.url.includes("/context/")) {
+      return;
+    }
+
+    // 2. If Authorization header is present, verify staff JWT
+    if (request.headers.authorization) {
+      await authenticate(request, reply);
+      return;
+    }
+
+    // 3. For read-only GET requests, allow resolution via x-qr-token or ?qrToken
+    const qrToken = (request.headers["x-qr-token"] || (request.query as any)?.qrToken) as string | undefined;
+    if (request.method === "GET" && qrToken) {
+      try {
+        const validated = await qrService.resolveValidatedQrEntity(qrToken);
+        request.authenticatedUser = {
+          id: `guest-${validated.type.toLowerCase()}-${validated.qr.token}`,
+          tenantId: validated.tenantId,
+          email: `guest@${validated.type.toLowerCase()}.local`,
+          name: `Guest (${validated.type})`,
+          role: "WAITER" as any,
+          isActive: true,
+          permissions: [],
+        };
+        return;
+      } catch {
+        throw new AppError("Invalid or expired QR token", 401, "UNAUTHORIZED");
+      }
+    }
+
+    // 4. Default: enforce staff authentication
+    await authenticate(request, reply);
+  });
+
+  /**
+   * GET /context/:token
+   * Public QR Context resolution alias for customer menu entry
+   */
+  fastify.get("/context/:token", async (request, reply) => {
+    const { token } = request.params as { token: string };
+    const qrContext = await qrService.resolvePublicQrContext(token);
+    return reply.status(200).send(formatSuccessResponse(qrContext, request));
+  });
 
   // ==========================================
   // Categories Endpoints

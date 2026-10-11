@@ -13,7 +13,7 @@ interface LiveTrackingHeaderProps {
 
 export function LiveTrackingHeader({ order }: LiveTrackingHeaderProps) {
   const wsState = useWebSocketConnection();
-  const menuHref = `/menu/${order.qrContext.token}`;
+  const menuHref = `/menu/${order.qrContext?.token || ""}`;
 
   const formattedTime = React.useMemo(() => {
     try {

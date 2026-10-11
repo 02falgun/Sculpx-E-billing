@@ -2,9 +2,14 @@ import { PrismaClient } from "@prisma/client";
 import { env } from "../config/env.js";
 
 // Select the effective connection URL.
-// When DIRECT_URL is present, it is favored for direct PostgreSQL queries
-// or as fallback if the pooler port is unreachable in specific network topologies.
-const effectiveDatabaseUrl = env.DIRECT_URL || env.DATABASE_URL;
+// When DIRECT_URL is present, it connects via session pooler port :5432.
+// We configure connection_limit=5 to prevent exceeding Supabase's max client pool of 15.
+let rawUrl = env.DIRECT_URL || env.DATABASE_URL;
+if (rawUrl && !rawUrl.includes("connection_limit")) {
+  const separator = rawUrl.includes("?") ? "&" : "?";
+  rawUrl = `${rawUrl}${separator}connection_limit=3&pool_timeout=60`;
+}
+const effectiveDatabaseUrl = rawUrl;
 
 declare global {
   // eslint-disable-next-line no-var

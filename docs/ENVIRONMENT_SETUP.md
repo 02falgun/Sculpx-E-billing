@@ -95,3 +95,60 @@ Raw printer TCP port 9100 must **NEVER** be port-forwarded, NAT-exposed, or reac
 - **Dispatch**: Backend generates ESC/POS binary buffers and pushes them to the connected gateway. The gateway spools them locally to LAN TCP or USB printers (`/dev/usb/lp0`).
 - **Advantage**: Requires zero router firewall changes or public static IP at the restaurant.
 
+---
+
+## 5. V1 Web Pilot Execution (Printerless Live Mode)
+
+For the V1 controlled pilot (10–15 concurrent customer dining sessions + multi-role staff operations):
+
+### 5.1 Operating Parameters
+- **Runtime Mocks**: Disabled (`NEXT_PUBLIC_USE_MOCK_API=false`).
+- **Data Persistence**: Live Supabase PostgreSQL database.
+- **Printer Hardware**: Strictly **Printerless Mode**. Hardware printers are not connected. Print jobs are created as durable database intents and spooled in the background; hardware connection timeouts gracefully back off and log warnings without aborting order placements, KOT progressions, or tax bill settlements.
+
+### 5.2 Pilot Internal Staff Accounts (`@ebilling.com`)
+All internal pilot test staff accounts are seeded and ready:
+
+| Role | Email | Password / PIN | Scope / Access Area |
+|---|---|---|---|
+| `SUPER_ADMIN` | `superadmin@ebilling.com` | `demo-secure-pass` | Complete platform governance & audit ledger |
+| `ADMIN` | `admin@ebilling.com` | `demo-secure-pass` | Back-Office (`/admin`), Menu Catalog, Printers, QR Tent Cards |
+| `MANAGER` | `manager@ebilling.com` | `demo-secure-pass` | Shift management, void authorizations, discount overrides |
+| `CAPTAIN` | `captain@ebilling.com` | `demo-secure-pass` | Floor management, table assignment, service escalations |
+| `WAITER` | `waiter@ebilling.com` | `demo-secure-pass` | Waiter POS (`/pos`), Table Floor (`/tables`), Bill requests |
+| `CASHIER` | `cashier@ebilling.com` | `demo-secure-pass` | Central Billing Desk (`/billing`), GST invoices, UPI/Cash settlement |
+| `KITCHEN_STAFF` | `kitchenstaff@ebilling.com` | `demo-secure-pass` | Paperless Touchscreen KDS (`/kitchen`), KOT lifecycle progression |
+
+*(Legacy demonstration accounts under `@demo.com` remain supported for backward-compatible staging scripts.)*
+
+### 5.3 Canonical Pilot Dining QR Tokens
+10 Tables and 3 Rooms are pre-seeded with active QR tokens:
+- **Tables (1 to 10)**: `table-token-1`, `table-token-2`, `table-token-3`, `table-token-4`, `table-token-5`, `table-token-6`, `table-token-7`, `table-token-8`, `table-token-9`, `table-token-10`
+- **Rooms (101, 301, 302)**: `room-token-101`, `room-token-301`, `room-token-302`
+
+Direct customer QR URL format:
+`http://localhost:3000/menu/table-token-1`
+
+---
+
+## 6. Future Organizational Hosting Recommendations
+
+When moving from local pilot execution to cloud hosting:
+
+### Frontend Hosting: Vercel / Cloudflare Pages
+- **Recommended**: Deploy the Next.js frontend (`/`) to **Vercel** or **Cloudflare Pages**.
+- **Configuration**:
+  - Set `NEXT_PUBLIC_API_URL` to the public backend domain (e.g. `https://api.yourdomain.com/api/v1`).
+  - Set `NEXT_PUBLIC_WS_URL` to the public WebSocket domain (e.g. `wss://api.yourdomain.com/ws`).
+  - Set `NEXT_PUBLIC_USE_MOCK_API=false`.
+- **Note**: Next.js App Router static pages, SSR routes, and client assets excel on Vercel's global CDN edge.
+
+### Backend Hosting: Containerized Persistent Host (NOT Serverless)
+- **Important**: The Fastify backend (`backend/`) MUST NOT be deployed to serverless environments (like AWS Lambda or Vercel Serverless Functions) because:
+  1. It runs a persistent in-process WebSocket connection registry (`/ws`) for instant real-time KDS and POS updates.
+  2. It runs persistent background daemons: the Transactional Outbox worker (every 2s) and the Print Queue Spooler (every 3s).
+  3. Serverless functions freeze execution when idle, terminating active WebSockets and pausing queue workers.
+- **Recommended Backend Hosts**:
+  - Container-based PaaS: **Fly.io**, **Railway**, **Render**, or **AWS ECS / Fargate**.
+  - Dedicated VPS / VM: **Ubuntu 24.04 LTS** on Hetzner, DigitalOcean, or AWS EC2 running Docker Compose or PM2 with an Nginx reverse proxy.
+

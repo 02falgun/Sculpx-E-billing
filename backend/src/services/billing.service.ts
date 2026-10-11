@@ -426,7 +426,8 @@ export class BillingService {
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
-        timeout: 10000,
+        maxWait: 25000,
+        timeout: 45000,
       }
     );
 
@@ -730,7 +731,8 @@ export class BillingService {
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
-        timeout: 10000,
+        maxWait: 25000,
+        timeout: 45000,
       }
     );
 
@@ -1124,7 +1126,8 @@ export class BillingService {
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
-        timeout: 10000,
+        maxWait: 25000,
+        timeout: 45000,
       }
     );
 

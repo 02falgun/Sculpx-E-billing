@@ -60,6 +60,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       "x-request-id",
       "Idempotency-Key",
       "X-Requested-With",
+      "x-qr-token",
+      "X-QR-Token",
     ],
     exposedHeaders: ["x-request-id"],
   });

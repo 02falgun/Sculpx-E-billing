@@ -4,6 +4,7 @@ import { apiClient } from "../client";
 
 export class HttpMenuService implements IMenuService {
   async getContextByQrToken(qrToken: string): Promise<ApiResponse<QRContext>> {
+    apiClient.setActiveQrToken(qrToken);
     return apiClient.get<QRContext>(`/menu/context/${encodeURIComponent(qrToken)}`);
   }
 

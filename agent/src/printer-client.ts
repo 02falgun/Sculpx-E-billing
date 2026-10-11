@@ -92,8 +92,8 @@ export class LocalPrinterClient {
 
     const parts = ip.split(".").map((n) => Number.parseInt(n, 10));
     if (parts.length !== 4 || parts.some((p) => Number.isNaN(p) || p < 0 || p > 255)) {
-      // Non-IPv4 or hostname: allow if explicitly in allowedHosts
-      return this.config.allowedHosts.includes(ip);
+      // Non-IPv4 or hostname: only allow if explicitly listed in allowedHosts and not wildcard
+      return !this.config.allowedHosts.includes("*") && this.config.allowedHosts.includes(ip);
     }
 
     const [b1, b2] = parts;

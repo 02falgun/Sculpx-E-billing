@@ -32,6 +32,7 @@ interface PendingJobRequest {
   requestId: string;
   jobId: string;
   printerId: string;
+  agentId: string;
   stage: "PENDING" | "RECEIVED" | "COMPLETED";
   timeoutTimer: NodeJS.Timeout;
   resolve: (result: PrinterAdapterResult) => void;
@@ -40,6 +41,7 @@ interface PendingJobRequest {
 interface PendingHealthRequest {
   requestId: string;
   printerId: string;
+  agentId: string;
   timeoutTimer: NodeJS.Timeout;
   resolve: (result: PrinterHealthResult) => void;
 }
@@ -643,6 +645,18 @@ export class PrintAgentGatewayService {
       return;
     }
 
+    // Authorization verification: only the exact agent dispatched to can acknowledge
+    if (pending.agentId !== agent.agentId) {
+      logger.warn({
+        event: "unauthorized_agent_ack_rejected",
+        requestId: ack.requestId,
+        jobId: ack.jobId,
+        expectedAgentId: pending.agentId,
+        receivedAgentId: agent.agentId,
+      });
+      return;
+    }
+
     switch (ack.stage) {
       case "RECEIVED": {
         // Agent safely queued job into local memory; mark stage to guard against disconnect
@@ -691,6 +705,16 @@ export class PrintAgentGatewayService {
   private handleHealthCheckResult(agent: ConnectedAgentDevice, res: AgentHealthCheckResultPayload): void {
     const pending = this.pendingHealthRequests.get(res.requestId);
     if (!pending) return;
+
+    if (pending.agentId !== agent.agentId) {
+      logger.warn({
+        event: "unauthorized_health_result_rejected",
+        requestId: res.requestId,
+        expectedAgentId: pending.agentId,
+        receivedAgentId: agent.agentId,
+      });
+      return;
+    }
 
     clearTimeout(pending.timeoutTimer);
     this.pendingHealthRequests.delete(res.requestId);
@@ -802,6 +826,7 @@ export class PrintAgentGatewayService {
         requestId,
         jobId,
         printerId: printer.id,
+        agentId: targetAgent.agentId,
         stage: "PENDING",
         timeoutTimer,
         resolve,
@@ -868,6 +893,7 @@ export class PrintAgentGatewayService {
       this.pendingHealthRequests.set(requestId, {
         requestId,
         printerId: printer.id,
+        agentId: targetAgent.agentId,
         timeoutTimer,
         resolve,
       });

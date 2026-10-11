@@ -100,6 +100,18 @@ export interface CreateOrderResponse {
   kots: CreatedKotResponse[];
   createdAt: string;
   updatedAt: string;
+  qrContext?: {
+    token: string;
+    type: "TABLE" | "ROOM";
+    identifier: string;
+    displayName: string;
+    tenantId: string;
+  };
+  timeline?: Array<{
+    status: string;
+    timestamp: string;
+    note?: string;
+  }>;
   // Aliases for frontend 1:1 compatibility with Order entity:
   order: {
     id: string;

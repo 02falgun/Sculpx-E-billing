@@ -55,6 +55,21 @@ export function KDSBoard() {
     return { total, newCount, cooking, ready };
   }, [deduplicatedKOTs]);
 
+  const [viewMode, setViewMode] = React.useState<"COLUMNS" | "FILTER">("COLUMNS");
+
+  const newKOTs = React.useMemo(
+    () => kots.filter((k) => k.status === "NEW" || k.status === "ACCEPTED"),
+    [kots]
+  );
+  const preparingKOTs = React.useMemo(
+    () => kots.filter((k) => k.status === "PREPARING"),
+    [kots]
+  );
+  const readyKOTs = React.useMemo(
+    () => kots.filter((k) => k.status === "READY"),
+    [kots]
+  );
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
@@ -75,21 +90,6 @@ export function KDSBoard() {
       </div>
     );
   }
-
-  const [viewMode, setViewMode] = React.useState<"COLUMNS" | "FILTER">("COLUMNS");
-
-  const newKOTs = React.useMemo(
-    () => kots.filter((k) => k.status === "NEW" || k.status === "ACCEPTED"),
-    [kots]
-  );
-  const preparingKOTs = React.useMemo(
-    () => kots.filter((k) => k.status === "PREPARING"),
-    [kots]
-  );
-  const readyKOTs = React.useMemo(
-    () => kots.filter((k) => k.status === "READY"),
-    [kots]
-  );
 
   return (
     <div className="space-y-6">

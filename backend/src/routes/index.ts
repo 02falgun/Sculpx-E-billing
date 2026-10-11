@@ -9,6 +9,8 @@ import { billingRoutes } from "./billing.js";
 import { inventoryRoutes } from "./inventory.js";
 import { printerRoutes, printJobRoutes } from "./printer.js";
 import { printAgentRoutes } from "./print-agent.js";
+import { tableRoutes } from "./table.js";
+import { roomRoutes } from "./room.js";
 
 export const apiRoutes: FastifyPluginAsync = async (fastify) => {
   // Direct /api/health and /api/ready
@@ -44,6 +46,12 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
   // Direct /api/print-agents endpoints
   await fastify.register(printAgentRoutes, { prefix: "/print-agents" });
 
+  // Direct /api/tables endpoints
+  await fastify.register(tableRoutes, { prefix: "/tables" });
+
+  // Direct /api/rooms endpoints
+  await fastify.register(roomRoutes, { prefix: "/rooms" });
+
   // Mount under /v1 for versioned API contract (/api/v1/...)
   await fastify.register(
     async (v1) => {
@@ -58,6 +66,8 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
       await v1.register(printerRoutes, { prefix: "/printers" });
       await v1.register(printJobRoutes, { prefix: "/print-jobs" });
       await v1.register(printAgentRoutes, { prefix: "/print-agents" });
+      await v1.register(tableRoutes, { prefix: "/tables" });
+      await v1.register(roomRoutes, { prefix: "/rooms" });
     },
     { prefix: "/v1" }
   );

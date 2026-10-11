@@ -21,6 +21,21 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   const [checking, setChecking] = React.useState(true);
+  const [hasHydrated, setHasHydrated] = React.useState(
+    () => useAuthStore.persist?.hasHydrated?.() ?? false
+  );
+
+  React.useEffect(() => {
+    const unsub = useAuthStore.persist?.onFinishHydration?.(() => {
+      setHasHydrated(true);
+    });
+    if (useAuthStore.persist?.hasHydrated?.()) {
+      setHasHydrated(true);
+    }
+    return () => {
+      unsub?.();
+    };
+  }, []);
 
   React.useEffect(() => {
     // If route is public customer route, allow immediately
@@ -37,8 +52,27 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
       return;
     }
 
+    // Wait for store to finish rehydration from localStorage
+    if (!hasHydrated) {
+      return;
+    }
+
     if (!isAuthenticated || !user) {
-      // Redirect to login
+      if (typeof window !== "undefined") {
+        try {
+          const raw = window.localStorage.getItem("restro_staff_auth");
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed?.state?.user && parsed?.state?.isAuthenticated) {
+              // Persisted state exists; trigger rehydration and do not redirect
+              useAuthStore.persist?.rehydrate?.();
+              return;
+            }
+          }
+        } catch {}
+      }
+
+      // Truly unauthenticated, redirect to login
       router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
       return;
     }
@@ -55,7 +89,7 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
     }
 
     setChecking(false);
-  }, [pathname, isAuthenticated, user, allowedRoles, router]);
+  }, [pathname, isAuthenticated, user, allowedRoles, router, hasHydrated]);
 
   if (checking) {
     return (

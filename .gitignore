@@ -38,3 +38,9 @@ backend/dist/
 backend/.env
 backend/.env.local
 
+# agent
+agent/node_modules/
+agent/dist/
+agent/.env
+
+

@@ -108,7 +108,7 @@ export default function OrderTrackingPage({ params }: OrderTrackingPageProps) {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Add more dishes */}
-          <Link href={`/menu/${order.qrContext.token}`} className="w-full">
+          <Link href={`/menu/${order.qrContext?.token || ""}`} className="w-full">
             <Button
               type="button"
               variant="outline"

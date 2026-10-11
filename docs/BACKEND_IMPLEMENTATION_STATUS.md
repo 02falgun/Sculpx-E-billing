@@ -645,6 +645,30 @@ Delivered full end-to-end kitchen status progression lifecycle, PostgreSQL row-l
 - **Security Hardening**: Eliminated long-lived staff JWTs from WebSocket URL query strings in browser client; audited and strictly separated device credentials from staff user tokens.
 - **Verification**: 15 new automated end-to-end integration tests in `backend/tests/print-agent.test.ts` (100% passing) and 17 regression tests in `backend/tests/printers.test.ts` (100% passing).
 
+---
+
+## 18. Phase 6G: Staging Readiness, Reliability Audit & Physical Printer Commissioning (Completed & Verified)
+
+### 18.1 Key Audit & Reliability Hardening Deliverables
+- **Database Migration Reconciliation**:
+  - Audited `_prisma_migrations`, `schema.prisma`, and PostgreSQL physical columns/indexes.
+  - Confirmed schema agreement across all 5 migrations. Verified `npx prisma migrate status` reports `Database schema is up to date!`.
+  - Migration SQL files verified as 100% idempotent and replayable for fresh staging deployments (`npx prisma migrate deploy`).
+- **Print Status Lifecycle Semantics**:
+  - Transport-layer socket write confirmation (`stage: PRINTED` / `COMPLETED`) decoupled from physical output detection.
+  - `UNCERTAIN` state guarded against automatic worker re-queuing to prevent duplicate physical prints.
+- **WebSocket Security & ACK Spoofing Protection**:
+  - Bound `agentId` to `PendingJobRequest` and `PendingHealthRequest`.
+  - ACKs and health results from unauthorized/mismatched agents are strictly rejected with audit event `unauthorized_agent_ack_rejected`.
+  - Disallowed wildcard host bypasses in agent RFC 1918 private subnet validator.
+- **Automated Agent & Queue Recovery Suite (`backend/tests/print-agent-recovery.test.ts`)**:
+  - Implemented and verified 8 comprehensive recovery scenarios covering agent crash post-RECEIVED, stale worker lease recovery (>60s), revoked device reconnection attempts, cross-agent ACK spoofing, operator retry/cancellation, and audited reprints.
+  - All 8 / 8 recovery tests passing 100% green against live PostgreSQL.
+- **Physical Hardware Commissioning Manual**:
+  - Authored standardized protocol for 80mm Ethernet ESC/POS thermal printer commissioning in `docs/PHASE_6G_STAGING_READINESS_AUDIT.md`.
+  - Physical tests declared as *Pending Physical Verification* (zero fabricated hardware results).
+
+
 
 
 

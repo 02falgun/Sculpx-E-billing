@@ -10,6 +10,7 @@ export interface RequestOptions extends RequestInit {
 export class ApiClient {
   private baseUrl: string;
   private authToken: string | null = null;
+  private activeQrToken: string | null = null;
 
   constructor(baseUrl: string = ENV.API_URL) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
@@ -23,12 +24,29 @@ export class ApiClient {
     return this.authToken;
   }
 
+  setActiveQrToken(token: string | null): void {
+    this.activeQrToken = token;
+    if (typeof window !== "undefined") {
+      try {
+        if (token) {
+          window.sessionStorage?.setItem("restro_active_qr_token", token);
+        } else {
+          window.sessionStorage?.removeItem("restro_active_qr_token");
+        }
+      } catch {}
+    }
+  }
+
+  getActiveQrToken(): string | null {
+    return this.activeQrToken;
+  }
+
   setBaseUrl(url: string): void {
     this.baseUrl = url.replace(/\/$/, "");
   }
 
   async request<T>(endpoint: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
-    const { params, token, timeoutMs = 15000, headers, ...rest } = options;
+    const { params, token, timeoutMs = 30000, headers, ...rest } = options;
 
     let url = `${this.baseUrl}/${endpoint.replace(/^\//, "")}`;
 
@@ -76,6 +94,25 @@ export class ApiClient {
 
     if (resolvedToken) {
       reqHeaders["Authorization"] = `Bearer ${resolvedToken}`;
+    } else {
+      const activeQrToken =
+        this.activeQrToken ||
+        (typeof window !== "undefined"
+          ? (() => {
+              try {
+                return (
+                  window.sessionStorage?.getItem("restro_active_qr_token") ||
+                  window.localStorage?.getItem("restro_active_qr_token") ||
+                  undefined
+                );
+              } catch {}
+              return undefined;
+            })()
+          : undefined);
+
+      if (activeQrToken) {
+        reqHeaders["x-qr-token"] = activeQrToken;
+      }
     }
 
     try {

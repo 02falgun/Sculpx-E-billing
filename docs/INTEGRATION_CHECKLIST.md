@@ -119,3 +119,26 @@ Before switching `NEXT_PUBLIC_USE_MOCK_API=false` in production:
 3. **Production Domain & SSL**: Provision HTTPS/WSS SSL certificates on production domain and configure CORS whitelist for production origins.
 4. **JWT Secret Hardening**: Ensure `JWT_SECRET` is set to a cryptographically secure 64-character random string in production `.env`.
 
+---
+
+## 4. Stage 7: V1 Web Pilot Validation (Live Database & Multi-Role Operations)
+
+- [x] **Runtime Mock Removal**: `NEXT_PUBLIC_USE_MOCK_API=false` active; all operations hit real Fastify backend and Supabase PostgreSQL.
+- [x] **Canonical Database Seeding**: 5 categories, 10 canonical menu items with modifier groups, 10 tables (`table-token-1` to `table-token-10`), 3 rooms (`room-token-101`, `room-token-301`, `room-token-302`), and 7 staff users (`*@ebilling.com`).
+- [x] **Backend Table & Room APIs**: `GET /api/v1/tables`, `GET /api/v1/tables/:id`, `PATCH /api/v1/tables/:id/status`, `GET /api/v1/rooms`, `GET /api/v1/rooms/:id`, and `PATCH /api/v1/rooms/:id/status` implemented with full status mapping.
+- [x] **KDS React Lifecycle Fix**: Fixed React Rules of Hooks violation in `KDSBoard.tsx` where `useState` and `useMemo` were conditionally executed after loading returns.
+- [x] **RoleGuard Rehydration Fix**: Fixed client redirection loop in `RoleGuard.tsx` by verifying `restro_staff_auth` localStorage persistence before rehydration.
+- [x] **Prisma Pool & Transaction Hardening**: Configured `connection_limit=7&pool_timeout=45` with `maxWait: 25000, timeout: 45000` to seamlessly absorb high-concurrency bursts across remote pooler network latency.
+- [x] **Automated Concurrency Validation**: `scripts/pilot-concurrency-validation.ts` verified with 10/10 simultaneous customer ordering sessions, KDS ticket queue updates, and cashier GST invoice creation + UPI payment settlement.
+- [x] **Playwright E2E Suite (100% Passed)**:
+  - `smoke.spec.ts` (4/4 passed)
+  - `customer-journey.spec.ts` (1/1 passed)
+  - `staff-operations.spec.ts` (1/1 passed)
+  - `admin-backoffice.spec.ts` (1/1 passed)
+  - Total: **7/7 Playwright tests passed cleanly** in headless Chromium.
+- [x] **Backend Vitest Integration Suite (100% Passed)**:
+  - `billing.test.ts` (20/20 passed)
+  - `kitchen-kds.test.ts` (16/16 passed)
+  - `frontend-live-api-parity.test.ts` (7/7 passed)
+  - Total: **43/43 tests passed cleanly**.
+

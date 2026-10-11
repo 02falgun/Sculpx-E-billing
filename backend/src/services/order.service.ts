@@ -325,6 +325,20 @@ export class OrderService {
                 ? validatedQr.table!.id
                 : validatedQr.room!.id,
           },
+          qrContext: {
+            token: payload.qrToken,
+            type: validatedQr.type,
+            identifier: diningIdentifier,
+            displayName: diningDisplayName,
+            tenantId: validatedQr.tenantId,
+          },
+          timeline: [
+            {
+              status: "PLACED",
+              timestamp: order.createdAt.toISOString(),
+              note: "Order placed by guest",
+            },
+          ],
           items: formattedItems,
           assignedKotIds: [kot.id],
           kots: [
@@ -371,7 +385,8 @@ export class OrderService {
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
-        timeout: 20000,
+        maxWait: 25000,
+        timeout: 45000,
       }
     );
 
@@ -381,6 +396,247 @@ export class OrderService {
     }
 
     return transactionResult.response;
+  }
+
+  /**
+   * Helper to format a database order record into standard API response format.
+   */
+  private formatOrderEntity(order: any) {
+    const qrType: "TABLE" | "ROOM" = order.tableId ? "TABLE" : order.roomId ? "ROOM" : (order.qrCode?.type || "TABLE");
+    const identifier = order.table?.tableNumber || order.room?.roomNumber || "Unknown";
+    const displayName = order.table
+      ? (order.table.displayName || `Table ${order.table.tableNumber}`)
+      : order.room
+      ? `Room ${order.room.roomNumber}`
+      : `Table ${identifier}`;
+    const qrToken = order.qrCode?.token || "";
+
+    const items = (order.items || []).map((item: any) => {
+      let modifiers: any[] = [];
+      if (item.selectedModifiers) {
+        if (Array.isArray(item.selectedModifiers)) {
+          modifiers = item.selectedModifiers;
+        } else if (typeof item.selectedModifiers === "string") {
+          try {
+            modifiers = JSON.parse(item.selectedModifiers);
+          } catch {}
+        }
+      }
+      return {
+        id: item.id,
+        menuItemId: item.menuItemId || "",
+        name: item.itemName,
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        totalPrice: Number(item.totalPrice),
+        taxRatePercentage: 5,
+        taxAmount: Number(item.taxAmount),
+        modifiers,
+        specialInstructions: item.specialInstructions || undefined,
+        status: item.status || "PLACED",
+      };
+    });
+
+    const timeline = [
+      {
+        status: "PLACED",
+        timestamp: order.createdAt.toISOString(),
+        note: "Order placed by guest",
+      },
+    ];
+
+    if (order.status !== "PLACED") {
+      timeline.push({
+        status: order.status,
+        timestamp: order.updatedAt.toISOString(),
+        note: `Order status: ${order.status}`,
+      });
+    }
+
+    return {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      source: order.source,
+      paymentPreference: order.paymentPreference,
+      customerName: order.customerName || undefined,
+      customerPhone: order.customerPhone || undefined,
+      specialInstructions: order.specialInstructions || undefined,
+      subtotal: Number(order.subtotal),
+      taxTotal: Number(order.taxTotal),
+      serviceCharge: Number(order.serviceCharge || 0),
+      discountTotal: 0,
+      grandTotal: Number(order.grandTotal),
+      billId: order.bills?.[0]?.id || undefined,
+      qrContext: {
+        token: qrToken,
+        type: qrType,
+        identifier,
+        displayName,
+        tenantId: order.tenantId,
+      },
+      items,
+      timeline,
+      cancellation:
+        order.status === "CANCELLED"
+          ? {
+              reason: order.cancellationReason || "Cancelled by staff/guest",
+              cancelledAt: order.updatedAt.toISOString(),
+              cancelledBy: "STAFF",
+            }
+          : undefined,
+      createdAt: order.createdAt.toISOString(),
+      updatedAt: order.updatedAt.toISOString(),
+    };
+  }
+
+  /**
+   * Retrieve single order by ID or orderNumber.
+   */
+  async getOrderById(orderId: string, tenantId?: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+
+    const order = await prisma.order.findFirst({
+      where: {
+        ...(isUuid ? { id: orderId } : { orderNumber: orderId }),
+        ...(tenantId ? { tenantId } : {}),
+      },
+      include: {
+        qrCode: true,
+        table: true,
+        room: true,
+        items: true,
+        kots: true,
+        bills: { select: { id: true, billNumber: true, paymentStatus: true } },
+      },
+    });
+
+    if (!order) {
+      throw new AppError("Order not found", 404, "ORDER_NOT_FOUND");
+    }
+
+    return this.formatOrderEntity(order);
+  }
+
+  /**
+   * List paginated orders for a tenant.
+   */
+  async listOrders(
+    tenantId: string,
+    params?: {
+      status?: string;
+      qrType?: "ROOM" | "TABLE";
+      page?: number;
+      limit?: number;
+    }
+  ) {
+    const page = Math.max(1, params?.page || 1);
+    const limit = Math.min(100, Math.max(1, params?.limit || 20));
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.OrderWhereInput = {
+      tenantId,
+    };
+
+    if (params?.status) {
+      where.status = params.status as OrderStatus;
+    }
+
+    if (params?.qrType === "TABLE") {
+      where.tableId = { not: null };
+    } else if (params?.qrType === "ROOM") {
+      where.roomId = { not: null };
+    }
+
+    const [total, orders] = await Promise.all([
+      prisma.order.count({ where }),
+      prisma.order.findMany({
+        where,
+        include: {
+          qrCode: true,
+          table: true,
+          room: true,
+          items: true,
+          kots: true,
+          bills: { select: { id: true, billNumber: true, paymentStatus: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      items: orders.map((o) => this.formatOrderEntity(o)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Update order status.
+   */
+  async updateOrderStatus(
+    orderId: string,
+    status: OrderStatus,
+    note?: string,
+    tenantId?: string
+  ) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+
+    const order = await prisma.order.findFirst({
+      where: {
+        ...(isUuid ? { id: orderId } : { orderNumber: orderId }),
+        ...(tenantId ? { tenantId } : {}),
+      },
+    });
+
+    if (!order) {
+      throw new AppError("Order not found", 404, "ORDER_NOT_FOUND");
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        status,
+        ...(status === "CANCELLED" && note ? { cancellationReason: note } : {}),
+      },
+      include: {
+        qrCode: true,
+        table: true,
+        room: true,
+        items: true,
+        kots: true,
+        bills: { select: { id: true, billNumber: true, paymentStatus: true } },
+      },
+    });
+
+    // Queue outbox status event for real-time frontend updates
+    try {
+      const event = await outboxService.createEvent(prisma, {
+        tenantId: updated.tenantId,
+        eventType: "order.updated",
+        topic: "orders:all",
+        payload: {
+          orderId: updated.id,
+          orderNumber: updated.orderNumber,
+          status: updated.status,
+          note,
+        },
+      });
+      outboxService.dispatchEvent(event.id).catch(() => {});
+    } catch {}
+
+    return this.formatOrderEntity(updated);
+  }
+
+  /**
+   * Cancel an order.
+   */
+  async cancelOrder(orderId: string, reason: string, tenantId?: string) {
+    return this.updateOrderStatus(orderId, OrderStatus.CANCELLED, reason, tenantId);
   }
 }
 

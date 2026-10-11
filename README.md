@@ -72,28 +72,30 @@ Designed with clean architecture and strict tenant isolation: supports a dual-mo
 
 ## 🔐 Authentication & Staff Roles Matrix
 
-The platform implements strict role-based access control (RBAC) backed by PostgreSQL and JWT:
+The platform implements strict role-based access control (RBAC) backed by PostgreSQL and JWT. Both internal pilot accounts (`@ebilling.com`) and staging demonstration accounts (`@demo.com`) are supported:
 
-| Email | Role | Name | Permissions & Scope |
+| Role | Pilot Email (`@ebilling.com`) | Legacy Email (`@demo.com`) | Permissions & Scope |
 |---|---|---|---|
-| `superadmin@demo.com` | `SUPER_ADMIN` | Kavya Kumar | Multi-property owner, audit logs, system-wide configuration |
-| `admin@demo.com` | `ADMIN` | Rajesh Sharma | Menu catalog management, printers, tables, staff users, inventory |
-| `manager@demo.com` | `MANAGER` | Vikram Mehta | Shift operations, bill voids, refund authorization, reports |
-| `captain@demo.com` | `CAPTAIN` | Karan Verma | Floor captain, order escalations, table status overrides |
-| `waiter@demo.com` | `WAITER` | Rahul Sharma | Table orders, POS entries, customer bill requests |
-| `cashier@demo.com` | `CASHIER` | Pooja Verma | Billing ledger, settlements (Cash, Card, UPI, Room Charge) |
-| `kitchen@demo.com` | `KITCHEN_STAFF` | Chef Sanjeev | Touchscreen KDS board, ticket status progression |
+| `SUPER_ADMIN` | `superadmin@ebilling.com` | `superadmin@demo.com` | Multi-property owner, audit logs, system-wide configuration |
+| `ADMIN` | `admin@ebilling.com` | `admin@demo.com` | Menu catalog management, printers, tables, staff users, inventory |
+| `MANAGER` | `manager@ebilling.com` | `manager@demo.com` | Shift operations, bill voids, refund authorization, reports |
+| `CAPTAIN` | `captain@ebilling.com` | `captain@demo.com` | Floor captain, order escalations, table status overrides |
+| `WAITER` | `waiter@ebilling.com` | `waiter@demo.com` | Table orders, POS entries, customer bill requests |
+| `CASHIER` | `cashier@ebilling.com` | `cashier@demo.com` | Billing ledger, settlements (Cash, Card, UPI, Room Charge) |
+| `KITCHEN_STAFF` | `kitchenstaff@ebilling.com` | `kitchen@demo.com` | Touchscreen KDS board, ticket status progression |
 
-*(Demo account password: `demo-secure-pass`)*
+*(Password for all staff accounts: `demo-secure-pass`)*
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (V1 Live Pilot Mode)
+
+Runtime mocks are disabled by default (`NEXT_PUBLIC_USE_MOCK_API=false`). All dining sessions, orders, KOTs, and bills persist in Supabase PostgreSQL.
 
 ### 1. Prerequisites
 - Node.js `v22+` or `v25+`
 - npm `v10+`
-- PostgreSQL instance (or Supabase project)
+- Supabase PostgreSQL instance
 
 ### 2. Frontend Setup
 ```bash
@@ -104,7 +106,7 @@ cd Sculpx-E-billing
 # Install root dependencies
 npm install
 
-# Start Next.js development server
+# Start Next.js development server (Port 3000)
 npm run dev
 # Frontend runs at: http://localhost:3000
 ```
@@ -120,12 +122,19 @@ npm install
 # Generate Prisma Client
 npm run prisma:generate
 
-# Seed staff demonstration accounts (idempotent)
-npm run db:seed
+# Seed canonical business catalog (5 categories, 10 items, 10 tables, 3 rooms, 7 staff users)
+npm run canonical-seed
 
-# Start backend in development mode
+# Start backend in development mode (Port 8000)
 npm run dev
 # Backend runs at: http://localhost:8000
+```
+
+### 4. Running the Multi-Role Pilot Concurrency Test
+```bash
+cd backend
+npx tsx scripts/pilot-concurrency-validation.ts
+# Simulates 10 concurrent customer dining sessions, kitchen KOT expediting, and cashier settlement.
 ```
 
 ---

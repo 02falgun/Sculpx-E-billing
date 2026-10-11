@@ -40,8 +40,12 @@ async function main(): Promise<void> {
     // Start in-process outbox event dispatcher worker daemon
     outboxService.startBackgroundWorker(2000);
 
-    // Start in-process print queue worker daemon
-    printWorkerService.startBackgroundWorker(3000);
+    // Start in-process print queue worker daemon (disabled in printerless pilot mode)
+    if (process.env.ENABLE_PRINT_WORKER === "true") {
+      printWorkerService.startBackgroundWorker(5000);
+    } else {
+      app.log.info("Printerless pilot mode: Physical print worker daemon disabled.");
+    }
 
     app.log.info(
       {

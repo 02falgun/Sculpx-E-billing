@@ -8,6 +8,9 @@ import {
   orderHeadersSchema,
   type CreateOrderRequest,
 } from "../schemas/order.schema.js";
+import { z } from "zod";
+import { OrderStatus } from "@prisma/client";
+import { qrService } from "../services/qr.service.js";
 import { env } from "../config/env.js";
 
 export const orderRoutes: FastifyPluginAsync = async (fastify) => {
@@ -192,6 +195,199 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
       return reply
         .status(201)
         .send(formatSuccessResponse(result, req, "Order placed successfully"));
+    }
+  );
+
+  const getOrderParamsSchema = z.object({
+    id: z.string().min(1, "Order ID is required"),
+  });
+
+  const listOrdersQuerySchema = z.object({
+    status: z.string().optional(),
+    qrType: z.enum(["ROOM", "TABLE"]).optional(),
+    page: z.coerce.number().min(1).default(1),
+    limit: z.coerce.number().min(1).max(100).default(20),
+  });
+
+  const updateStatusBodySchema = z.object({
+    status: z.nativeEnum(OrderStatus),
+    note: z.string().max(500).optional(),
+  });
+
+  const cancelOrderBodySchema = z.object({
+    reason: z.string().trim().min(1, "Cancellation reason is required").max(500),
+  });
+
+  /**
+   * GET /api/v1/orders/:id
+   * Retrieve single order by UUID or orderNumber.
+   * Public dining guests can track their order; staff sees order details.
+   */
+  fastify.get(
+    "/:id",
+    async (
+      req: FastifyRequest<{ Params: { id: string } }>,
+      reply: FastifyReply
+    ) => {
+      const parsed = getOrderParamsSchema.safeParse(req.params);
+      if (!parsed.success) {
+        return reply.status(400).send(
+          formatErrorResponse("VALIDATION_FAILED", "Invalid order ID parameter")
+        );
+      }
+
+      // Check for optional staff auth
+      let tenantId: string | undefined;
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        try {
+          const decoded = await req.jwtVerify<{ tenantId?: string }>();
+          tenantId = decoded?.tenantId;
+        } catch {
+          tenantId = undefined;
+        }
+      }
+
+      const order = await orderService.getOrderById(parsed.data.id, tenantId);
+      return formatSuccessResponse(order, req);
+    }
+  );
+
+  /**
+   * GET /api/v1/orders
+   * List paginated orders for tenant.
+   */
+  fastify.get(
+    "/",
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      const parsed = listOrdersQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return reply.status(400).send(
+          formatErrorResponse("VALIDATION_FAILED", "Invalid query parameters")
+        );
+      }
+
+      let tenantId: string | undefined;
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        try {
+          const decoded = await req.jwtVerify<{ tenantId?: string }>();
+          tenantId = decoded?.tenantId;
+        } catch {}
+      }
+
+      // If no staff token, check x-qr-token header
+      if (!tenantId) {
+        const qrHeader = (req.headers["x-qr-token"] || req.headers["X-QR-Token"]) as string | undefined;
+        if (qrHeader) {
+          try {
+            const qr = await qrService.resolveValidatedQrEntity(qrHeader.trim());
+            tenantId = qr.tenantId;
+          } catch {}
+        }
+      }
+
+      if (!tenantId) {
+        tenantId = "e1b1d1f0-0000-4000-8000-000000000001";
+      }
+
+      const result = await orderService.listOrders(tenantId, parsed.data);
+      return formatSuccessResponse(result, req);
+    }
+  );
+
+  /**
+   * PATCH /api/v1/orders/:id/status
+   * Update order status.
+   */
+  fastify.patch(
+    "/:id/status",
+    async (
+      req: FastifyRequest<{ Params: { id: string } }>,
+      reply: FastifyReply
+    ) => {
+      const parsedParams = getOrderParamsSchema.safeParse(req.params);
+      if (!parsedParams.success) {
+        return reply.status(400).send(
+          formatErrorResponse("VALIDATION_FAILED", "Invalid order ID")
+        );
+      }
+      const parsedBody = updateStatusBodySchema.safeParse(req.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send(
+          formatErrorResponse(
+            "VALIDATION_FAILED",
+            "Invalid status value",
+            parsedBody.error.issues.map((i) => ({
+              field: i.path.join("."),
+              issue: i.message,
+            }))
+          )
+        );
+      }
+
+      let tenantId: string | undefined;
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        try {
+          const decoded = await req.jwtVerify<{ tenantId?: string }>();
+          tenantId = decoded?.tenantId;
+        } catch {}
+      }
+
+      const updated = await orderService.updateOrderStatus(
+        parsedParams.data.id,
+        parsedBody.data.status,
+        parsedBody.data.note,
+        tenantId
+      );
+
+      return formatSuccessResponse(updated, req, "Order status updated");
+    }
+  );
+
+  /**
+   * POST /api/v1/orders/:id/cancel
+   * Cancel order.
+   */
+  fastify.post(
+    "/:id/cancel",
+    async (
+      req: FastifyRequest<{ Params: { id: string } }>,
+      reply: FastifyReply
+    ) => {
+      const parsedParams = getOrderParamsSchema.safeParse(req.params);
+      if (!parsedParams.success) {
+        return reply.status(400).send(
+          formatErrorResponse("VALIDATION_FAILED", "Invalid order ID")
+        );
+      }
+      const parsedBody = cancelOrderBodySchema.safeParse(req.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send(
+          formatErrorResponse(
+            "VALIDATION_FAILED",
+            "Cancellation reason is required"
+          )
+        );
+      }
+
+      let tenantId: string | undefined;
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        try {
+          const decoded = await req.jwtVerify<{ tenantId?: string }>();
+          tenantId = decoded?.tenantId;
+        } catch {}
+      }
+
+      const cancelled = await orderService.cancelOrder(
+        parsedParams.data.id,
+        parsedBody.data.reason,
+        tenantId
+      );
+
+      return formatSuccessResponse(cancelled, req, "Order cancelled successfully");
     }
   );
 };
