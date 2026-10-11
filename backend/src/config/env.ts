@@ -27,8 +27,13 @@ const envSchema = z.object({
   DEMO_SEED_PASSWORD: z.string().default("demo-secure-pass"),
   ALLOW_DEMO_SEED: z
     .string()
-    .transform((v) => v.toLowerCase() === "true" || v === "1")
-    .default("true"),
+    .optional()
+    .transform((v) => {
+      if (v === undefined || v.trim() === "") {
+        return process.env.NODE_ENV !== "production";
+      }
+      return v.toLowerCase() === "true" || v === "1";
+    }),
   RATE_LIMIT_MAX: z.coerce.number().min(1).default(10),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().min(1000).default(60000),
 });
