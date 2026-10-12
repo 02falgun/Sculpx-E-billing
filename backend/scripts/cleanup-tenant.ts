@@ -133,12 +133,11 @@ async function main() {
 
     // 5. Menu Catalog
     await tx.modifierOption.deleteMany({
-      where: { group: { tenantId } },
+      where: { group: { menuItem: { category: { tenantId } } } },
     });
-    await tx.menuItemModifierGroup.deleteMany({
+    await tx.modifierGroup.deleteMany({
       where: { menuItem: { category: { tenantId } } },
     });
-    await tx.modifierGroup.deleteMany({ where: { tenantId } });
     await tx.menuItem.deleteMany({ where: { category: { tenantId } } });
     await tx.menuCategory.deleteMany({ where: { tenantId } });
 
