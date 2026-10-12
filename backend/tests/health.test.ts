@@ -73,4 +73,22 @@ describe("GET /api/health & Liveness Probes", () => {
     const payload = JSON.parse(response.payload);
     expect(payload.meta.requestId).toBe(customId);
   });
+
+  it("should permit CORS preflight OPTIONS request with x-target-tenant-id and x-location-id", async () => {
+    const response = await app.inject({
+      method: "OPTIONS",
+      url: "/api/v1/auth/login",
+      headers: {
+        origin: "https://sculpx-e-billing.vercel.app",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type,x-target-tenant-id,x-location-id,authorization",
+      },
+    });
+
+    expect([200, 204]).toContain(response.statusCode);
+    expect(response.headers["access-control-allow-origin"]).toBe("https://sculpx-e-billing.vercel.app");
+    const allowed = (response.headers["access-control-allow-headers"] as string || "").toLowerCase();
+    expect(allowed).toContain("x-target-tenant-id");
+    expect(allowed).toContain("x-location-id");
+  });
 });

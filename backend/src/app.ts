@@ -69,8 +69,14 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       "X-Requested-With",
       "x-qr-token",
       "X-QR-Token",
+      "x-target-tenant-id",
+      "X-Target-Tenant-Id",
+      "x-location-id",
+      "X-Location-Id",
+      "x-bootstrap-token",
+      "X-Bootstrap-Token",
     ],
-    exposedHeaders: ["x-request-id"],
+    exposedHeaders: ["x-request-id", "x-target-tenant-id", "x-location-id"],
   });
 
   // Register JWT Plugin
