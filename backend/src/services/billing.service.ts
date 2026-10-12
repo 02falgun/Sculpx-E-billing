@@ -474,7 +474,7 @@ export class BillingService {
     billId: string,
     tenantId?: string
   ): Promise<FormattedBillResponse> {
-    const bill = await prisma.bill.findUnique({
+    let bill = await prisma.bill.findUnique({
       where: { id: billId },
       include: {
         items: true,
@@ -488,6 +488,36 @@ export class BillingService {
         },
       },
     });
+
+    if (!bill) {
+      // Check if billId is actually an order ID
+      const order = await prisma.order.findUnique({
+        where: { id: billId },
+        include: {
+          bills: {
+            include: {
+              items: true,
+              payments: true,
+              order: {
+                include: {
+                  table: true,
+                  room: true,
+                  qrCode: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (order && (!tenantId || order.tenantId === tenantId)) {
+        if (order.bills.length > 0) {
+          bill = order.bills.find((b) => b.paymentStatus !== BillPaymentStatus.VOIDED) || order.bills[0];
+        } else if (order.status !== OrderStatus.CANCELLED && order.status !== OrderStatus.PENDING_VALIDATION) {
+          return await this.generateBillForOrder(order.id, order.tenantId);
+        }
+      }
+    }
 
     if (!bill) {
       throw new AppError("Bill not found", 404, "BILL_NOT_FOUND", { billId });
