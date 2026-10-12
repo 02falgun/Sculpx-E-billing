@@ -96,16 +96,26 @@ To ensure immediate revocation of compromised accounts or stale permissions with
 
 ---
 
-## 5. Multi-Tenant Onboarding & Isolation
+## 5. Multi-Tenant Onboarding & Multi-Location Isolation
 
-1. **Hotel Onboarding**:
-   - `POST /api/v1/tenants/onboard` provisions a new hotel with legal identity, tax rates (CGST/SGST), and its initial Hotel Administrator.
-   - Protected by platform `SUPER_ADMIN` role or secure bootstrap token `x-bootstrap-token`.
-   - The newly onboarded hotel starts with **ZERO** rooms, tables, categories, or items (complete empty state).
-2. **Tenant Scoping Rule**:
-   - Client-provided tenant IDs in query parameters or request bodies are **NEVER** trusted for authorization.
-   - Every protected route extracts tenant ID strictly from `request.authenticatedUser.tenantId`.
-   - Cross-tenant queries are rejected at the database query level with `403 Forbidden` or `404 Not Found`.
+### 5.1 Hierarchical Scope Authorization
+In addition to platform-wide `SUPER_ADMIN`, the platform authorizes users across explicit organization and location scopes:
+- **`SUPER_ADMIN`**: Unrestricted platform governance. Can create franchise organizations, onboard independent businesses, provision locations, and assign members.
+- **`FRANCHISE_OWNER` / Group Admin**: Organization membership in `OrganizationUser`. Permitted to view and oversee all locations tied to their authorized `organizationId`. Cannot access unrelated franchise organizations or create unassigned branches.
+- **`LOCATION_ADMIN` / `HOTEL_ADMIN`**: Assigned to specific branches via `UserLocationAssignment`. Authorized strictly for that operational property.
+- **Branch Staff (`CHEF`, `WAITER`, `CASHIER`)**: Bound to explicit location assignments (`UserLocationAssignment`). Cross-location actions are blocked.
+
+### 5.2 Server-Side Location Scope Resolution (`requireTenantScope`)
+Client-supplied headers or body IDs (`x-location-id`, `x-target-tenant-id`) are validated on every request:
+1. Authenticated user's `authorizedTenantIds` and `authorizedLocationIds` are resolved from their active assignments in PostgreSQL.
+2. If the user is `SUPER_ADMIN`, any valid tenant/location is permitted.
+3. If the user is branch staff or location admin, the requested tenant must be in `authorizedTenantIds`. Cross-tenant attempts are rejected with HTTP 403 `FORBIDDEN`.
+4. **Suspension Check**: The location's status is checked in database. If `status !== 'ACTIVE'`, any mutating HTTP request (`POST`, `PUT`, `PATCH`, `DELETE`) on tables, rooms, orders, or bills is rejected with HTTP 403 `LOCATION_SUSPENDED`. Read-only GET requests remain authorized for auditing and historical invoice viewing.
+
+### 5.3 Pilot Onboarding & Zero Fake Data Rule
+- `POST /api/v1/organizations/franchise/onboard` creates the franchise organization, its first location, isolated operational tenant, and provisions initial owner credentials in a single atomic database transaction (`prisma.$transaction`).
+- `POST /api/v1/locations` creates a standalone location (or franchise branch) and isolated operational tenant.
+- All newly created locations start in a clean state: **0 tables, 0 rooms, 0 menu items, 0 orders, 0 fake invoices**. No static demo arrays or fabricated business records exist.
 
 ---
 

@@ -61,6 +61,9 @@ export const menuRoutes: FastifyPluginAsync = async (fastify) => {
           isActive: true,
           tokenVersion: 1,
           permissions: [],
+          authorizedTenantIds: [validated.tenantId],
+          authorizedLocationIds: [],
+          authorizedOrganizationIds: [],
         };
         return;
       } catch {

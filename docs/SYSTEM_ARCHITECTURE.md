@@ -78,3 +78,49 @@ graph TD
 1. **WebSocket Degradation**: If WebSocket connection fails, TanStack Query automatically falls back to interval polling (window focus revalidation & stale-while-revalidate).
 2. **Offline Detection**: PWA shell detects navigator connectivity changes and informs the user immediately to prevent lost cart or payment submissions.
 3. **Optimistic Updates with Server Authority**: Client displays immediate feedback for actions like quantity increments, but final order placement waits for server confirmation.
+
+---
+
+## 4. Multi-Tenant, Franchise & Multi-Location Hierarchy
+
+SCULPX E-Billing operates as a multi-tenant hospitality platform supporting independent restaurants, independent hotels, combined hospitality properties, and multi-unit franchise organizations.
+
+```mermaid
+graph TD
+    Platform[SCULPX Platform Super Admin]
+
+    subgraph Independent["Independent Hospitality Business"]
+        IndLoc[Independent Location: The Grand Diner]
+        IndTenant[(Operational Tenant Security Boundary)]
+        IndLoc --- IndTenant
+    end
+
+    subgraph Franchise["Franchise Organization: Taj Hospitality Group"]
+        FranchiseOrg[Parent Organization Entity]
+        Loc1[Branch 1: Mumbai Central]
+        Loc2[Branch 2: Pune Baner]
+        Loc3[Branch 3: Goa Beachfront]
+        Tenant1[(Operational Tenant 1)]
+        Tenant2[(Operational Tenant 2)]
+        Tenant3[(Operational Tenant 3)]
+
+        FranchiseOrg --> Loc1
+        FranchiseOrg --> Loc2
+        FranchiseOrg --> Loc3
+        Loc1 --- Tenant1
+        Loc2 --- Tenant2
+        Loc3 --- Tenant3
+    end
+
+    Platform --> Independent
+    Platform --> Franchise
+```
+
+### Separation of Concerns & Boundary Definitions
+1. **Organization (`Organization` model)**: Parent business entity or franchise brand. Contains corporate details, legal name, tax identifiers, and franchise-level brand settings. Independent businesses have no parent organization (`organizationId: null`).
+2. **Location (`Location` model)**: Physical branch or property (restaurant, hotel, or combined). Contains address, city, timezone, currency, GSTIN, and enabled hospitality modules.
+3. **Operational Tenant (`Tenant` model)**: Hard security isolation boundary in PostgreSQL. Each Location links 1-to-1 with an operational Tenant (`tenantId @unique`). All operational records (`tables`, `rooms`, `menu_categories`, `menu_items`, `orders`, `bills`, `payments`, `inventory`, `printers`) are strictly scoped to `tenantId`.
+4. **Lifecycle & Suspension Rules**:
+   - `ACTIVE`: Full operational capabilities.
+   - `SUSPENDED`: Read-only historical data access. Any state-modifying requests (`POST`, `PUT`, `PATCH`, `DELETE`) on operational tables, rooms, orders, or bills are rejected with HTTP 403 `LOCATION_SUSPENDED`. Historical invoices, ledger entries, and audit logs remain immutable.
+   - `ARCHIVED`: Property decommissioned, preserved for accounting and regulatory retention.

@@ -14,6 +14,8 @@ import {
   ITenantService,
   IRoleService,
   IAuditService,
+  IOrganizationService,
+  ILocationService,
 } from "./interfaces";
 
 import { MockMenuService } from "./mock/menu.mock";
@@ -45,6 +47,8 @@ import {
   HttpTenantService,
   HttpRoleService,
   HttpAuditService,
+  HttpOrganizationService,
+  HttpLocationService,
 } from "./http";
 
 // Instances of mock services
@@ -78,6 +82,8 @@ const httpAuth = new HttpAuthService();
 const httpTenant = new HttpTenantService();
 const httpRole = new HttpRoleService();
 const httpAudit = new HttpAuditService();
+const httpOrganization = new HttpOrganizationService();
+const httpLocation = new HttpLocationService();
 
 export function getMenuService(): IMenuService {
   return ENV.USE_MOCK_API ? mockMenu : httpMenu;
@@ -192,4 +198,21 @@ export const roleApi = new Proxy({} as IRoleService, {
 export const auditApi = new Proxy({} as IAuditService, {
   get: (_, prop: string | symbol) => (getAuditService() as unknown as Record<string | symbol, unknown>)[prop],
 });
+
+export function getOrganizationService(): IOrganizationService {
+  return httpOrganization;
+}
+
+export function getLocationService(): ILocationService {
+  return httpLocation;
+}
+
+export const organizationApi = new Proxy({} as IOrganizationService, {
+  get: (_, prop: string | symbol) => (getOrganizationService() as unknown as Record<string | symbol, unknown>)[prop],
+});
+
+export const locationApi = new Proxy({} as ILocationService, {
+  get: (_, prop: string | symbol) => (getLocationService() as unknown as Record<string | symbol, unknown>)[prop],
+});
+
 

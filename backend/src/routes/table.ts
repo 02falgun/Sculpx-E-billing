@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { formatSuccessResponse, AppError } from "../lib/errors.js";
 import { TableStatus } from "@prisma/client";
-import { authenticate, requireRoles } from "../middleware/auth.js";
+import { authenticate, requireRoles, requireTenantScope } from "../middleware/auth.js";
 import { auditService } from "../services/audit.service.js";
 
 const createTableSchema = z.object({
@@ -94,7 +94,7 @@ export const tableRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.post(
     "/",
-    { preHandler: [authenticate, requireRoles("ADMIN", "SUPER_ADMIN", "MANAGER")] },
+    { preHandler: [authenticate, requireRoles("ADMIN", "SUPER_ADMIN", "MANAGER"), requireTenantScope] },
     async (req: FastifyRequest, reply: FastifyReply) => {
       const caller = req.authenticatedUser!;
       const parseResult = createTableSchema.safeParse(req.body);
@@ -108,12 +108,13 @@ export const tableRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const data = parseResult.data;
+      const targetTenantId = (req.body as any)?.tenantId || caller.tenantId;
 
-      // Check uniqueness within caller's tenant
+      // Check uniqueness within target tenant
       const existing = await prisma.table.findUnique({
         where: {
           tenantId_tableNumber: {
-            tenantId: caller.tenantId,
+            tenantId: targetTenantId,
             tableNumber: data.tableNumber,
           },
         },
@@ -132,7 +133,7 @@ export const tableRoutes: FastifyPluginAsync = async (fastify) => {
       const { table, qr } = await prisma.$transaction(async (tx) => {
         const t = await tx.table.create({
           data: {
-            tenantId: caller.tenantId,
+            tenantId: targetTenantId,
             tableNumber: data.tableNumber,
             displayName: data.displayName,
             capacity: data.capacity,

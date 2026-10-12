@@ -24,9 +24,15 @@ import {
   Settings,
   Sparkles,
   Layers,
+  Building2,
+  MapPin,
+  PlusCircle,
 } from "lucide-react";
+import { useAuthStore } from "@/store";
 
 export function AdminDashboardOverview() {
+  const user = useAuthStore((s) => s.user);
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
   const { data: tables = [] } = useTables();
   const { data: rooms = [] } = useRooms();
   const { data: orderData } = useOrders();
@@ -263,6 +269,83 @@ export function AdminDashboardOverview() {
           </span>
         </div>
       </div>
+
+      {/* Super Admin Multi-Tenant & Franchise Platform Hub */}
+      {isSuperAdmin && (
+        <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/70 via-purple-50/40 to-slate-50 p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-indigo-600" />
+                <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                  Franchise Organizations &amp; Multi-Location Control
+                </h2>
+              </div>
+              <p className="text-xs text-slate-600 mt-1">
+                Platform-level management of parent franchise groups, independent hospitality properties, and operational branches.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/admin/franchises/new"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-xs transition"
+              >
+                <PlusCircle className="h-3.5 w-3.5" />
+                Onboard Franchise
+              </Link>
+              <Link
+                href="/admin/locations/new"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-xs transition"
+              >
+                <PlusCircle className="h-3.5 w-3.5" />
+                Add Location
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+            <Link
+              href="/admin/franchises"
+              className="p-4 rounded-xl border border-indigo-200/70 bg-white/90 hover:bg-white hover:border-indigo-400 hover:shadow-sm transition flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition">
+                    Franchise Organizations
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Parent brands, multi-unit groups, and cross-location reporting.
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition" />
+            </Link>
+
+            <Link
+              href="/admin/locations"
+              className="p-4 rounded-xl border border-indigo-200/70 bg-white/90 hover:bg-white hover:border-indigo-400 hover:shadow-sm transition flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-emerald-600 transition">
+                    Operational Locations Fleet
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Restaurants, hotels, independent branches, and tenant isolation.
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition" />
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Quick Launch Operations Modules */}
       <div>

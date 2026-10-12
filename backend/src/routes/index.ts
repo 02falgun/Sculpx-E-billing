@@ -15,6 +15,8 @@ import { userRoutes } from "./user.js";
 import { tenantRoutes } from "./tenant.js";
 import { roleRoutes } from "./role.js";
 import { auditRoutes } from "./audit.js";
+import { organizationRoutes } from "./organization.js";
+import { locationRoutes } from "./location.js";
 
 export const apiRoutes: FastifyPluginAsync = async (fastify) => {
   // Direct /api/health and /api/ready
@@ -28,6 +30,12 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Direct /api/tenants endpoints
   await fastify.register(tenantRoutes, { prefix: "/tenants" });
+
+  // Direct /api/organizations endpoints
+  await fastify.register(organizationRoutes, { prefix: "/organizations" });
+
+  // Direct /api/locations endpoints
+  await fastify.register(locationRoutes, { prefix: "/locations" });
 
   // Direct /api/roles endpoints
   await fastify.register(roleRoutes, { prefix: "/roles" });
@@ -75,6 +83,8 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
       await v1.register(authRoutes, { prefix: "/auth" });
       await v1.register(userRoutes, { prefix: "/users" });
       await v1.register(tenantRoutes, { prefix: "/tenants" });
+      await v1.register(organizationRoutes, { prefix: "/organizations" });
+      await v1.register(locationRoutes, { prefix: "/locations" });
       await v1.register(roleRoutes, { prefix: "/roles" });
       await v1.register(auditRoutes, { prefix: "/audit" });
       await v1.register(menuRoutes, { prefix: "/menu" });

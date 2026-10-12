@@ -7,4 +7,5 @@ export * from "./CashierNavigation";
 export * from "./ManagerNavigation";
 export * from "./WaiterNavigation";
 export * from "./UserWorkspaceMenu";
+export * from "./LocationSelector";
 

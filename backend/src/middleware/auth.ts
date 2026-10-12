@@ -15,6 +15,10 @@ export interface AuthenticatedUser {
   isActive: boolean;
   tokenVersion: number;
   permissions: string[];
+  authorizedTenantIds: string[];
+  authorizedLocationIds: string[];
+  authorizedOrganizationIds: string[];
+  organizationRole?: string;
 }
 
 declare module "@fastify/jwt" {
@@ -69,6 +73,23 @@ export async function authenticate(
           permissionKey: true,
         },
       },
+      locationAssignments: {
+        include: {
+          location: {
+            select: {
+              id: true,
+              tenantId: true,
+              status: true,
+            },
+          },
+        },
+      },
+      organizationMemberships: {
+        select: {
+          organizationId: true,
+          role: true,
+        },
+      },
     },
   });
 
@@ -97,6 +118,11 @@ export async function authenticate(
   const roleDefaults = ROLE_DEFAULT_PERMISSIONS[user.role] || [];
   const effectivePermissions = Array.from(new Set([...roleDefaults, ...explicitPerms]));
 
+  const assignedTenantIds = user.locationAssignments.map((a) => a.location.tenantId);
+  const allAuthorizedTenantIds = Array.from(new Set([user.tenantId, ...assignedTenantIds]));
+  const allAuthorizedLocationIds = user.locationAssignments.map((a) => a.locationId);
+  const allAuthorizedOrgIds = user.organizationMemberships.map((m) => m.organizationId);
+
   request.authenticatedUser = {
     id: user.id,
     tenantId: user.tenantId,
@@ -107,6 +133,10 @@ export async function authenticate(
     isActive: user.isActive,
     tokenVersion: user.tokenVersion,
     permissions: effectivePermissions,
+    authorizedTenantIds: allAuthorizedTenantIds,
+    authorizedLocationIds: allAuthorizedLocationIds,
+    authorizedOrganizationIds: allAuthorizedOrgIds,
+    organizationRole: user.organizationMemberships[0]?.role,
   };
 }
 
@@ -193,13 +223,30 @@ export async function requireTenantScope(
   const query = (request.query as Record<string, string> | undefined) || {};
   const body = (request.body as Record<string, string> | undefined) || {};
 
-  const targetTenantId = params.tenantId || query.tenantId || body.tenantId;
+  const targetTenantId = params.tenantId || query.tenantId || body.tenantId || user.tenantId;
 
-  if (targetTenantId && targetTenantId !== user.tenantId) {
-    throw new AppError(
-      "Cross-tenant access forbidden: resource belongs to another organization",
-      403,
-      "FORBIDDEN"
-    );
+  if (targetTenantId) {
+    if (!user.authorizedTenantIds.includes(targetTenantId)) {
+      throw new AppError(
+        "Cross-tenant access forbidden: resource belongs to another organization",
+        403,
+        "FORBIDDEN"
+      );
+    }
+
+    // If target location is suspended, prevent non-GET operational mutations
+    if (request.method !== "GET") {
+      const loc = await prisma.location.findUnique({
+        where: { tenantId: targetTenantId },
+        select: { status: true },
+      });
+      if (loc && loc.status !== "ACTIVE") {
+        throw new AppError(
+          `Location is ${loc.status.toLowerCase()}. Operational modifications are suspended.`,
+          403,
+          "LOCATION_SUSPENDED"
+        );
+      }
+    }
   }
 }

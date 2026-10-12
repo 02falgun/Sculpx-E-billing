@@ -19,6 +19,8 @@ import {
   FileText,
   Sliders,
   Database,
+  Building2,
+  MapPin,
 } from "lucide-react";
 import { UserWorkspaceMenu } from "./UserWorkspaceMenu";
 
@@ -35,6 +37,17 @@ export function AdminSidebar() {
         { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
       ],
     },
+    ...(isSuperAdmin
+      ? [
+          {
+            group: "ORGANIZATIONS",
+            links: [
+              { href: "/admin/franchises", label: "Franchises", icon: Building2 },
+              { href: "/admin/locations", label: "Locations", icon: MapPin },
+            ],
+          },
+        ]
+      : []),
     {
       group: "OPERATIONS",
       links: [

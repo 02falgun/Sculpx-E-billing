@@ -170,6 +170,8 @@ model User {
   permissions           UserPermission[]
   payments              Payment[]
   inventoryTransactions InventoryTransaction[]
+  organizationMemberships OrganizationUser[]
+  locationAssignments     UserLocationAssignment[]
 
   @@map("users")
 }
@@ -668,6 +670,7 @@ model Tenant {
   settings          Json?     @default("{}")
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  location          Location?
 
   @@map("tenants")
 }
@@ -719,5 +722,88 @@ model StaffInvitation {
 
   @@index([tenantId, email])
   @@map("staff_invitations")
+}
+
+model Organization {
+  id            String             @id @default(uuid()) @db.Uuid
+  name          String             @db.VarChar(255)
+  code          String             @unique @db.VarChar(50)
+  type          String             @default("FRANCHISE") @db.VarChar(50) // FRANCHISE | INDEPENDENT
+  legalName     String?            @map("legal_name") @db.VarChar(255)
+  contactEmail  String?            @map("contact_email") @db.VarChar(255)
+  contactPhone  String?            @map("contact_phone") @db.VarChar(50)
+  address       String?            @db.VarChar(255)
+  status        String             @default("ACTIVE") @db.VarChar(20) // ACTIVE | SUSPENDED | ARCHIVED
+  brandSettings Json?              @default("{}") @map("brand_settings")
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  locations     Location[]
+  users         OrganizationUser[]
+
+  @@map("organizations")
+}
+
+model Location {
+  id              String                   @id @default(uuid()) @db.Uuid
+  organizationId  String?                  @map("organization_id") @db.Uuid
+  tenantId        String                   @unique @map("tenant_id") @db.Uuid
+  name            String                   @db.VarChar(255)
+  code            String                   @unique @db.VarChar(50)
+  locationType    String                   @default("COMBINED") @map("location_type") @db.VarChar(50) // RESTAURANT | HOTEL | COMBINED
+  address         String?                  @db.VarChar(255)
+  city            String?                  @db.VarChar(100)
+  state           String?                  @db.VarChar(100)
+  postalCode      String?                  @map("postal_code") @db.VarChar(20)
+  country         String                   @default("India") @db.VarChar(100)
+  timezone        String                   @default("Asia/Kolkata") @db.VarChar(50)
+  currency        String                   @default("INR") @db.VarChar(10)
+  currencySymbol  String                   @default("₹") @map("currency_symbol") @db.VarChar(10)
+  contactEmail    String?                  @map("contact_email") @db.VarChar(255)
+  contactPhone    String?                  @map("contact_phone") @db.VarChar(50)
+  gstin           String?                  @db.VarChar(50)
+  enabledModules  Json?                    @default("{\"accommodation\": true, \"restaurant\": true, \"inventory\": true, \"kds\": true}") @map("enabled_modules")
+  status          String                   @default("ACTIVE") @db.VarChar(20) // ACTIVE | SUSPENDED | ARCHIVED
+  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization    Organization?            @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  tenant          Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userAssignments UserLocationAssignment[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("locations")
+}
+
+model OrganizationUser {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  role           String       @default("FRANCHISE_OWNER") @db.VarChar(50) // FRANCHISE_OWNER | GROUP_ADMIN
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_users")
+}
+
+model UserLocationAssignment {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  locationId String    @map("location_id") @db.Uuid
+  role       Role?
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location   Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, locationId])
+  @@index([userId])
+  @@index([locationId])
+  @@map("user_location_assignments")
 }
 

@@ -12,3 +12,5 @@ export * from "./user.http";
 export * from "./tenant.http";
 export * from "./role.http";
 export * from "./audit.http";
+export * from "./organization.http";
+export * from "./location.http";

@@ -11,6 +11,8 @@ export class ApiClient {
   private baseUrl: string;
   private authToken: string | null = null;
   private activeQrToken: string | null = null;
+  private activeLocationId: string | null = null;
+  private activeTenantId: string | null = null;
 
   constructor(baseUrl: string = ENV.API_URL) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
@@ -22,6 +24,22 @@ export class ApiClient {
 
   getAuthToken(): string | null {
     return this.authToken;
+  }
+
+  setActiveLocationId(locationId: string | null): void {
+    this.activeLocationId = locationId;
+  }
+
+  getActiveLocationId(): string | null {
+    return this.activeLocationId;
+  }
+
+  setActiveTenantId(tenantId: string | null): void {
+    this.activeTenantId = tenantId;
+  }
+
+  getActiveTenantId(): string | null {
+    return this.activeTenantId;
   }
 
   setActiveQrToken(token: string | null): void {
@@ -113,6 +131,19 @@ export class ApiClient {
       if (activeQrToken) {
         reqHeaders["x-qr-token"] = activeQrToken;
       }
+    }
+
+    let activeLocId: string | null | undefined = this.activeLocationId;
+    let activeTenId: string | null | undefined = this.activeTenantId;
+    if (typeof window !== "undefined" && typeof window.localStorage?.getItem === "function") {
+      activeLocId = activeLocId || window.localStorage.getItem("restro_active_location_id");
+      activeTenId = activeTenId || window.localStorage.getItem("restro_active_tenant_id");
+    }
+    if (activeLocId) {
+      reqHeaders["x-location-id"] = activeLocId;
+    }
+    if (activeTenId) {
+      reqHeaders["x-target-tenant-id"] = activeTenId;
     }
 
     try {

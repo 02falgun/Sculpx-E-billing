@@ -231,3 +231,22 @@ export interface IAuditService {
   getAuditLogs(query?: { limit?: number; offset?: number; action?: string; resource?: string }): Promise<ApiResponse<{ logs: Array<{ id: string; actorEmail?: string; actorRole?: string; action: string; resource: string; resourceId?: string; details?: Record<string, unknown>; ipAddress?: string; createdAt: string }>; total: number }>>;
 }
 
+export interface IOrganizationService {
+  getOrganizations(query?: { search?: string; type?: string; status?: string }): Promise<ApiResponse<import("@/types").Organization[]>>;
+  getOrganizationById(id: string): Promise<ApiResponse<import("@/types").Organization>>;
+  createOrganization(data: import("@/types").CreateOrganizationInput): Promise<ApiResponse<import("@/types").Organization>>;
+  updateOrganization(id: string, data: Partial<import("@/types").CreateOrganizationInput & { status: string }>): Promise<ApiResponse<import("@/types").Organization>>;
+  onboardFranchise(data: import("@/types").OnboardFranchiseWizardInput): Promise<ApiResponse<{ organization: import("@/types").Organization; location?: import("@/types").Location; owner?: any; locationAdmin?: any }>>;
+  getOrganizationStats(id: string): Promise<ApiResponse<import("@/types").OrganizationStats>>;
+}
+
+export interface ILocationService {
+  getLocations(query?: { organizationId?: string; status?: string; locationType?: string; search?: string }): Promise<ApiResponse<import("@/types").Location[]>>;
+  getLocationById(id: string): Promise<ApiResponse<import("@/types").Location>>;
+  createLocation(data: import("@/types").CreateLocationInput): Promise<ApiResponse<{ location: import("@/types").Location; tenant: any; adminUser?: any }>>;
+  updateLocation(id: string, data: import("@/types").UpdateLocationInput): Promise<ApiResponse<import("@/types").Location>>;
+  updateLocationStatus(id: string, status: string, reason?: string): Promise<ApiResponse<import("@/types").Location>>;
+  assignUserToLocation(id: string, data: { userId: string; role?: string; isPrimary?: boolean }): Promise<ApiResponse<any>>;
+  getLocationStats(id: string): Promise<ApiResponse<import("@/types").LocationStats>>;
+}
+
