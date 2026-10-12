@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Dialog } from "@/components/ui/Dialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Spinner } from "@/components/ui/Spinner";
+import { useAuthStore } from "@/store";
 
 export default function AdminUsersPage() {
   const queryClient = useQueryClient();
@@ -34,10 +35,12 @@ export default function AdminUsersPage() {
   });
 
   // State
+  const currentUser = useAuthStore((s) => s.user);
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editingUser, setEditingUser] = React.useState<User | null>(null);
   const [resettingUser, setResettingUser] = React.useState<User | null>(null);
   const [deactivatingUser, setDeactivatingUser] = React.useState<User | null>(null);
+  const [deletingUser, setDeletingUser] = React.useState<User | null>(null);
 
   // Form states
   const [name, setName] = React.useState("");
@@ -225,6 +228,25 @@ export default function AdminUsersPage() {
     },
   });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: async () => {
+      if (!deletingUser || !userApi.deleteUser) return;
+      const res = await userApi.deleteUser(deletingUser.id);
+      if (!res.success) throw new Error(res.error?.message || "Failed to delete employee");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      const deletedName = deletingUser?.name;
+      setDeletingUser(null);
+      setErrorMsg(null);
+      setSuccessMsg(`Employee ${deletedName || ""} removed successfully.`);
+      setTimeout(() => setSuccessMsg(null), 3500);
+    },
+    onError: (err: any) => {
+      setErrorMsg(err?.message || "Failed to delete employee");
+    },
+  });
+
   const saveRoleMutation = useMutation({
     mutationFn: async () => {
       if (editingRole) {
@@ -404,7 +426,11 @@ export default function AdminUsersPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {users.map((u) => {
-            const isSelfAdmin = u.role === "ADMIN" || u.role === "SUPER_ADMIN";
+            const isCurrentUser =
+              currentUser?.id === u.id ||
+              (currentUser?.email && currentUser.email.toLowerCase() === u.email.toLowerCase());
+            const isSuperAdminTarget = u.role === "SUPER_ADMIN";
+            const canManageRole = !isCurrentUser && !(currentUser?.role !== "SUPER_ADMIN" && isSuperAdminTarget);
             return (
               <div
                 key={u.id}
@@ -495,14 +521,27 @@ export default function AdminUsersPage() {
                     >
                       <LogOut className="h-3.5 w-3.5" />
                     </button>
-                    {!isSelfAdmin && (
+                    {!isCurrentUser && (
                       <button
                         type="button"
                         onClick={() => setDeactivatingUser(u)}
-                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                         title="Deactivate Account"
                       >
                         <UserX className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {canManageRole && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setErrorMsg(null);
+                          setDeletingUser(u);
+                        }}
+                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Delete Employee"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </div>
@@ -918,11 +957,58 @@ export default function AdminUsersPage() {
             </Button>
             <Button
               variant="danger"
-              className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
               onClick={() => deactivateUserMutation.mutate()}
               isLoading={deactivateUserMutation.isPending}
             >
               Deactivate Account
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Delete Employee Confirmation */}
+      <Dialog
+        isOpen={!!deletingUser}
+        onClose={() => setDeletingUser(null)}
+        title={`Delete Employee: ${deletingUser?.name || ""}`}
+        description="Permanently remove this employee or safely archive credentials."
+      >
+        <div className="space-y-4 pt-2">
+          {errorMsg && (
+            <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+          <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-3 text-xs space-y-1.5">
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Employee Name:</span>
+              <strong className="text-slate-900">{deletingUser?.name}</strong>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Email:</span>
+              <span className="text-slate-700 font-mono">{deletingUser?.email}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Assigned Role:</span>
+              <span className="font-semibold text-slate-800">{deletingUser?.role}</span>
+            </div>
+          </div>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Are you sure you want to delete <strong className="text-slate-900">{deletingUser?.name}</strong>? Active login sessions will be immediately revoked. If this staff member has recorded payments or transactions, their account will be safely anonymized to preserve financial audit compliance.
+          </p>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={() => setDeletingUser(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+              onClick={() => deleteUserMutation.mutate()}
+              isLoading={deleteUserMutation.isPending}
+            >
+              Delete Employee
             </Button>
           </div>
         </div>

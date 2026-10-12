@@ -40,7 +40,7 @@ describe("SCULPX E-Billing — Phase 6G: Agent & Queue Recovery Audit Suite", ()
     wsGatewayUrl = `ws://127.0.0.1:${serverPort}/ws/print-agent`;
 
     // 3. User & Admin token
-    let admin = await prisma.user.findFirst({ where: { tenantId: TENANT_ID, role: "ADMIN" } });
+    let admin = await prisma.user.findFirst({ where: { tenantId: TENANT_ID, role: "ADMIN", isActive: true } });
     if (!admin) {
       admin = await prisma.user.create({
         data: {

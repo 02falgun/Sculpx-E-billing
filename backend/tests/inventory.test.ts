@@ -40,7 +40,7 @@ describe("SCULPX E-Billing — Phase 5: Inventory & Recipe BOM Consumption Suite
 
     // 1. Users setup
     adminUser = await prisma.user.findFirst({
-      where: { tenantId: TEST_TENANT_A, role: "ADMIN" },
+      where: { tenantId: TEST_TENANT_A, role: "ADMIN", isActive: true },
     });
     if (!adminUser) {
       adminUser = await prisma.user.create({
@@ -55,7 +55,7 @@ describe("SCULPX E-Billing — Phase 5: Inventory & Recipe BOM Consumption Suite
     }
 
     managerUser = await prisma.user.findFirst({
-      where: { tenantId: TEST_TENANT_A, role: "MANAGER" },
+      where: { tenantId: TEST_TENANT_A, role: "MANAGER", isActive: true },
     });
     if (!managerUser) {
       managerUser = await prisma.user.create({
@@ -70,7 +70,7 @@ describe("SCULPX E-Billing — Phase 5: Inventory & Recipe BOM Consumption Suite
     }
 
     waiterUser = await prisma.user.findFirst({
-      where: { tenantId: TEST_TENANT_A, role: "WAITER" },
+      where: { tenantId: TEST_TENANT_A, role: "WAITER", isActive: true },
     });
     if (!waiterUser) {
       waiterUser = await prisma.user.create({
@@ -85,7 +85,7 @@ describe("SCULPX E-Billing — Phase 5: Inventory & Recipe BOM Consumption Suite
     }
 
     tenantBAdminUser = await prisma.user.findFirst({
-      where: { tenantId: TEST_TENANT_B, role: "ADMIN" },
+      where: { tenantId: TEST_TENANT_B, role: "ADMIN", isActive: true },
     });
     if (!tenantBAdminUser) {
       tenantBAdminUser = await prisma.user.create({

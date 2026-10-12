@@ -62,7 +62,7 @@ describe("SCULPX E-Billing — Phase 6F: Secure Local Print Agent & Cloud Gatewa
     wsGatewayUrl = `ws://127.0.0.1:${serverPort}/ws/print-agent`;
 
     // 3. Setup test users and JWTs
-    let adminA = await prisma.user.findFirst({ where: { tenantId: TENANT_A, role: "ADMIN" } });
+    let adminA = await prisma.user.findFirst({ where: { tenantId: TENANT_A, role: "ADMIN", isActive: true } });
     if (!adminA) {
       adminA = await prisma.user.create({
         data: {
@@ -75,7 +75,7 @@ describe("SCULPX E-Billing — Phase 6F: Secure Local Print Agent & Cloud Gatewa
       });
     }
 
-    let adminB = await prisma.user.findFirst({ where: { tenantId: TENANT_B, role: "ADMIN" } });
+    let adminB = await prisma.user.findFirst({ where: { tenantId: TENANT_B, role: "ADMIN", isActive: true } });
     if (!adminB) {
       adminB = await prisma.user.create({
         data: {

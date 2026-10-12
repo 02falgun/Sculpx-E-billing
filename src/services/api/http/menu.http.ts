@@ -31,4 +31,16 @@ export class HttpMenuService implements IMenuService {
   async deleteMenuItem(id: string): Promise<ApiResponse<void>> {
     return apiClient.delete<void>(`/menu/items/${encodeURIComponent(id)}`);
   }
+
+  async createCategory(data: { name: string; description?: string; displayOrder?: number }): Promise<ApiResponse<Category>> {
+    return apiClient.post<Category>("/menu/categories", data);
+  }
+
+  async updateCategory(id: string, data: Partial<{ name: string; description?: string; displayOrder?: number; isActive?: boolean }>): Promise<ApiResponse<Category>> {
+    return apiClient.patch<Category>(`/menu/categories/${encodeURIComponent(id)}`, data);
+  }
+
+  async deleteCategory(id: string): Promise<ApiResponse<void>> {
+    return apiClient.delete<void>(`/menu/categories/${encodeURIComponent(id)}`);
+  }
 }

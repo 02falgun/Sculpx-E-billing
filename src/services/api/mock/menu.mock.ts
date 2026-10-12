@@ -159,4 +159,40 @@ export class MockMenuService implements IMenuService {
     this.items = this.items.filter((i) => i.id !== id);
     return { success: true, data: undefined, message: "Item deleted" };
   }
+
+  async createCategory(data: { name: string; description?: string; displayOrder?: number }): Promise<ApiResponse<Category>> {
+    await delay(150);
+    const newCategory: Category = {
+      id: `cat-${Date.now()}`,
+      name: data.name,
+      slug: data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      description: data.description || "",
+      displayOrder: data.displayOrder ?? (this.categories.length + 1),
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    this.categories.push(newCategory);
+    return { success: true, data: newCategory, message: "Category created" };
+  }
+
+  async updateCategory(id: string, data: Partial<{ name: string; description?: string; displayOrder?: number; isActive?: boolean }>): Promise<ApiResponse<Category>> {
+    await delay(150);
+    const index = this.categories.findIndex((c) => c.id === id);
+    if (index === -1) {
+      return { success: false, data: null as unknown as Category, error: { code: "NOT_FOUND", message: "Category not found" } };
+    }
+    this.categories[index] = {
+      ...this.categories[index],
+      ...data,
+      updatedAt: new Date().toISOString(),
+    };
+    return { success: true, data: this.categories[index], message: "Category updated" };
+  }
+
+  async deleteCategory(id: string): Promise<ApiResponse<void>> {
+    await delay(150);
+    this.categories = this.categories.filter((c) => c.id !== id);
+    return { success: true, data: undefined, message: "Category deleted" };
+  }
 }

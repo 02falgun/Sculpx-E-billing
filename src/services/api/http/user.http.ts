@@ -34,4 +34,8 @@ export class HttpUserService implements IUserService {
   async deactivateUser(id: string): Promise<ApiResponse<null>> {
     return apiClient.delete<null>(`/users/${encodeURIComponent(id)}`);
   }
+
+  async deleteUser(id: string): Promise<ApiResponse<null>> {
+    return apiClient.delete<null>(`/users/${encodeURIComponent(id)}`);
+  }
 }

@@ -86,3 +86,64 @@ export function useUpdateMenuItem() {
     },
   });
 }
+
+export function useDeleteMenuItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await menuApi.deleteMenuItem(id);
+      if (!res.success) throw new Error(res.error?.message || "Failed to delete menu item");
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["menu", "items"] });
+    },
+  });
+}
+
+export function useCreateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { name: string; description?: string; displayOrder?: number }) => {
+      if (!menuApi.createCategory) throw new Error("Category creation not supported");
+      const res = await menuApi.createCategory(data);
+      if (!res.success) throw new Error(res.error?.message || "Failed to create category");
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["menu", "categories"] });
+    },
+  });
+}
+
+export function useUpdateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<{ name: string; description?: string; displayOrder?: number; isActive?: boolean }> }) => {
+      if (!menuApi.updateCategory) throw new Error("Category update not supported");
+      const res = await menuApi.updateCategory(id, data);
+      if (!res.success) throw new Error(res.error?.message || "Failed to update category");
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["menu", "categories"] });
+      queryClient.invalidateQueries({ queryKey: ["menu", "items"] });
+    },
+  });
+}
+
+export function useDeleteCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (!menuApi.deleteCategory) throw new Error("Category deletion not supported");
+      const res = await menuApi.deleteCategory(id);
+      if (!res.success) throw new Error(res.error?.message || "Failed to delete category");
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["menu", "categories"] });
+      queryClient.invalidateQueries({ queryKey: ["menu", "items"] });
+    },
+  });
+}

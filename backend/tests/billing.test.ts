@@ -41,7 +41,7 @@ describe("SCULPX E-Billing — Phase 4: Billing, Invoices, Payments & Settlement
 
     // 1. Users setup
     cashierUser = await prisma.user.findFirst({
-      where: { tenantId: TEST_TENANT_A, role: "CASHIER" },
+      where: { tenantId: TEST_TENANT_A, role: "CASHIER", isActive: true },
     });
     if (!cashierUser) {
       cashierUser = await prisma.user.create({
@@ -56,7 +56,7 @@ describe("SCULPX E-Billing — Phase 4: Billing, Invoices, Payments & Settlement
     }
 
     managerUser = await prisma.user.findFirst({
-      where: { tenantId: TEST_TENANT_A, role: "MANAGER" },
+      where: { tenantId: TEST_TENANT_A, role: "MANAGER", isActive: true },
     });
     if (!managerUser) {
       managerUser = await prisma.user.create({
@@ -71,7 +71,7 @@ describe("SCULPX E-Billing — Phase 4: Billing, Invoices, Payments & Settlement
     }
 
     waiterUser = await prisma.user.findFirst({
-      where: { tenantId: TEST_TENANT_A, role: "WAITER" },
+      where: { tenantId: TEST_TENANT_A, role: "WAITER", isActive: true },
     });
     if (!waiterUser) {
       waiterUser = await prisma.user.create({
@@ -86,7 +86,7 @@ describe("SCULPX E-Billing — Phase 4: Billing, Invoices, Payments & Settlement
     }
 
     kitchenUser = await prisma.user.findFirst({
-      where: { tenantId: TEST_TENANT_A, role: "KITCHEN_STAFF" },
+      where: { tenantId: TEST_TENANT_A, role: "KITCHEN_STAFF", isActive: true },
     });
     if (!kitchenUser) {
       kitchenUser = await prisma.user.create({
@@ -101,7 +101,7 @@ describe("SCULPX E-Billing — Phase 4: Billing, Invoices, Payments & Settlement
     }
 
     tenantBUser = await prisma.user.findFirst({
-      where: { tenantId: TEST_TENANT_B, role: "CASHIER" },
+      where: { tenantId: TEST_TENANT_B, role: "CASHIER", isActive: true },
     });
     if (!tenantBUser) {
       tenantBUser = await prisma.user.create({

@@ -3,10 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { useTables, useRooms } from "@/hooks/useTables";
+import { useTables, useRooms, useRotateTableQr, useRotateRoomQr } from "@/hooks/useTables";
 import { useUIStore } from "@/store";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
+import { EmptyState } from "@/components/ui/EmptyState";
 import {
   QrCode,
   Printer,
@@ -18,40 +19,39 @@ import {
   BedDouble,
   Search,
   RefreshCw,
-  Sparkles,
-  Layers,
-  Power,
+  AlertCircle,
+  Plus,
 } from "lucide-react";
-
 import { ENV } from "@/config";
-
-interface QRItem {
-  id: string;
-  type: "TABLE" | "ROOM";
-  identifier: string; // e.g. "T01" or "301"
-  displayName: string;
-  subtext: string;
-  routeUrl: string;
-  isActive: boolean;
-}
+import { Table, Room } from "@/types";
 
 export function QRCodeGeneratorManager() {
-  const { data: tables = [] } = useTables();
-  const { data: rooms = [] } = useRooms();
+  const {
+    data: tables = [],
+    isLoading: isLoadingTables,
+    isError: isErrorTables,
+    refetch: refetchTables,
+  } = useTables();
+
+  const {
+    data: rooms = [],
+    isLoading: isLoadingRooms,
+    isError: isErrorRooms,
+    refetch: refetchRooms,
+  } = useRooms();
+
+  const rotateTableQrMutation = useRotateTableQr();
+  const rotateRoomQrMutation = useRotateRoomQr();
   const addToast = useUIStore((s) => s.addToast);
 
   const [mode, setMode] = React.useState<"TABLE" | "ROOM">("TABLE");
-  const [selectedIdentifier, setSelectedIdentifier] = React.useState<string>("T05");
+  const [selectedEntityId, setSelectedEntityId] = React.useState<string>("");
   const [qrDataUrl, setQrDataUrl] = React.useState<string>("");
   const [copied, setCopied] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterType, setFilterType] = React.useState<"ALL" | "TABLE" | "ROOM">("ALL");
-  const [isBulkPrintOpen, setIsBulkPrintOpen] = React.useState(false);
 
-  // Active status local tracking
-  const [statusMap, setStatusMap] = React.useState<Record<string, boolean>>({});
-
-  // Base URL for QR Links configured via environment
+  // Base URL for QR links from runtime config or window location
   const baseUrl = React.useMemo(() => {
     if (ENV.APP_URL) return ENV.APP_URL.replace(/\/$/, "");
     if (typeof window !== "undefined") {
@@ -60,38 +60,85 @@ export function QRCodeGeneratorManager() {
     return "http://localhost:3000";
   }, []);
 
-  // Compute active item
-  const selectedItem = React.useMemo(() => {
+  // Synchronize selection when mode or records change
+  React.useEffect(() => {
     if (mode === "TABLE") {
-      const match = tables.find(
-        (t) => `T${t.tableNumber.padStart(2, "0")}` === selectedIdentifier || t.tableNumber === selectedIdentifier
-      );
-      const rawNum = selectedIdentifier.replace(/^T/i, "") || "05";
-      const num = rawNum.padStart(2, "0");
+      if (tables.length > 0) {
+        // If current selection is still in tables, keep it, otherwise select first table
+        const stillExists = tables.some((t) => t.id === selectedEntityId);
+        if (!stillExists) {
+          setSelectedEntityId(tables[0].id);
+        }
+      } else {
+        setSelectedEntityId("");
+      }
+    } else {
+      if (rooms.length > 0) {
+        const stillExists = rooms.some((r) => r.id === selectedEntityId);
+        if (!stillExists) {
+          setSelectedEntityId(rooms[0].id);
+        }
+      } else {
+        setSelectedEntityId("");
+      }
+    }
+  }, [mode, tables, rooms, selectedEntityId]);
+
+  // Find currently selected record
+  const selectedTable: Table | undefined = React.useMemo(() => {
+    if (mode !== "TABLE") return undefined;
+    return tables.find((t) => t.id === selectedEntityId) || tables[0];
+  }, [mode, tables, selectedEntityId]);
+
+  const selectedRoom: Room | undefined = React.useMemo(() => {
+    if (mode !== "ROOM") return undefined;
+    return rooms.find((r) => r.id === selectedEntityId) || rooms[0];
+  }, [mode, rooms, selectedEntityId]);
+
+  // Compute active preview data from real persisted record
+  const selectedPreview = React.useMemo(() => {
+    if (mode === "TABLE" && selectedTable) {
+      const token = selectedTable.qrToken || "";
+      const queryParam = token ? `?token=${encodeURIComponent(token)}` : "";
+      const relativeUrl = `/menu/table/${encodeURIComponent(selectedTable.tableNumber)}${queryParam}`;
+      const fullUrl = `${baseUrl}${relativeUrl}`;
       return {
         type: "TABLE" as const,
-        identifier: `T${num}`,
-        displayName: `Table ${num}`,
-        subtext: match?.section || "Main Dining Pavilion",
-        relativeUrl: `/menu/table/T${num}`,
-        fullUrl: `${baseUrl}/menu/table/T${num}`,
+        id: selectedTable.id,
+        identifier: selectedTable.tableNumber,
+        displayName: selectedTable.displayName || `Table ${selectedTable.tableNumber}`,
+        subtext: `${selectedTable.section} • Cap: ${selectedTable.capacity} Guests`,
+        qrToken: token,
+        status: selectedTable.status,
+        relativeUrl,
+        fullUrl,
       };
-    } else {
-      const match = rooms.find((r) => r.roomNumber === selectedIdentifier);
-      const num = selectedIdentifier.replace(/^R/i, "") || "301";
+    } else if (mode === "ROOM" && selectedRoom) {
+      const token = selectedRoom.qrToken || "";
+      const queryParam = token ? `?token=${encodeURIComponent(token)}` : "";
+      const relativeUrl = `/menu/room/${encodeURIComponent(selectedRoom.roomNumber)}${queryParam}`;
+      const fullUrl = `${baseUrl}${relativeUrl}`;
       return {
         type: "ROOM" as const,
-        identifier: num,
-        displayName: `Room ${num}`,
-        subtext: match?.floor || `${num.charAt(0)}th Floor Suite`,
-        relativeUrl: `/menu/room/${num}`,
-        fullUrl: `${baseUrl}/menu/room/${num}`,
+        id: selectedRoom.id,
+        identifier: selectedRoom.roomNumber,
+        displayName: `Room ${selectedRoom.roomNumber}`,
+        subtext: `${selectedRoom.floor} • ${selectedRoom.roomType || "Guestroom"}`,
+        qrToken: token,
+        status: selectedRoom.status,
+        relativeUrl,
+        fullUrl,
       };
     }
-  }, [mode, selectedIdentifier, tables, rooms, baseUrl]);
+    return null;
+  }, [mode, selectedTable, selectedRoom, baseUrl]);
 
-  // Generate real scannable QR Code using qrcode library
+  // Generate real QR code image
   const generateQRCode = React.useCallback(async (url: string) => {
+    if (!url) {
+      setQrDataUrl("");
+      return;
+    }
     try {
       const dataUrl = await QRCode.toDataURL(url, {
         width: 600,
@@ -109,25 +156,30 @@ export function QRCodeGeneratorManager() {
   }, []);
 
   React.useEffect(() => {
-    generateQRCode(selectedItem.fullUrl);
-  }, [selectedItem.fullUrl, generateQRCode]);
+    if (selectedPreview?.fullUrl) {
+      generateQRCode(selectedPreview.fullUrl);
+    } else {
+      setQrDataUrl("");
+    }
+  }, [selectedPreview?.fullUrl, generateQRCode]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(selectedItem.fullUrl);
+    if (!selectedPreview) return;
+    navigator.clipboard.writeText(selectedPreview.fullUrl);
     setCopied(true);
     addToast({
       type: "success",
       title: "QR URL Copied",
-      message: `Direct link for ${selectedItem.displayName} copied to clipboard.`,
+      message: `Direct link for ${selectedPreview.displayName} copied to clipboard.`,
     });
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownload = () => {
-    if (!qrDataUrl) return;
+    if (!qrDataUrl || !selectedPreview) return;
     const a = document.createElement("a");
     a.href = qrDataUrl;
-    a.download = `sculpx-qr-${selectedItem.type.toLowerCase()}-${selectedItem.identifier.toLowerCase()}.png`;
+    a.download = `sculpx-qr-${selectedPreview.type.toLowerCase()}-${selectedPreview.identifier}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -135,7 +187,7 @@ export function QRCodeGeneratorManager() {
     addToast({
       type: "success",
       title: "PNG Downloaded",
-      message: `High-resolution QR saved for ${selectedItem.displayName}.`,
+      message: `High-resolution QR saved for ${selectedPreview.displayName}.`,
     });
   };
 
@@ -143,60 +195,89 @@ export function QRCodeGeneratorManager() {
     window.print();
   };
 
-  const toggleActiveStatus = (key: string) => {
-    setStatusMap((prev) => ({
-      ...prev,
-      [key]: prev[key] === undefined ? false : !prev[key],
-    }));
+  const handleRotateCurrentQr = async () => {
+    if (!selectedPreview) return;
+    try {
+      if (selectedPreview.type === "TABLE") {
+        await rotateTableQrMutation.mutateAsync(selectedPreview.id);
+      } else {
+        await rotateRoomQrMutation.mutateAsync(selectedPreview.id);
+      }
+      addToast({
+        type: "success",
+        title: "QR Token Rotated",
+        message: `A new secure QR token has been generated and persisted for ${selectedPreview.displayName}. Old token invalidated.`,
+      });
+    } catch (err: any) {
+      alert(err?.message || "Failed to rotate QR token");
+    }
   };
 
-  // Fleet list
-  const fleetList: QRItem[] = React.useMemo(() => {
-    const list: QRItem[] = [];
+  // Fleet list composed exclusively from real persisted records
+  const fleetList = React.useMemo(() => {
+    const list: Array<{
+      id: string;
+      rawId: string;
+      type: "TABLE" | "ROOM";
+      identifier: string;
+      displayName: string;
+      subtext: string;
+      qrToken: string;
+      routeUrl: string;
+      status: string;
+      isActive: boolean;
+    }> = [];
 
-    // Tables T01 - T08
-    const tableNumbers = ["01", "02", "03", "04", "05", "06", "07", "08"];
-    tableNumbers.forEach((num) => {
+    tables.forEach((t) => {
+      const queryParam = t.qrToken ? `?token=${encodeURIComponent(t.qrToken)}` : "";
       list.push({
-        id: `tbl-T${num}`,
+        id: `tbl-${t.id}`,
+        rawId: t.id,
         type: "TABLE",
-        identifier: `T${num}`,
-        displayName: `Table ${num}`,
-        subtext: "Dine-In Restaurant",
-        routeUrl: `/menu/table/T${num}`,
-        isActive: statusMap[`tbl-T${num}`] !== false,
+        identifier: t.tableNumber,
+        displayName: t.displayName || `Table ${t.tableNumber}`,
+        subtext: `${t.section} • Cap: ${t.capacity}`,
+        qrToken: t.qrToken || "",
+        routeUrl: `/menu/table/${encodeURIComponent(t.tableNumber)}${queryParam}`,
+        status: t.status,
+        isActive: t.isActive !== false,
       });
     });
 
-    // Rooms 301 - 305
-    const roomNumbers = ["301", "302", "303", "304", "305"];
-    roomNumbers.forEach((num) => {
+    rooms.forEach((r) => {
+      const queryParam = r.qrToken ? `?token=${encodeURIComponent(r.qrToken)}` : "";
       list.push({
-        id: `room-${num}`,
+        id: `room-${r.id}`,
+        rawId: r.id,
         type: "ROOM",
-        identifier: num,
-        displayName: `Room ${num}`,
-        subtext: `${num.charAt(0)}th Floor Suite`,
-        routeUrl: `/menu/room/${num}`,
-        isActive: statusMap[`room-${num}`] !== false,
+        identifier: r.roomNumber,
+        displayName: `Room ${r.roomNumber}`,
+        subtext: `${r.floor} • ${r.roomType || "Suite"}`,
+        qrToken: r.qrToken || "",
+        routeUrl: `/menu/room/${encodeURIComponent(r.roomNumber)}${queryParam}`,
+        status: r.status,
+        isActive: r.isActive !== false,
       });
     });
 
     return list;
-  }, [statusMap]);
+  }, [tables, rooms]);
 
   const filteredFleet = React.useMemo(() => {
     return fleetList.filter((item) => {
       if (filterType !== "ALL" && item.type !== filterType) return false;
       if (!searchQuery) return true;
-      const q = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase().trim();
       return (
         item.displayName.toLowerCase().includes(q) ||
         item.identifier.toLowerCase().includes(q) ||
-        item.routeUrl.toLowerCase().includes(q)
+        item.subtext.toLowerCase().includes(q) ||
+        item.qrToken.toLowerCase().includes(q)
       );
     });
   }, [fleetList, filterType, searchQuery]);
+
+  const isRotating = rotateTableQrMutation.isPending || rotateRoomQrMutation.isPending;
 
   return (
     <div className="space-y-8 font-sans">
@@ -205,10 +286,10 @@ export function QRCodeGeneratorManager() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h2 className="text-base font-bold text-neutral-900 tracking-tight">
-              Create &amp; Preview Location QR
+              Dynamic Tent Card & QR Studio
             </h2>
             <p className="text-xs text-neutral-500 mt-0.5">
-              Generate scannable tokens that resolve directly to the guest ordering flow.
+              Select any active restaurant table or guestroom to view and print its real, persisted QR code.
             </p>
           </div>
 
@@ -216,10 +297,7 @@ export function QRCodeGeneratorManager() {
           <div className="flex items-center gap-1 p-1 bg-neutral-100 rounded-lg">
             <button
               type="button"
-              onClick={() => {
-                setMode("TABLE");
-                setSelectedIdentifier("T05");
-              }}
+              onClick={() => setMode("TABLE")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 mode === "TABLE"
                   ? "bg-black text-white shadow-xs"
@@ -227,15 +305,12 @@ export function QRCodeGeneratorManager() {
               }`}
             >
               <UtensilsCrossed className="h-3.5 w-3.5" />
-              <span>Table QR</span>
+              <span>Table QR ({tables.length})</span>
             </button>
 
             <button
               type="button"
-              onClick={() => {
-                setMode("ROOM");
-                setSelectedIdentifier("301");
-              }}
+              onClick={() => setMode("ROOM")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 mode === "ROOM"
                   ? "bg-black text-white shadow-xs"
@@ -243,238 +318,307 @@ export function QRCodeGeneratorManager() {
               }`}
             >
               <BedDouble className="h-3.5 w-3.5" />
-              <span>Room QR</span>
+              <span>Room QR ({rooms.length})</span>
             </button>
           </div>
         </div>
 
-        {/* Quick Parameters Selector Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-          <div className="md:col-span-4">
-            <label className="block text-xs font-medium text-neutral-700 mb-1.5">
-              Select {mode === "TABLE" ? "Table Number" : "Guestroom Number"}
-            </label>
-            <select
-              value={selectedIdentifier}
-              onChange={(e) => setSelectedIdentifier(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-900 focus:border-black focus:outline-none"
-            >
-              {mode === "TABLE" ? (
-                <>
-                  <option value="T01">Table 01 (Indoor Garden)</option>
-                  <option value="T02">Table 02 (Indoor Garden)</option>
-                  <option value="T03">Table 03 (Pavilion Center)</option>
-                  <option value="T04">Table 04 (Pavilion Center)</option>
-                  <option value="T05">Table 05 (Royal Verandah)</option>
-                  <option value="T06">Table 06 (Royal Verandah)</option>
-                  <option value="T07">Table 07 (Terrace View)</option>
-                  <option value="T08">Table 08 (Terrace View)</option>
-                </>
-              ) : (
-                <>
-                  <option value="301">Room 301 (3rd Floor Palace Suite)</option>
-                  <option value="302">Room 302 (3rd Floor Executive)</option>
-                  <option value="303">Room 303 (3rd Floor Deluxe)</option>
-                  <option value="304">Room 304 (3rd Floor Deluxe)</option>
-                  <option value="305">Room 305 (3rd Floor Penthouse)</option>
-                </>
-              )}
-            </select>
-          </div>
-
-          <div className="md:col-span-5">
-            <label className="block text-xs font-medium text-neutral-700 mb-1.5">
-              Destination URL (Live Route)
-            </label>
-            <div className="flex items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-mono text-neutral-800">
-              <span className="truncate flex-1">{selectedItem.fullUrl}</span>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="text-neutral-500 hover:text-black cursor-pointer"
-                title="Copy URL"
-              >
-                {copied ? <Check className="h-4 w-4 text-neutral-900" /> : <Copy className="h-4 w-4" />}
-              </button>
+        {/* Error States with Retry */}
+        {mode === "TABLE" && isErrorTables && (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+              <span>Failed to load restaurant tables from backend.</span>
             </div>
-          </div>
-
-          <div className="md:col-span-3 flex items-end gap-2 pt-2 md:pt-0">
-            <Button
-              type="button"
-              variant="primary"
-              size="md"
-              onClick={() => generateQRCode(selectedItem.fullUrl)}
-              className="flex-1 font-semibold"
-              leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
-            >
-              Regenerate
+            <Button size="sm" variant="outline" onClick={() => refetchTables()}>
+              Retry
             </Button>
-
-            <Link href={selectedItem.relativeUrl} target="_blank">
-              <Button
-                type="button"
-                variant="outline"
-                size="md"
-                className="font-medium"
-                leftIcon={<ExternalLink className="h-3.5 w-3.5" />}
-              >
-                Preview
-              </Button>
-            </Link>
           </div>
-        </div>
-      </div>
-      {/* 2. PRINTABLE TENT CARD DISPLAY (Hotel Ready) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Printable Preview Container */}
-        <div className="lg:col-span-7 bg-neutral-100 rounded-xl p-6 flex flex-col items-center justify-center print:bg-white print:p-0">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-3 print:hidden">
-            Printable Tent Card Specification
+        )}
+
+        {mode === "ROOM" && isErrorRooms && (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+              <span>Failed to load guestrooms from backend.</span>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => refetchRooms()}>
+              Retry
+            </Button>
           </div>
+        )}
 
-          {/* Actual Tent Card to Print */}
-          <div
-            id="printable-tent-card"
-            className="w-full max-w-sm rounded-xl border border-neutral-300 bg-white p-8 text-center space-y-6 print:border print:border-black print:m-0 print:max-w-none print:w-full"
-          >
-            {/* Branding Header */}
-            <div>
-              <h2 className="text-xl font-bold text-neutral-900 tracking-wider uppercase">
-                SCULPX
-              </h2>
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500 block mt-1">
-                {mode === "TABLE" ? "SCAN TO ORDER" : "IN-ROOM DINING"}
-              </span>
-            </div>
-
-            {/* High-Resolution Scannable QR Code */}
-            <div className="mx-auto w-52 h-52 rounded-lg border border-neutral-200 bg-white p-3 flex flex-col items-center justify-center">
-              {qrDataUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={qrDataUrl}
-                  alt={`QR code for ${selectedItem.displayName}`}
-                  className="h-44 w-44 object-contain"
-                />
-              ) : (
-                <div className="h-44 w-44 flex items-center justify-center text-neutral-400">
-                  <QrCode className="h-16 w-16" />
-                </div>
-              )}
-            </div>
-
-            {/* Context Badge */}
-            <div className="rounded-lg bg-black py-2.5 px-4 text-white">
-              <span className="text-[10px] font-medium tracking-widest uppercase text-neutral-400 block">
-                {mode === "TABLE" ? "Dine-In Location" : "Suite Room"}
-              </span>
-              <span className="text-xl font-bold tracking-tight block mt-0.5">
-                {selectedItem.displayName}
-              </span>
-            </div>
-
-            {/* Instructional Footer */}
-            <div className="text-xs text-neutral-600 space-y-1 pt-1">
-              <p className="font-medium text-neutral-900">
-                {mode === "TABLE"
-                  ? "Scan with your phone to browse our menu and order."
-                  : "Scan to order from our restaurant directly to your room."}
-              </p>
-              <p className="text-[10px] text-neutral-400 font-mono">
-                No app download required • Instant order tracking
-              </p>
-            </div>
+        {/* Loading Indicator */}
+        {((mode === "TABLE" && isLoadingTables) || (mode === "ROOM" && isLoadingRooms)) && (
+          <div className="flex items-center justify-center py-8 gap-2 text-xs text-neutral-500 font-medium">
+            <Spinner size="sm" className="text-neutral-900" />
+            <span>Loading {mode === "TABLE" ? "restaurant tables" : "hotel rooms"}...</span>
           </div>
-        </div>
+        )}
 
-        {/* Action Panel for Active QR */}
-        <div className="lg:col-span-5 space-y-4 print:hidden">
-          <div className="bg-white rounded-xl border border-neutral-200 p-6 space-y-5">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-700 bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200">
-                  {selectedItem.type} QR ACTIVE
-                </span>
-                <span className="text-xs font-mono font-medium text-neutral-600">
-                  Ready to scan
-                </span>
-              </div>
-              <h3 className="text-lg font-bold text-neutral-900 tracking-tight mt-2">
-                {selectedItem.displayName}
-              </h3>
-              <p className="text-xs text-neutral-500">{selectedItem.subtext}</p>
-            </div>
-
-            <div className="p-3 rounded-lg bg-neutral-50 border border-neutral-200 text-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Destination:</span>
-                <span className="font-mono font-semibold text-neutral-800">{selectedItem.relativeUrl}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Correction:</span>
-                <span className="font-medium text-neutral-800">High (Level H)</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Format:</span>
-                <span className="font-medium text-neutral-800">PNG / Vector</span>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="space-y-2 pt-1">
-              <Button
-                variant="primary"
-                size="md"
-                onClick={handlePrint}
-                className="w-full font-semibold"
-                leftIcon={<Printer className="h-4 w-4" />}
-              >
-                Print Tent Card
-              </Button>
-
-              <Button
-                variant="outline"
-                size="md"
-                onClick={handleDownload}
-                className="w-full font-medium"
-                leftIcon={<Download className="h-4 w-4" />}
-              >
-                Download PNG
-              </Button>
-
-              <Button
-                variant="outline"
-                size="md"
-                onClick={handleCopy}
-                className="w-full font-medium"
-                leftIcon={copied ? <Check className="h-4 w-4 text-neutral-900" /> : <Copy className="h-4 w-4" />}
-              >
-                {copied ? "Link Copied!" : "Copy Customer URL"}
-              </Button>
-
-              <Link href={selectedItem.relativeUrl} target="_blank" className="block">
-                <Button
-                  variant="outline"
-                  size="md"
-                  className="w-full font-medium"
-                  leftIcon={<ExternalLink className="h-4 w-4" />}
-                >
-                  Open Live Customer Menu
+        {/* Empty States */}
+        {mode === "TABLE" && !isLoadingTables && !isErrorTables && tables.length === 0 && (
+          <div className="p-8 text-center bg-neutral-50 rounded-xl border border-dashed border-neutral-300">
+            <UtensilsCrossed className="h-8 w-8 text-neutral-400 mx-auto mb-2" />
+            <h4 className="text-sm font-bold text-neutral-900">No restaurant tables configured yet</h4>
+            <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
+              Add your dining room tables in Table Management to generate real, scannable guest QR codes.
+            </p>
+            <div className="pt-4">
+              <Link href="/admin/tables">
+                <Button size="sm" variant="primary" leftIcon={<Plus className="h-4 w-4" />}>
+                  Go to Table Management
                 </Button>
               </Link>
             </div>
           </div>
-        </div>
+        )}
+
+        {mode === "ROOM" && !isLoadingRooms && !isErrorRooms && rooms.length === 0 && (
+          <div className="p-8 text-center bg-neutral-50 rounded-xl border border-dashed border-neutral-300">
+            <BedDouble className="h-8 w-8 text-neutral-400 mx-auto mb-2" />
+            <h4 className="text-sm font-bold text-neutral-900">No hotel rooms configured yet</h4>
+            <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
+              Add guestrooms in Room Management to generate in-room dining tent cards.
+            </p>
+            <div className="pt-4">
+              <Link href="/admin/rooms">
+                <Button size="sm" variant="primary" leftIcon={<Plus className="h-4 w-4" />}>
+                  Go to Room Management
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Dynamic Selector Bar for real records */}
+        {selectedPreview && (
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center pt-2">
+            <div className="md:col-span-4">
+              <label className="block text-xs font-medium text-neutral-700 mb-1.5">
+                Select {mode === "TABLE" ? "Dining Table" : "Guestroom"}
+              </label>
+              <select
+                value={selectedEntityId}
+                onChange={(e) => setSelectedEntityId(e.target.value)}
+                className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-900 focus:border-black focus:outline-none"
+              >
+                {mode === "TABLE"
+                  ? tables.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        Table {t.tableNumber} — {t.displayName || t.section} ({t.section})
+                      </option>
+                    ))
+                  : rooms.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Room {r.roomNumber} — {r.floor} ({r.roomType || "Standard"})
+                      </option>
+                    ))}
+              </select>
+            </div>
+
+            <div className="md:col-span-5">
+              <label className="block text-xs font-medium text-neutral-700 mb-1.5">
+                Destination URL (Persisted Token Context)
+              </label>
+              <div className="flex items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-mono text-neutral-800">
+                <span className="truncate flex-1">{selectedPreview.fullUrl}</span>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="text-neutral-500 hover:text-black cursor-pointer"
+                  title="Copy URL"
+                >
+                  {copied ? <Check className="h-4 w-4 text-neutral-900" /> : <Copy className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="md:col-span-3 flex items-end gap-2 pt-2 md:pt-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={handleRotateCurrentQr}
+                disabled={isRotating}
+                className="flex-1 font-semibold border-neutral-300"
+                leftIcon={<RefreshCw className={`h-3.5 w-3.5 ${isRotating ? "animate-spin" : ""}`} />}
+              >
+                Rotate Token
+              </Button>
+
+              <Link href={selectedPreview.relativeUrl} target="_blank">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="md"
+                  className="font-medium"
+                  leftIcon={<ExternalLink className="h-3.5 w-3.5" />}
+                >
+                  Preview
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* 3. QR FLEET DIRECTORY TABLE */}
+      {/* 2. PRINTABLE TENT CARD DISPLAY */}
+      {selectedPreview && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Printable Preview Container */}
+          <div className="lg:col-span-7 bg-neutral-100 rounded-xl p-6 flex flex-col items-center justify-center print:bg-white print:p-0">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-3 print:hidden">
+              Printable Tent Card Specification
+            </div>
+
+            {/* Actual Tent Card to Print */}
+            <div
+              id="printable-tent-card"
+              className="w-full max-w-sm rounded-xl border border-neutral-300 bg-white p-8 text-center space-y-6 print:border print:border-black print:m-0 print:max-w-none print:w-full"
+            >
+              {/* Branding Header */}
+              <div>
+                <h2 className="text-xl font-bold text-neutral-900 tracking-wider uppercase">
+                  SCULPX
+                </h2>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500 block mt-1">
+                  {selectedPreview.type === "TABLE" ? "SCAN TO ORDER" : "IN-ROOM DINING"}
+                </span>
+              </div>
+
+              {/* High-Resolution Scannable QR Code */}
+              <div className="mx-auto w-52 h-52 rounded-lg border border-neutral-200 bg-white p-3 flex flex-col items-center justify-center">
+                {qrDataUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={qrDataUrl}
+                    alt={`QR code for ${selectedPreview.displayName}`}
+                    className="h-44 w-44 object-contain"
+                  />
+                ) : (
+                  <div className="h-44 w-44 flex items-center justify-center text-neutral-400">
+                    <QrCode className="h-16 w-16" />
+                  </div>
+                )}
+              </div>
+
+              {/* Context Badge */}
+              <div className="rounded-lg bg-black py-2.5 px-4 text-white">
+                <span className="text-[10px] font-medium tracking-widest uppercase text-neutral-400 block">
+                  {selectedPreview.type === "TABLE" ? "Dine-In Location" : "Suite Room"}
+                </span>
+                <span className="text-xl font-bold tracking-tight block mt-0.5">
+                  {selectedPreview.displayName}
+                </span>
+              </div>
+
+              {/* Instructional Footer */}
+              <div className="text-xs text-neutral-600 space-y-1 pt-1">
+                <p className="font-medium text-neutral-900">
+                  {selectedPreview.type === "TABLE"
+                    ? "Scan with your phone to browse our menu and order."
+                    : "Scan to order from our restaurant directly to your room."}
+                </p>
+                <p className="text-[10px] text-neutral-400 font-mono">
+                  No app download required • Instant order tracking
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Panel for Active QR */}
+          <div className="lg:col-span-5 space-y-4 print:hidden">
+            <div className="bg-white rounded-xl border border-neutral-200 p-6 space-y-5">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-700 bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200">
+                    {selectedPreview.type} QR ACTIVE
+                  </span>
+                  <span className="text-xs font-mono font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                    Persisted Token
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-neutral-900 tracking-tight mt-2">
+                  {selectedPreview.displayName}
+                </h3>
+                <p className="text-xs text-neutral-500">{selectedPreview.subtext}</p>
+              </div>
+
+              <div className="p-3 rounded-lg bg-neutral-50 border border-neutral-200 text-xs space-y-2">
+                <div>
+                  <span className="text-neutral-500 block text-[10px] uppercase font-bold">Secure Token:</span>
+                  <span className="font-mono text-[11px] font-semibold text-neutral-800 break-all select-all">
+                    {selectedPreview.qrToken || "No token assigned"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-neutral-500 block text-[10px] uppercase font-bold">Customer Route:</span>
+                  <span className="font-mono text-[11px] text-neutral-700 break-all select-all">
+                    {selectedPreview.relativeUrl}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-neutral-200 text-[11px]">
+                  <span className="text-neutral-500">Error Correction:</span>
+                  <span className="font-medium text-neutral-800">High (Level H)</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-1">
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={handlePrint}
+                  className="w-full font-semibold"
+                  leftIcon={<Printer className="h-4 w-4" />}
+                >
+                  Print Tent Card
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={handleDownload}
+                  className="w-full font-medium"
+                  leftIcon={<Download className="h-4 w-4" />}
+                >
+                  Download PNG
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={handleCopy}
+                  className="w-full font-medium"
+                  leftIcon={copied ? <Check className="h-4 w-4 text-neutral-900" /> : <Copy className="h-4 w-4" />}
+                >
+                  {copied ? "Link Copied!" : "Copy Customer URL"}
+                </Button>
+
+                <Link href={selectedPreview.relativeUrl} target="_blank" className="block">
+                  <Button
+                    variant="outline"
+                    size="md"
+                    className="w-full font-medium"
+                    leftIcon={<ExternalLink className="h-4 w-4" />}
+                  >
+                    Open Live Customer Menu
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. REAL QR FLEET DIRECTORY TABLE */}
       <div className="rounded-xl border border-neutral-200 bg-white p-6 print:hidden space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-neutral-200">
           <div>
-            <h3 className="text-sm font-bold text-neutral-900">QR Code Fleet Directory</h3>
+            <h3 className="text-sm font-bold text-neutral-900">Property QR Code Fleet Directory</h3>
             <p className="text-xs text-neutral-500">
-              Active and standby QR codes deployed across dining tables and guestrooms.
+              Persisted QR codes synchronized with Operations Tables &amp; Rooms.
             </p>
           </div>
 
@@ -508,7 +652,7 @@ export function QRCodeGeneratorManager() {
                   filterType === "TABLE" ? "bg-white text-black shadow-xs font-semibold" : "text-neutral-600"
                 }`}
               >
-                Tables (8)
+                Tables ({tables.length})
               </button>
               <button
                 type="button"
@@ -517,81 +661,118 @@ export function QRCodeGeneratorManager() {
                   filterType === "ROOM" ? "bg-white text-black shadow-xs font-semibold" : "text-neutral-600"
                 }`}
               >
-                Rooms (5)
+                Rooms ({rooms.length})
               </button>
             </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-neutral-200 text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">
-                <th className="pb-2.5">Type</th>
-                <th className="pb-2.5">Entity Name</th>
-                <th className="pb-2.5">Customer Route</th>
-                <th className="pb-2.5">Status</th>
-                <th className="pb-2.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100 text-neutral-700">
-              {filteredFleet.map((item) => (
-                <tr key={item.id} className="hover:bg-neutral-50 transition-colors">
-                  <td className="py-2.5">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 text-neutral-800 border border-neutral-200">
-                      {item.type === "TABLE" ? <UtensilsCrossed className="h-3 w-3" /> : <BedDouble className="h-3 w-3" />}
-                      {item.type}
-                    </span>
-                  </td>
-                  <td className="py-2.5 font-semibold text-neutral-900">
-                    <div>{item.displayName}</div>
-                    <span className="text-[10px] text-neutral-400 font-normal">{item.subtext}</span>
-                  </td>
-                  <td className="py-2.5 font-mono text-neutral-700">
-                    <Link href={item.routeUrl} target="_blank" className="hover:underline">
-                      {item.routeUrl}
-                    </Link>
-                  </td>
-                  <td className="py-2.5">
-                    <button
-                      type="button"
-                      onClick={() => toggleActiveStatus(item.id)}
-                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium cursor-pointer border ${
-                        item.isActive
-                          ? "bg-neutral-900 text-white border-neutral-900"
-                          : "bg-neutral-100 text-neutral-500 border-neutral-200"
-                      }`}
-                    >
-                      <span className={`h-1.5 w-1.5 rounded-full ${item.isActive ? "bg-white" : "bg-neutral-400"}`} />
-                      <span>{item.isActive ? "Active" : "Inactive"}</span>
-                    </button>
-                  </td>
-                  <td className="py-2.5 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMode(item.type);
-                          setSelectedIdentifier(item.identifier);
-                          window.scrollTo({ top: 0, behavior: "smooth" });
-                        }}
-                        className="px-2.5 py-1 rounded border border-neutral-300 hover:bg-neutral-100 text-neutral-700 font-medium text-[11px] cursor-pointer"
-                      >
-                        Inspect
-                      </button>
-
-                      <Link href={item.routeUrl} target="_blank">
-                        <Button size="sm" variant="outline" className="text-xs px-2" title="Open Customer Menu">
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </td>
+        {fleetList.length === 0 ? (
+          <div className="py-8 text-center text-xs text-neutral-400 font-medium">
+            No restaurant tables or guestrooms exist in your hotel database yet.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-neutral-200 text-neutral-500 font-semibold uppercase tracking-wider text-[10px]">
+                  <th className="pb-2.5">Type</th>
+                  <th className="pb-2.5">Entity Name</th>
+                  <th className="pb-2.5">Customer Route</th>
+                  <th className="pb-2.5">Token Context</th>
+                  <th className="pb-2.5">Status</th>
+                  <th className="pb-2.5 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-neutral-100 text-neutral-700">
+                {filteredFleet.map((item) => (
+                  <tr key={item.id} className="hover:bg-neutral-50 transition-colors">
+                    <td className="py-2.5">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 text-neutral-800 border border-neutral-200">
+                        {item.type === "TABLE" ? <UtensilsCrossed className="h-3 w-3" /> : <BedDouble className="h-3 w-3" />}
+                        {item.type}
+                      </span>
+                    </td>
+
+                    <td className="py-2.5 font-semibold text-neutral-900">
+                      <div>{item.displayName}</div>
+                      <span className="text-[10px] text-neutral-400 font-normal">{item.subtext}</span>
+                    </td>
+
+                    <td className="py-2.5 font-mono text-neutral-700">
+                      <Link href={item.routeUrl} target="_blank" className="hover:underline">
+                        {item.routeUrl}
+                      </Link>
+                    </td>
+
+                    <td className="py-2.5 font-mono text-[11px] text-neutral-500 max-w-xs truncate">
+                      {item.qrToken || "No token"}
+                    </td>
+
+                    <td className="py-2.5">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          item.status === "AVAILABLE" || item.status === "VACANT"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-neutral-100 text-neutral-700"
+                        }`}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+
+                    <td className="py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMode(item.type);
+                            setSelectedEntityId(item.rawId);
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                          className="px-2.5 py-1 rounded border border-neutral-300 hover:bg-neutral-100 text-neutral-700 font-medium text-[11px] cursor-pointer"
+                        >
+                          Select &amp; Preview
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              if (item.type === "TABLE") {
+                                await rotateTableQrMutation.mutateAsync(item.rawId);
+                              } else {
+                                await rotateRoomQrMutation.mutateAsync(item.rawId);
+                              }
+                              addToast({
+                                type: "success",
+                                title: "Token Rotated",
+                                message: `Rotated QR token for ${item.displayName}.`,
+                              });
+                            } catch (err: any) {
+                              alert(err?.message || "Failed to rotate token");
+                            }
+                          }}
+                          disabled={isRotating}
+                          className="px-2 py-1 rounded border border-neutral-300 hover:bg-neutral-100 text-neutral-700 font-medium text-[11px] cursor-pointer"
+                          title="Rotate QR Token"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </button>
+
+                        <Link href={item.routeUrl} target="_blank">
+                          <Button size="sm" variant="outline" className="text-xs px-2" title="Open Customer Menu">
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -87,6 +87,16 @@ export class MockUserService implements IUserService {
     user.isActive = false;
     return { success: true, data: null, message: "User deactivated" };
   }
+
+  async deleteUser(id: string): Promise<ApiResponse<null>> {
+    await delay(150);
+    const index = this.users.findIndex((u) => u.id === id);
+    if (index === -1) {
+      return { success: false, data: null, error: { code: "USER_NOT_FOUND", message: "User not found" } };
+    }
+    this.users.splice(index, 1);
+    return { success: true, data: null, message: "User deleted successfully" };
+  }
 }
 
 export class MockAuthService implements IAuthService {

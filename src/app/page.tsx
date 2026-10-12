@@ -83,12 +83,6 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/admin"
-              className="hidden sm:inline-flex text-xs font-medium text-neutral-600 hover:text-black transition-colors"
-            >
-              Admin Dashboard
-            </Link>
             <Link href="/login">
               <Button variant="primary" size="sm" rightIcon={<ArrowRight className="h-3.5 w-3.5" />}>
                 Staff Login
@@ -361,14 +355,6 @@ export default function HomePage() {
           <div className="flex items-center gap-4 text-neutral-500">
             <Link href="/login" className="hover:text-black transition-colors">
               Staff Sign In
-            </Link>
-            <span>&middot;</span>
-            <Link href="/admin/inventory" className="hover:text-black transition-colors">
-              Inventory Ledger
-            </Link>
-            <span>&middot;</span>
-            <Link href="/admin/qr" className="hover:text-black transition-colors">
-              QR Studio
             </Link>
           </div>
         </div>

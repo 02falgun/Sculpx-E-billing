@@ -596,7 +596,7 @@ export const userRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * DELETE /:id
-   * Deactivate staff account.
+   * Authorized staff deletion workflow with data integrity safeguards.
    */
   fastify.delete(
     "/:id",
@@ -605,44 +605,123 @@ export const userRoutes: FastifyPluginAsync = async (fastify) => {
       const caller = request.authenticatedUser!;
       const { id } = request.params as { id: string };
 
+      // 1. Prevent self-deletion
       if (caller.id === id) {
-        throw new AppError("Cannot deactivate your own account", 400, "SELF_DEACTIVATION_PROHIBITED");
+        throw new AppError("Cannot delete your own account", 400, "SELF_DELETION_PROHIBITED");
       }
 
+      // 2. Target existence check
       const user = await prisma.user.findUnique({ where: { id } });
       if (!user) {
         throw new AppError("Staff member not found", 404, "NOT_FOUND");
       }
 
+      // 3. Prevent cross-tenant deletion
       if (caller.role !== "SUPER_ADMIN" && user.tenantId !== caller.tenantId) {
         throw new AppError("Forbidden: cross-tenant access denied", 403, "FORBIDDEN");
       }
 
+      // 4. Prevent hotel Admin from deleting Super Admin
       if (caller.role !== "SUPER_ADMIN" && user.role === "SUPER_ADMIN") {
-        throw new AppError("Forbidden: cannot deactivate Super Admin account", 403, "FORBIDDEN");
+        throw new AppError("Forbidden: hotel Admins cannot delete Super Admin accounts", 403, "FORBIDDEN");
       }
 
-      await prisma.user.update({
-        where: { id },
-        data: {
-          isActive: false,
-          tokenVersion: { increment: 1 },
-        },
-      });
+      // 5. Prevent deleting the last valid Super Admin (lockout protection)
+      if (user.role === "SUPER_ADMIN") {
+        const remainingSuperAdmins = await prisma.user.count({
+          where: {
+            role: "SUPER_ADMIN",
+            isActive: true,
+            NOT: { id },
+          },
+        });
+        if (remainingSuperAdmins === 0) {
+          throw new AppError(
+            "Cannot delete the last Super Admin account. Platform administration lock-out prevented.",
+            400,
+            "LAST_SUPER_ADMIN_DELETION_PROHIBITED"
+          );
+        }
+      }
 
+      // 6. Prevent deleting the last Admin of the tenant (tenant lockout protection)
+      if (user.role === "ADMIN") {
+        const remainingAdmins = await prisma.user.count({
+          where: {
+            tenantId: user.tenantId,
+            role: "ADMIN",
+            isActive: true,
+            NOT: { id },
+          },
+        });
+        if (remainingAdmins === 0) {
+          throw new AppError(
+            "Cannot delete the last Admin account for this property. Administration lock-out prevented.",
+            400,
+            "LAST_ADMIN_DELETION_PROHIBITED"
+          );
+        }
+      }
+
+      // 7. Inspect foreign keys / relations to orders, bills, payments, inventory
+      const paymentCount = await prisma.payment.count({ where: { receivedByUserId: id } });
+      const inventoryCount = await prisma.inventoryTransaction.count({ where: { performedByUserId: id } });
+      const hasHistoricalReferences = paymentCount > 0 || inventoryCount > 0;
+
+      // 8. Revoke sessions and execute safe deletion
+      if (hasHistoricalReferences) {
+        // Safe anonymization strategy preserving genuine financial history
+        await prisma.$transaction(async (tx) => {
+          await tx.userPermission.deleteMany({ where: { userId: id } });
+          await tx.user.update({
+            where: { id },
+            data: {
+              name: `[Deleted] ${user.name.slice(0, 30)}`,
+              email: `deleted-${user.id.slice(0, 8)}@archived.local`,
+              phoneNumber: null,
+              isActive: false,
+              tokenVersion: { increment: 10 },
+              passwordHash: "DELETED_ACCOUNT_CREDENTIALS_INVALIDATED",
+            },
+          });
+        });
+      } else {
+        // Safe permanent deletion when no historical financial references exist
+        await prisma.$transaction(async (tx) => {
+          await tx.userPermission.deleteMany({ where: { userId: id } });
+          await tx.user.delete({ where: { id } });
+        });
+      }
+
+      // 9. Write audit log (no credentials or secrets recorded)
       await auditService.record({
         tenantId: user.tenantId,
         actorId: caller.id,
         actorEmail: caller.email,
         actorRole: caller.role,
-        action: "STAFF_DEACTIVATED",
+        action: "STAFF_DELETED",
         resource: "users",
         resourceId: id,
-        details: { targetEmail: user.email },
+        details: {
+          targetEmail: user.email,
+          targetRole: user.role,
+          targetName: user.name,
+          strategy: hasHistoricalReferences ? "ANONYMIZED_ARCHIVE" : "PERMANENT_REMOVAL",
+        },
         ipAddress: request.ip,
       });
 
-      return reply.status(200).send(formatSuccessResponse(null, request, "Staff member deactivated successfully"));
+      return reply.status(200).send(
+        formatSuccessResponse(
+          {
+            id,
+            deleted: true,
+            strategy: hasHistoricalReferences ? "ANONYMIZED_ARCHIVE" : "PERMANENT_REMOVAL",
+          },
+          request,
+          "Employee deleted successfully"
+        )
+      );
     }
   );
 };

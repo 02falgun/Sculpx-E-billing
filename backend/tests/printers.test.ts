@@ -31,7 +31,7 @@ describe("SCULPX E-Billing — Phase 6: Hardware Printing & Print Queue Suite", 
     printerService.setAdapter(mockAdapter);
 
     // Find or create Tenant A Admin
-    let adminA = await prisma.user.findFirst({ where: { tenantId: TENANT_A, role: "ADMIN" } });
+    let adminA = await prisma.user.findFirst({ where: { tenantId: TENANT_A, role: "ADMIN", isActive: true } });
     if (!adminA) {
       adminA = await prisma.user.create({
         data: {
@@ -45,7 +45,7 @@ describe("SCULPX E-Billing — Phase 6: Hardware Printing & Print Queue Suite", 
     }
 
     // Find or create Tenant A Manager
-    let managerA = await prisma.user.findFirst({ where: { tenantId: TENANT_A, role: "MANAGER" } });
+    let managerA = await prisma.user.findFirst({ where: { tenantId: TENANT_A, role: "MANAGER", isActive: true } });
     if (!managerA) {
       managerA = await prisma.user.create({
         data: {
@@ -59,7 +59,7 @@ describe("SCULPX E-Billing — Phase 6: Hardware Printing & Print Queue Suite", 
     }
 
     // Find or create Tenant A Cashier
-    let cashierA = await prisma.user.findFirst({ where: { tenantId: TENANT_A, role: "CASHIER" } });
+    let cashierA = await prisma.user.findFirst({ where: { tenantId: TENANT_A, role: "CASHIER", isActive: true } });
     if (!cashierA) {
       cashierA = await prisma.user.create({
         data: {
@@ -73,7 +73,7 @@ describe("SCULPX E-Billing — Phase 6: Hardware Printing & Print Queue Suite", 
     }
 
     // Find or create Tenant A Waiter
-    let waiterA = await prisma.user.findFirst({ where: { tenantId: TENANT_A, role: "WAITER" } });
+    let waiterA = await prisma.user.findFirst({ where: { tenantId: TENANT_A, role: "WAITER", isActive: true } });
     if (!waiterA) {
       waiterA = await prisma.user.create({
         data: {
@@ -87,7 +87,7 @@ describe("SCULPX E-Billing — Phase 6: Hardware Printing & Print Queue Suite", 
     }
 
     // Find or create Tenant B Admin
-    let adminB = await prisma.user.findFirst({ where: { tenantId: TENANT_B, role: "ADMIN" } });
+    let adminB = await prisma.user.findFirst({ where: { tenantId: TENANT_B, role: "ADMIN", isActive: true } });
     if (!adminB) {
       adminB = await prisma.user.create({
         data: {

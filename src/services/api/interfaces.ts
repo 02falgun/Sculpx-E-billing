@@ -43,6 +43,9 @@ export interface IMenuService {
   createMenuItem(item: Partial<MenuItem>): Promise<ApiResponse<MenuItem>>;
   updateMenuItem(id: string, item: Partial<MenuItem>): Promise<ApiResponse<MenuItem>>;
   deleteMenuItem(id: string): Promise<ApiResponse<void>>;
+  createCategory?(data: { name: string; description?: string; displayOrder?: number }): Promise<ApiResponse<Category>>;
+  updateCategory?(id: string, data: Partial<{ name: string; description?: string; displayOrder?: number; isActive?: boolean }>): Promise<ApiResponse<Category>>;
+  deleteCategory?(id: string): Promise<ApiResponse<void>>;
 }
 
 export interface IOrderService {
@@ -166,6 +169,7 @@ export interface IUserService {
   resetPassword?(id: string, newPassword: string): Promise<ApiResponse<null>>;
   revokeSessions?(id: string): Promise<ApiResponse<null>>;
   deactivateUser?(id: string): Promise<ApiResponse<null>>;
+  deleteUser?(id: string): Promise<ApiResponse<null>>;
 }
 
 export interface TenantProfile {
