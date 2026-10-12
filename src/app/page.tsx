@@ -23,8 +23,8 @@ export default function HomePage() {
       title: "QR ORDERING",
       tagline: "Guests order from their table or room.",
       desc: "Fast, contactless guest ordering with category filtering, portion modifiers, chef instructions, and instant digital tax invoices. No logins required.",
-      link: "/menu/table/T05",
-      linkLabel: "Simulate Table 05",
+      link: "/admin/tables",
+      linkLabel: "Fleet & QR Setup",
       icon: QrCode,
     },
     {
@@ -84,10 +84,10 @@ export default function HomePage() {
 
           <div className="flex items-center gap-3">
             <Link
-              href="/menu/table/T05"
+              href="/admin"
               className="hidden sm:inline-flex text-xs font-medium text-neutral-600 hover:text-black transition-colors"
             >
-              Guest QR Demo
+              Admin Dashboard
             </Link>
             <Link href="/login">
               <Button variant="primary" size="sm" rightIcon={<ArrowRight className="h-3.5 w-3.5" />}>

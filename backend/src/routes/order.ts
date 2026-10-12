@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
-import { formatSuccessResponse, formatErrorResponse } from "../lib/errors.js";
+import { formatSuccessResponse, formatErrorResponse, AppError } from "../lib/errors.js";
 import { cartService } from "../services/cart.service.js";
 import { orderService } from "../services/order.service.js";
 import { validateCartRequestSchema, type ValidateCartRequest } from "../schemas/cart.schema.js";
@@ -288,7 +288,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       if (!tenantId) {
-        tenantId = "e1b1d1f0-0000-4000-8000-000000000001";
+        throw new AppError("Authentication or valid QR token context required", 401, "UNAUTHORIZED");
       }
 
       const result = await orderService.listOrders(tenantId, parsed.data);

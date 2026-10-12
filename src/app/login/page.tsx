@@ -132,7 +132,7 @@ function LoginForm() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@demo.com"
+              placeholder="staff@hotel.com"
               className="w-full"
             />
 
@@ -193,12 +193,9 @@ function LoginForm() {
         {/* Footer info */}
         <div className="pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-400">
           <span>&copy; {new Date().getFullYear()} SCULPX Hospitality</span>
-          <Link
-            href="/menu/table/T01"
-            className="text-xs text-neutral-600 hover:text-black transition-colors"
-          >
-            Guest Table Menu &rarr;
-          </Link>
+          <span className="text-xs text-neutral-500 font-medium">
+            Authorized Personnel Only
+          </span>
         </div>
       </div>
 
@@ -215,7 +212,7 @@ function LoginForm() {
 
         <div className="relative z-10 max-w-md text-white space-y-3">
           <div className="inline-flex items-center gap-2 rounded-[4px] border border-white/20 bg-black/60 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-300">
-            SCULPX Grand Hotel
+            SCULPX Hospitality Platform
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
             Restaurant operations, simplified.

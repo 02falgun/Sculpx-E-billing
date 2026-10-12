@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { menuApi } from "@/services/api";
 
 export function useQRContext(qrToken: string) {
@@ -56,5 +56,33 @@ export function useMenuItem(id: string) {
     },
     enabled: !!id,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCreateMenuItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (item: Partial<import("@/types").MenuItem>) => {
+      const res = await menuApi.createMenuItem(item);
+      if (!res.success) throw new Error(res.error?.message || "Failed to create menu item");
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["menu", "items"] });
+    },
+  });
+}
+
+export function useUpdateMenuItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, item }: { id: string; item: Partial<import("@/types").MenuItem> }) => {
+      const res = await menuApi.updateMenuItem(id, item);
+      if (!res.success) throw new Error(res.error?.message || "Failed to update menu item");
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["menu", "items"] });
+    },
   });
 }

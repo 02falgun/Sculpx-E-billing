@@ -49,6 +49,11 @@ export function AdminDashboardOverview() {
   const readiness = readinessData?.readiness;
   const metrics = readinessData?.metrics;
   const isPilotReady = readiness?.isPilotReady ?? (tables.length > 0 && menuItems.length > 0);
+  const readinessPercentage =
+    readiness?.percentage ??
+    (isPilotReady
+      ? 100
+      : Math.round(((tables.length > 0 ? 1 : 0) + (menuItems.length > 0 ? 1 : 0) + (rooms.length > 0 ? 1 : 0)) * 33.3));
 
   return (
     <div className="space-y-8">
@@ -78,7 +83,7 @@ export function AdminDashboardOverview() {
               {isPilotReady ? "Ready for Live Pilot" : "Setup In Progress"}
             </span>
             <span className="text-sm font-black text-slate-900">
-              {readiness?.percentage ?? (isPilotReady ? 100 : 40)}%
+              {readinessPercentage}%
             </span>
           </div>
         </div>
@@ -89,7 +94,7 @@ export function AdminDashboardOverview() {
             className={`h-full transition-all duration-500 rounded-full ${
               isPilotReady ? "bg-emerald-600" : "bg-amber-500"
             }`}
-            style={{ width: `${readiness?.percentage ?? (isPilotReady ? 100 : 40)}%` }}
+            style={{ width: `${readinessPercentage}%` }}
           />
         </div>
 

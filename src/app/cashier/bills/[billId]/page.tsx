@@ -157,7 +157,9 @@ export default function CashierBillDetailPage({ params }: CashierBillPageProps) 
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
             <QRContextBadge context={bill.qrContext} />
             <div className="text-right text-xs text-slate-500">
-              <span className="block font-semibold text-slate-900">GSTIN: 27AABCT3518Q1Z5</span>
+              {bill.customerGstNumber && (
+                <span className="block font-semibold text-slate-900">GSTIN: {bill.customerGstNumber}</span>
+              )}
               <span>Invoice: Tax Bill</span>
             </div>
           </div>

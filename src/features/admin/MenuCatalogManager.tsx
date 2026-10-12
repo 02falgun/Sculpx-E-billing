@@ -118,60 +118,76 @@ export function MenuCatalogManager() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredItems.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
-                <td className="py-3.5 pl-4 pr-3">
-                  <div className="font-bold text-slate-900">{item.name}</div>
-                  <div className="text-[11px] text-slate-400 line-clamp-1 max-w-sm mt-0.5">
-                    {item.description}
-                  </div>
-                </td>
-
-                <td className="py-3.5 px-3">
-                  <DietIndicator type={item.dietaryType} />
-                </td>
-
-                <td className="py-3.5 px-3">
-                  <CurrencyDisplay amount={item.price} className="font-bold text-slate-900" />
-                </td>
-
-                <td className="py-3.5 px-3 text-slate-500">
-                  ~{item.preparationTimeMinutes} mins
-                </td>
-
-                <td className="py-3.5 px-3">
-                  {item.isChefSpecial && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">
-                      <Sparkles className="h-3 w-3" /> Chef&apos;s Special
-                    </span>
-                  )}
-                </td>
-
-                <td className="py-3.5 pr-4 pl-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => toggleAvailability(item.id)}
-                    className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                      item.isAvailable
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
-                        : "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
-                    }`}
-                  >
-                    {item.isAvailable ? (
-                      <>
-                        <Check className="h-3.5 w-3.5 stroke-[2.5]" />
-                        <span>In Stock</span>
-                      </>
-                    ) : (
-                      <>
-                        <X className="h-3.5 w-3.5 stroke-[2.5]" />
-                        <span>Sold Out (86)</span>
-                      </>
-                    )}
-                  </button>
+            {filteredItems.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-12 text-center text-slate-500">
+                  <Utensils className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                  <p className="font-bold text-slate-700 text-sm">
+                    {menuItems.length === 0 ? "Your menu is empty. Add your first menu item." : "No dishes found matching your filter."}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {menuItems.length === 0
+                      ? "Create categories and dishes to make them available for dining room and QR orders."
+                      : "Try adjusting your search query or selected category."}
+                  </p>
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredItems.map((item) => (
+                <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="py-3.5 pl-4 pr-3">
+                    <div className="font-bold text-slate-900">{item.name}</div>
+                    <div className="text-[11px] text-slate-400 line-clamp-1 max-w-sm mt-0.5">
+                      {item.description}
+                    </div>
+                  </td>
+
+                  <td className="py-3.5 px-3">
+                    <DietIndicator type={item.dietaryType} />
+                  </td>
+
+                  <td className="py-3.5 px-3">
+                    <CurrencyDisplay amount={item.price} className="font-bold text-slate-900" />
+                  </td>
+
+                  <td className="py-3.5 px-3 text-slate-500">
+                    ~{item.preparationTimeMinutes} mins
+                  </td>
+
+                  <td className="py-3.5 px-3">
+                    {item.isChefSpecial && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">
+                        <Sparkles className="h-3 w-3" /> Chef&apos;s Special
+                      </span>
+                    )}
+                  </td>
+
+                  <td className="py-3.5 pr-4 pl-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => toggleAvailability(item.id)}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                        item.isAvailable
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                          : "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                      }`}
+                    >
+                      {item.isAvailable ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                          <span>In Stock</span>
+                        </>
+                      ) : (
+                        <>
+                          <X className="h-3.5 w-3.5 stroke-[2.5]" />
+                          <span>Sold Out (86)</span>
+                        </>
+                      )}
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

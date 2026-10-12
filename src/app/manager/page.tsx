@@ -38,11 +38,11 @@ export default function ManagerDashboardPage() {
   const bills = billsRes?.data || [];
 
   // Operational metrics
-  const totalOrdersCount = orders.length > 0 ? orders.length : 42;
-  const preparingCount = kots.filter((k) => k.status === "PREPARING").length || 8;
-  const readyCount = kots.filter((k) => k.status === "READY").length || 4;
+  const totalOrdersCount = orders.length;
+  const preparingCount = kots.filter((k) => k.status === "PREPARING").length;
+  const readyCount = kots.filter((k) => k.status === "READY").length;
   const outstandingBills = bills.filter((b) => b.dueAmount > 0);
-  const outstandingCount = outstandingBills.length > 0 ? outstandingBills.length : 3;
+  const outstandingCount = outstandingBills.length;
 
   const offlinePrinters = printers.filter((p) => p.status === "OFFLINE");
 
@@ -128,7 +128,7 @@ export default function ManagerDashboardPage() {
         </div>
       </div>
 
-      {/* NEEDS ATTENTION: OPERATIONAL EXCEPTIONS */}
+      {/* Real Dynamic Exceptions */}
       <div>
         <div className="flex items-center justify-between mb-3 px-1">
           <div className="flex items-center gap-2">
@@ -139,117 +139,109 @@ export default function ManagerDashboardPage() {
               Needs Attention • Operational Exceptions
             </h2>
           </div>
-          <span className="text-xs text-neutral-500">4 Active Exceptions</span>
+          <span className="text-xs text-neutral-500">
+            {offlinePrinters.length + (outstandingBills.length > 0 ? 1 : 0) + (kots.filter(k => k.status === "PREPARING").length > 0 ? 1 : 0)} Active Alerts
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* Card 1: Printer Offline */}
-          <div className="rounded-lg border border-neutral-200 bg-white p-4 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded border border-neutral-200">
-                  Hardware
-                </span>
-                <span className="text-xs font-medium text-neutral-500">Offline</span>
-              </div>
-              <h3 className="text-sm font-bold text-neutral-900 mt-2">
-                Reception Printer Offline
-              </h3>
-              <p className="text-xs text-neutral-600 mt-1">
-                Offline for 8 min • 3 queued jobs redirected to Kitchen thermal buffer.
-              </p>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between">
-              <span className="text-xs text-neutral-500">Queue: 3 jobs</span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => addToast({ type: "info", title: "Diagnostic Dispatched", message: "Probing IP socket 192.168.1.102..." })}
-                className="font-medium text-xs"
-              >
-                Retry Link
-              </Button>
-            </div>
+        {offlinePrinters.length === 0 && outstandingBills.length === 0 && kots.filter(k => k.status === "PREPARING").length === 0 ? (
+          <div className="rounded-xl border border-dashed border-neutral-200 bg-white p-8 text-center">
+            <CheckCircle2 className="h-7 w-7 text-emerald-600 mx-auto mb-2" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-900">
+              Operations Clear • No Active Exceptions
+            </h3>
+            <p className="text-xs text-neutral-500 mt-1 max-w-md mx-auto">
+              All hardware devices, active kitchen lines, and guest checks are operating smoothly without bottlenecks.
+            </p>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {offlinePrinters.length > 0 && (
+              <div className="rounded-lg border border-neutral-200 bg-white p-4 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider bg-rose-100 text-rose-800 px-2 py-0.5 rounded border border-rose-200">
+                      Hardware
+                    </span>
+                    <span className="text-xs font-medium text-rose-600">Offline</span>
+                  </div>
+                  <h3 className="text-sm font-bold text-neutral-900 mt-2">
+                    {offlinePrinters.length} Printer{offlinePrinters.length > 1 ? "s" : ""} Offline
+                  </h3>
+                  <p className="text-xs text-neutral-600 mt-1">
+                    {offlinePrinters.map((p) => p.name).join(", ")} not responding to network heartbeat.
+                  </p>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between">
+                  <span className="text-xs text-neutral-500">Fleet Alert</span>
+                  <Link href="/admin/printers">
+                    <Button size="sm" variant="outline" className="font-medium text-xs">
+                      Inspect Fleet
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
 
-          {/* Card 2: Delayed Orders */}
-          <div className="rounded-lg border border-neutral-200 bg-white p-4 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded border border-neutral-200">
-                  Kitchen Delay
-                </span>
-                <span className="text-xs font-medium text-neutral-500">&gt;20 min</span>
+            {kots.filter((k) => k.status === "PREPARING").length > 0 && (
+              <div className="rounded-lg border border-neutral-200 bg-white p-4 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-200">
+                      Kitchen Line
+                    </span>
+                    <span className="text-xs font-medium text-amber-600">Active</span>
+                  </div>
+                  <h3 className="text-sm font-bold text-neutral-900 mt-2">
+                    {kots.filter((k) => k.status === "PREPARING").length} Tickets On Cook Station
+                  </h3>
+                  <p className="text-xs text-neutral-600 mt-1">
+                    KOT orders are currently being prepared on active kitchen stations.
+                  </p>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between">
+                  <span className="text-xs text-neutral-500">Cooking Line</span>
+                  <Link href="/kitchen">
+                    <Button size="sm" variant="outline" className="text-xs font-medium">
+                      Inspect KDS
+                    </Button>
+                  </Link>
+                </div>
               </div>
-              <h3 className="text-sm font-bold text-neutral-900 mt-2">
-                2 Delayed KOTs on Cook Line
-              </h3>
-              <p className="text-xs text-neutral-600 mt-1">
-                Table 04 and Room 302 elapsed cooking times exceeded 20 minutes.
-              </p>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between">
-              <span className="text-xs text-neutral-500">Chef alerted</span>
-              <Link href="/kitchen">
-                <Button size="sm" variant="outline" className="text-xs font-medium">
-                  Inspect KDS
-                </Button>
-              </Link>
-            </div>
-          </div>
+            )}
 
-          {/* Card 3: Unpaid Bills */}
-          <div className="rounded-lg border border-neutral-200 bg-white p-4 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded border border-neutral-200">
-                  Settlement
-                </span>
-                <span className="text-xs font-medium text-neutral-500">3 Checks</span>
+            {outstandingBills.length > 0 && (
+              <div className="rounded-lg border border-neutral-200 bg-white p-4 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider bg-blue-100 text-blue-800 px-2 py-0.5 rounded border border-blue-200">
+                      Settlement
+                    </span>
+                    <span className="text-xs font-medium text-neutral-500">
+                      {outstandingBills.length} Check{outstandingBills.length > 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold text-neutral-900 mt-2">
+                    {outstandingBills.length} Unsettled Dining Check{outstandingBills.length > 1 ? "s" : ""}
+                  </h3>
+                  <p className="text-xs text-neutral-600 mt-1">
+                    Awaiting cashier payment collection.
+                  </p>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between">
+                  <span className="text-xs text-neutral-500">
+                    ₹{outstandingBills.reduce((acc, b) => acc + (b.dueAmount || 0), 0).toLocaleString("en-IN")} due
+                  </span>
+                  <Link href="/cashier/outstanding">
+                    <Button size="sm" variant="outline" className="text-xs font-medium">
+                      Cashier Desk
+                    </Button>
+                  </Link>
+                </div>
               </div>
-              <h3 className="text-sm font-bold text-neutral-900 mt-2">
-                3 Unpaid Dining Checks
-              </h3>
-              <p className="text-xs text-neutral-600 mt-1">
-                Table 03, Table 05, and Room 301 await cashier payment collection.
-              </p>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between">
-              <span className="text-xs text-neutral-500">₹3,720 due</span>
-              <Link href="/cashier/outstanding">
-                <Button size="sm" variant="outline" className="text-xs font-medium">
-                  Cashier Desk
-                </Button>
-              </Link>
-            </div>
+            )}
           </div>
-
-          {/* Card 4: Cancelled Order */}
-          <div className="rounded-lg border border-neutral-200 bg-white p-4 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded border border-neutral-200">
-                  Audit Void
-                </span>
-                <span className="text-xs font-mono font-medium text-neutral-500">ORD-1019</span>
-              </div>
-              <h3 className="text-sm font-bold text-neutral-900 mt-2">
-                1 Cancelled / Voided Order
-              </h3>
-              <p className="text-xs text-neutral-600 mt-1">
-                Guest cancelled due to urgent checkout. Inventory rollback confirmed.
-              </p>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between">
-              <span className="text-xs text-neutral-500">Audit logged</span>
-              <Link href="/manager/exceptions">
-                <Button size="sm" variant="outline" className="text-xs font-medium">
-                  Audit Details
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* OPERATIONAL STATUS BREAKDOWN */}
@@ -268,24 +260,24 @@ export default function ManagerDashboardPage() {
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
             <div className="p-3 rounded-lg bg-neutral-50 border border-neutral-200">
               <span className="text-[11px] text-neutral-500 font-medium block">Total</span>
-              <span className="text-xl font-bold text-neutral-900">{tables.length || 8}</span>
+              <span className="text-xl font-bold text-neutral-900">{tables.length}</span>
             </div>
             <div className="p-3 rounded-lg bg-neutral-50 border border-neutral-200">
               <span className="text-[11px] text-neutral-500 font-medium block">Available</span>
               <span className="text-xl font-bold text-neutral-900">
-                {tables.filter((t) => t.status === "AVAILABLE").length || 3}
+                {tables.filter((t) => t.status === "AVAILABLE").length}
               </span>
             </div>
             <div className="p-3 rounded-lg bg-neutral-50 border border-neutral-200">
               <span className="text-[11px] text-neutral-500 font-medium block">Occupied</span>
               <span className="text-xl font-bold text-neutral-900">
-                {tables.filter((t) => t.status === "OCCUPIED").length || 4}
+                {tables.filter((t) => t.status === "OCCUPIED").length}
               </span>
             </div>
             <div className="p-3 rounded-lg bg-neutral-50 border border-neutral-200">
               <span className="text-[11px] text-neutral-500 font-medium block">Billed</span>
               <span className="text-xl font-bold text-neutral-900">
-                {tables.filter((t) => t.status === "BILLED").length || 1}
+                {tables.filter((t) => t.status === "BILLED").length}
               </span>
             </div>
           </div>
@@ -298,27 +290,33 @@ export default function ManagerDashboardPage() {
               <h3 className="text-sm font-bold text-neutral-900">Kitchen Line Velocity</h3>
               <p className="text-xs text-neutral-500">Current ticket throughput and cook times</p>
             </div>
-            <Link href="/manager/kitchen" className="text-xs font-medium text-neutral-700 hover:text-black hover:underline">
+            <Link href="/kitchen" className="text-xs font-medium text-neutral-700 hover:text-black hover:underline">
               Inspect KDS &rarr;
             </Link>
           </div>
           <div className="mt-4 space-y-3 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-neutral-600 font-medium">Average Prep Time:</span>
-              <span className="font-semibold text-neutral-900 font-mono">11m 40s</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-neutral-600 font-medium">Expedite Rate:</span>
-              <span className="font-semibold text-neutral-900">94.2% on-time</span>
-            </div>
-            <div className="flex items-center justify-between">
               <span className="text-neutral-600 font-medium">Active KOT Tickets:</span>
               <span className="font-semibold text-neutral-900 font-mono">{kots.length} on line</span>
             </div>
             <div className="flex items-center justify-between">
+              <span className="text-neutral-600 font-medium">Preparing Cook Line:</span>
+              <span className="font-semibold text-neutral-900 font-mono">
+                {kots.filter((k) => k.status === "PREPARING").length} tickets
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-neutral-600 font-medium">Ready For Service:</span>
+              <span className="font-semibold text-neutral-900 font-mono">
+                {kots.filter((k) => k.status === "READY").length} tickets
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
               <span className="text-neutral-600 font-medium">Hardware Fleet:</span>
               <span className="font-semibold text-neutral-900">
-                {printers.length - offlinePrinters.length}/{printers.length} Printers Online
+                {printers.length > 0
+                  ? `${printers.length - offlinePrinters.length}/${printers.length} Printers Online`
+                  : "No printers configured"}
               </span>
             </div>
           </div>

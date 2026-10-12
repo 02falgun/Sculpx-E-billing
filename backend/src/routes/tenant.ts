@@ -221,28 +221,8 @@ export const tenantRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: caller.tenantId },
       });
 
-      // If tenant record does not exist yet (e.g. legacy demo tenant), synthesize default record
       if (!tenant) {
-        tenant = await prisma.tenant.upsert({
-          where: { id: caller.tenantId },
-          create: {
-            id: caller.tenantId,
-            name: "Sculpx Grand Hotel & Restaurant",
-            code: "sculpx-grand",
-            timezone: "Asia/Kolkata",
-            currency: "INR",
-            currencySymbol: "₹",
-            gstin: "27AABCT3518Q1Z5",
-            cgstRate: 2.5,
-            sgstRate: 2.5,
-            serviceChargeRate: 5.0,
-            hasAccommodation: true,
-            hasRestaurant: true,
-            isActive: true,
-            settings: {},
-          },
-          update: {},
-        });
+        throw new AppError("Hotel property profile not found", 404, "NOT_FOUND");
       }
 
       return reply.status(200).send(formatSuccessResponse(tenant, request));
@@ -274,7 +254,7 @@ export const tenantRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: caller.tenantId },
         create: {
           id: caller.tenantId,
-          name: data.name || "Sculpx Grand Hotel & Restaurant",
+          name: data.name || "Hotel Property",
           code: `tenant-${caller.tenantId.slice(0, 8)}`,
           timezone: data.timezone || "Asia/Kolkata",
           currency: data.currency || "INR",
@@ -282,7 +262,7 @@ export const tenantRoutes: FastifyPluginAsync = async (fastify) => {
           gstin: data.gstin || null,
           cgstRate: data.cgstRate ?? 2.5,
           sgstRate: data.sgstRate ?? 2.5,
-          serviceChargeRate: data.serviceChargeRate ?? 5.0,
+          serviceChargeRate: data.serviceChargeRate ?? 0,
           hasAccommodation: data.hasAccommodation ?? true,
           hasRestaurant: data.hasRestaurant ?? true,
           isActive: true,

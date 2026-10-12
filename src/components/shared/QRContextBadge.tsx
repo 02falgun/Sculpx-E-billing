@@ -24,7 +24,9 @@ export function QRContextBadge({ context, className }: QRContextBadgeProps) {
       </div>
       <div className="flex flex-col text-left leading-tight">
         <span className="font-semibold tracking-tight text-white">{title}</span>
-        <span className="text-[10px] text-neutral-400">{context.hotelName || "SCULPX Grand Hotel"}</span>
+        {context.hotelName && (
+          <span className="text-[10px] text-neutral-400">{context.hotelName}</span>
+        )}
       </div>
     </div>
   );
