@@ -248,7 +248,7 @@ export default function AdminRoomsPage() {
                 </div>
 
                 <a
-                  href={`/menu/room/${room.roomNumber}`}
+                  href={room.qrToken ? `/menu/room/${room.roomNumber}?token=${encodeURIComponent(room.qrToken)}` : `/menu/room/${room.roomNumber}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900 font-semibold text-[11px] hover:underline"

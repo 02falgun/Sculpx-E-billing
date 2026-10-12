@@ -250,7 +250,7 @@ export default function AdminTablesPage() {
                 </div>
 
                 <a
-                  href={`/menu/table/${table.tableNumber}`}
+                  href={table.qrToken ? `/menu/table/${table.tableNumber}?token=${encodeURIComponent(table.qrToken)}` : `/menu/table/${table.tableNumber}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900 font-semibold text-[11px] hover:underline"

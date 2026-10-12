@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useQRContext } from "@/hooks/useMenu";
 import { useCartStore } from "@/store";
 import { MenuCatalog } from "@/features/menu";
@@ -10,8 +10,10 @@ import { BedDouble } from "lucide-react";
 
 export default function RoomMenuPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const roomId = typeof params?.roomId === "string" ? params.roomId : "";
-  const token = `room-${roomId}`;
+  const queryToken = searchParams?.get("token");
+  const token = queryToken || `room-${roomId}`;
 
   const { data: qrContext, isLoading, error } = useQRContext(token);
   const setQRContext = useCartStore((s) => s.setQRContext);

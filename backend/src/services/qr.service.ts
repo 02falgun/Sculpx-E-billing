@@ -26,13 +26,107 @@ export class QrService {
     client?: Prisma.TransactionClient | PrismaClient
   ): Promise<ValidatedQrEntity> {
     const db = client || prisma;
-    const qr = await db.qrCode.findUnique({
+    let qr = await db.qrCode.findUnique({
       where: { token },
       include: {
         table: true,
         room: true,
       },
     });
+
+    if (!qr) {
+      const lower = token.toLowerCase();
+
+      // Fallback 1: Resolve table by identifier (e.g. table-T01, T01, table-1, 1)
+      if (lower.startsWith("table-") || lower.startsWith("t") || /^\d+$/.test(token)) {
+        const raw1 = token.replace(/^table-?/i, "");
+        const raw2 = raw1.replace(/^t0*/i, "");
+        const raw3 = raw1.replace(/^0+/, "");
+        const raw4 = raw2 ? `T${raw2.padStart(2, "0")}` : "";
+        const candidates = Array.from(new Set([token, raw1, raw2, raw3, raw4].filter(Boolean)));
+
+        const candidateTable = await db.table.findFirst({
+          where: {
+            OR: candidates.map((num) => ({ tableNumber: num })),
+            isActive: true,
+          },
+          include: {
+            qrCodes: {
+              where: { isActive: true },
+              orderBy: { createdAt: "desc" },
+            },
+          },
+        });
+
+        if (candidateTable) {
+          if (candidateTable.qrCodes.length > 0) {
+            qr = {
+              ...candidateTable.qrCodes[0],
+              table: candidateTable,
+              room: null,
+            };
+          } else {
+            qr = await db.qrCode.create({
+              data: {
+                tenantId: candidateTable.tenantId,
+                type: "TABLE",
+                tableId: candidateTable.id,
+                token: `tbl-${candidateTable.tableNumber.toLowerCase()}-${Date.now().toString(36)}`,
+                isActive: true,
+              },
+              include: {
+                table: true,
+                room: true,
+              },
+            });
+          }
+        }
+      }
+
+      // Fallback 2: Resolve room by identifier (e.g. room-101, 101, room-R-001)
+      if (!qr && (lower.startsWith("room-") || lower.startsWith("r") || /^\d{3,}$/.test(token))) {
+        const raw1 = token.replace(/^room-?/i, "");
+        const raw2 = raw1.replace(/^r-?0*/i, "");
+        const candidates = Array.from(new Set([token, raw1, raw2].filter(Boolean)));
+
+        const candidateRoom = await db.room.findFirst({
+          where: {
+            OR: candidates.map((num) => ({ roomNumber: num })),
+            isActive: true,
+          },
+          include: {
+            qrCodes: {
+              where: { isActive: true },
+              orderBy: { createdAt: "desc" },
+            },
+          },
+        });
+
+        if (candidateRoom) {
+          if (candidateRoom.qrCodes.length > 0) {
+            qr = {
+              ...candidateRoom.qrCodes[0],
+              table: null,
+              room: candidateRoom,
+            };
+          } else {
+            qr = await db.qrCode.create({
+              data: {
+                tenantId: candidateRoom.tenantId,
+                type: "ROOM",
+                roomId: candidateRoom.id,
+                token: `room-${candidateRoom.roomNumber.toLowerCase()}-${Date.now().toString(36)}`,
+                isActive: true,
+              },
+              include: {
+                table: true,
+                room: true,
+              },
+            });
+          }
+        }
+      }
+    }
 
     if (!qr) {
       throw new AppError("QR code not found or invalid", 404, "QR_NOT_FOUND");

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useQRContext } from "@/hooks/useMenu";
 import { useCartStore } from "@/store";
 import { MenuCatalog } from "@/features/menu";
@@ -10,8 +10,10 @@ import { QrCode } from "lucide-react";
 
 export default function TableMenuPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const tableId = typeof params?.tableId === "string" ? params.tableId : "";
-  const token = `table-${tableId}`;
+  const queryToken = searchParams?.get("token");
+  const token = queryToken || `table-${tableId}`;
 
   const { data: qrContext, isLoading, error } = useQRContext(token);
   const setQRContext = useCartStore((s) => s.setQRContext);
