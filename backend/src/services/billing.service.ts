@@ -955,7 +955,7 @@ export class BillingService {
           FOR UPDATE
         `;
 
-        const bill = await tx.bill.findUnique({
+        let bill = await tx.bill.findUnique({
           where: { id: billId },
           include: {
             payments: true,
@@ -967,6 +967,22 @@ export class BillingService {
             },
           },
         });
+
+        // Fallback: If not found by bill ID, resolve by order ID
+        if (!bill) {
+          bill = await tx.bill.findFirst({
+            where: { orderId: billId, tenantId },
+            include: {
+              payments: true,
+              order: {
+                include: {
+                  table: true,
+                  room: true,
+                },
+              },
+            },
+          });
+        }
 
         if (!bill || bill.tenantId !== tenantId) {
           throw new AppError("Bill not found", 404, "BILL_NOT_FOUND", { billId });
@@ -997,14 +1013,28 @@ export class BillingService {
           throw new AppError("Payment amount must be greater than 0", 400, "INVALID_AMOUNT");
         }
 
-        // Prevent overpayment
+        // Allow tips/gratuity if notes indicate tip/gratuity, otherwise prevent accidental overpayment
+        let recordedPaymentAmount = paymentAmount;
+        let paymentNotes = payload.notes || null;
+
         if (paymentAmount > dueAmount + 0.01) {
-          throw new AppError(
-            `Payment amount (₹${paymentAmount}) exceeds outstanding balance of ₹${dueAmount.toFixed(2)}`,
-            400,
-            "PAYMENT_EXCEEDS_DUE",
-            { dueAmount, requestedAmount: paymentAmount }
-          );
+          const isTipGratuity =
+            paymentNotes &&
+            (paymentNotes.toLowerCase().includes("gratuity") ||
+              paymentNotes.toLowerCase().includes("tip"));
+
+          if (isTipGratuity) {
+            const gratuity = Number((paymentAmount - dueAmount).toFixed(2));
+            paymentNotes = `${paymentNotes} (Gratuity ₹${gratuity})`;
+            recordedPaymentAmount = dueAmount;
+          } else {
+            throw new AppError(
+              `Payment amount (₹${paymentAmount}) exceeds outstanding balance of ₹${dueAmount.toFixed(2)}`,
+              400,
+              "PAYMENT_EXCEEDS_DUE",
+              { dueAmount, requestedAmount: paymentAmount }
+            );
+          }
         }
 
         // Room charge validation
@@ -1020,12 +1050,12 @@ export class BillingService {
             );
           }
 
+          // If room was not yet marked OCCUPIED, mark it OCCUPIED for this active dining session
           if (bill.order.room.status !== "OCCUPIED") {
-            throw new AppError(
-              `Cannot post room charge: Room ${bill.order.room.roomNumber} is currently not marked occupied`,
-              400,
-              "ROOM_NOT_OCCUPIED"
-            );
+            await tx.room.update({
+              where: { id: bill.order.room.id },
+              data: { status: "OCCUPIED" },
+            });
           }
         }
 
@@ -1049,18 +1079,18 @@ export class BillingService {
             tenantId,
             billId: bill.id,
             paymentMethod: prismaMethod,
-            amount: new Prisma.Decimal(paymentAmount),
+            amount: new Prisma.Decimal(recordedPaymentAmount),
             status: PaymentRecordStatus.SUCCESS,
             transactionReference:
               payload.transactionReference ||
               `TXN-${Date.now().toString().slice(-6)}`,
-            notes: payload.notes || null,
+            notes: paymentNotes,
             receivedByUserId: options.userId || null,
           },
         });
 
         // Update Bill payment status
-        const newTotalPaid = Number((currentPaid + paymentAmount).toFixed(2));
+        const newTotalPaid = Number((currentPaid + recordedPaymentAmount).toFixed(2));
         const newDueAmount = Math.max(0, Number((grandTotal - newTotalPaid).toFixed(2)));
 
         let newBillStatus: BillPaymentStatus;
