@@ -247,4 +247,25 @@ Supported methods: `CASH`, `CARD`, `UPI`, `ROOM_CHARGE`, `NET_BANKING`.
 | Printing | Thermal Printing Queue & Concurrency | PostgreSQL FOR UPDATE SKIP LOCKED + Network ESC/POS Adapter | `IMPLEMENTED & VERIFIED (PHASE 6)` |
 | Connectivity | Cloud-to-Printer Network Architecture | WireGuard VPN tunnel or Outbound Local Print Gateway | `IMPLEMENTED & VERIFIED (PHASE 6E)` |
 | Security | Table Spoofing Prevention | Cryptographically signed ephemeral QR session JWT | `IMPLEMENTED & VERIFIED (PHASE 3B.1)` |
+| Pilot Lifecycle | Clean Tenant Onboarding & Entity Lifecycle | Zero starter mock data; soft deactivation of historical tables/rooms; instant session revocation | `IMPLEMENTED & VERIFIED (V1 MASTER)` |
+
+---
+
+## 9. V1 Pilot Operations, Safe Entity Lifecycle & Printerless Mode
+
+### 9.1 Zero Starter Data Guarantee
+- Newly onboarded hotel tenants start with **ZERO** rooms, tables, categories, or menu items.
+- The UI presents truthful empty states with immediate calls to action (e.g. "Add your first dining table").
+- At no point are demo rooms, fake orders, or simulated revenue figures inserted into a new tenant's database.
+
+### 9.2 Safe Archival & Soft Deactivation
+- Deleting an operational room or table performs a safe soft deactivation (`isActive = false`).
+- Hard deletion (`DELETE FROM "tables"`) is strictly prohibited when foreign keys (historical orders, bills, payments, KOTs) exist.
+- Historical reporting, audit trails, and financial statements remain 100% intact after entity deactivation.
+
+### 9.3 Printerless V1 Pilot Operation
+- Physical thermal printer hardware is explicitly excluded from the V1 pilot scope.
+- All kitchen preparation orders are displayed digitally on the web-based Kitchen Display System (KDS).
+- All bills and tax receipts are viewed and settled digitally through the cashier billing desk.
+- Print queues and background workers operate in non-blocking mode; lack of physical hardware never interrupts order taking or payment recording.
 

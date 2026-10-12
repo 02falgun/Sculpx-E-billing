@@ -68,37 +68,55 @@ Staff Sign-In -> Role & Permission Verification -> RoleGuard Enforcement -> Stat
 | `CASHIER` | Cashier / Billing Desk | `/cashier` | Tax invoice generation, payment settlement, refunds, thermal receipt printing. |
 | `KITCHEN_STAFF` | Kitchen Chef / Expediter | `/kitchen` | KDS ticket progression (`ACCEPTED` -> `PREPARING` -> `READY`), elapsed timers. |
 
-### 3.2 Granular Permission Codes
-The backend checks individual permission strings in addition to high-level roles:
-- `all_superadmin`: Bypass all permission checks.
-- `all_admin`: Bypass administrative checks.
-- `manage_menu`: Edit items, categories, and prices.
-- `manage_inventory`: Stock adjustments and recipe BOM.
-- `manage_printers`: Hardware setup and queue retries.
-- `override_orders`: Void tickets and discount waivers.
-- `collect_payments`: Accept tender and settle tabs.
-- `process_refunds`: Reverse settled transactions.
+### 3.2 Granular Permission Codes (V1 Production Catalog)
+The backend enforces a centralized 36-key permission catalog in `backend/src/config/permissions.ts`:
+- **General**: `dashboard.view`
+- **Hotel Rooms**: `rooms.view`, `rooms.create`, `rooms.update`, `rooms.deactivate`
+- **Restaurant**: `tables.view`, `tables.create`, `tables.update`, `tables.deactivate`, `qr.manage`
+- **Menu**: `menu.view`, `menu.create`, `menu.update`, `menu.publish`
+- **People & Staff**: `staff.view`, `staff.invite`, `staff.update`, `staff.deactivate`, `roles.view`, `roles.manage`, `permissions.assign`
+- **Inventory**: `inventory.view`, `inventory.manage`
+- **Orders & Kitchen**: `orders.view`, `orders.create`, `orders.update`, `kitchen.view`, `kitchen.update`
+- **Finance & Billing**: `billing.view`, `billing.create_invoice`, `payments.record`, `payments.refund`
+- **System & Administration**: `reports.view`, `settings.manage`, `audit.view`, `tenant.manage`
 
 ---
 
-## 4. Frontend Route Guards vs. Backend Enforcement
+## 4. Session Revocation & Token Versioning (`tokenVersion`)
 
-> [!CAUTION]
-> Frontend route guarding via `RoleGuard` and `canAccess()` is **PURELY A UX CONVENIENCE** to prevent staff from viewing unauthorized screens. **IT PROVIDES ZERO SECURITY.**
-
-### Backend Security Rule:
-Every backend endpoint MUST independently verify:
-1. Valid JWT signature and unexpired timestamp.
-2. Tenant scoping (`user.tenant_id == resource.tenant_id`).
-3. Explicit role or permission check for the requested operation.
+To ensure immediate revocation of compromised accounts or stale permissions without waiting for JWT expiration:
+1. Every `User` record maintains an integer field `tokenVersion` (default `1`).
+2. The user's active `tokenVersion` is baked into the signed JWT payload.
+3. On every authenticated request, `backend/src/middleware/auth.ts` validates that the token's `tokenVersion` strictly matches the database record.
+4. When an administrator resets a staff password, alters permissions, or clicks **Revoke All Sessions**, the server atomically increments `tokenVersion`:
+   ```sql
+   UPDATE "users" SET "tokenVersion" = "tokenVersion" + 1 WHERE "id" = :userId;
+   ```
+5. Any previously issued tokens are immediately rejected with `401 Unauthorized` (`code: SESSION_REVOKED`).
 
 ---
 
-## 5. Public QR Ordering Security
+## 5. Multi-Tenant Onboarding & Isolation
+
+1. **Hotel Onboarding**:
+   - `POST /api/v1/tenants/onboard` provisions a new hotel with legal identity, tax rates (CGST/SGST), and its initial Hotel Administrator.
+   - Protected by platform `SUPER_ADMIN` role or secure bootstrap token `x-bootstrap-token`.
+   - The newly onboarded hotel starts with **ZERO** rooms, tables, categories, or items (complete empty state).
+2. **Tenant Scoping Rule**:
+   - Client-provided tenant IDs in query parameters or request bodies are **NEVER** trusted for authorization.
+   - Every protected route extracts tenant ID strictly from `request.authenticatedUser.tenantId`.
+   - Cross-tenant queries are rejected at the database query level with `403 Forbidden` or `404 Not Found`.
+
+---
+
+## 6. Public QR Ordering Security
 
 1. **Token Strategy**:
-   - The QR code contains a public identifier or opaque random token (e.g. `T01` or `qr_9f83a21b`).
+   - The QR code contains an opaque, cryptographically random token (`tbl-tenant-t01-abc123...`).
    - The QR URL NEVER exposes internal database IDs, hotel secrets, or administrative credentials.
-2. **Session Scope**:
+2. **QR Rotation**:
+   - Authorized admins can rotate table/room QR tokens at any time via `POST /api/v1/tables/:id/qr/rotate` or `POST /api/v1/rooms/:id/qr/rotate`.
+   - Previous QR tokens are immediately deactivated in `qr_codes` table, preventing stale paper cards from submitting orders.
+3. **Session Scope**:
    - Scanning a table QR grants customer permission to view the menu and place orders for **THAT SPECIFIC TABLE ONLY**.
    - Submitting orders for Table 02 using Table 01's context is rejected by backend session token verification.

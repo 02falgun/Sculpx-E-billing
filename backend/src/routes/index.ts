@@ -11,6 +11,10 @@ import { printerRoutes, printJobRoutes } from "./printer.js";
 import { printAgentRoutes } from "./print-agent.js";
 import { tableRoutes } from "./table.js";
 import { roomRoutes } from "./room.js";
+import { userRoutes } from "./user.js";
+import { tenantRoutes } from "./tenant.js";
+import { roleRoutes } from "./role.js";
+import { auditRoutes } from "./audit.js";
 
 export const apiRoutes: FastifyPluginAsync = async (fastify) => {
   // Direct /api/health and /api/ready
@@ -18,6 +22,18 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Direct /api/auth endpoints (/api/auth/login, /api/auth/me, /api/auth/logout)
   await fastify.register(authRoutes, { prefix: "/auth" });
+
+  // Direct /api/users endpoints
+  await fastify.register(userRoutes, { prefix: "/users" });
+
+  // Direct /api/tenants endpoints
+  await fastify.register(tenantRoutes, { prefix: "/tenants" });
+
+  // Direct /api/roles endpoints
+  await fastify.register(roleRoutes, { prefix: "/roles" });
+
+  // Direct /api/audit endpoints
+  await fastify.register(auditRoutes, { prefix: "/audit" });
 
   // Direct /api/menu endpoints
   await fastify.register(menuRoutes, { prefix: "/menu" });
@@ -57,6 +73,10 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
     async (v1) => {
       await v1.register(healthRoutes);
       await v1.register(authRoutes, { prefix: "/auth" });
+      await v1.register(userRoutes, { prefix: "/users" });
+      await v1.register(tenantRoutes, { prefix: "/tenants" });
+      await v1.register(roleRoutes, { prefix: "/roles" });
+      await v1.register(auditRoutes, { prefix: "/audit" });
       await v1.register(menuRoutes, { prefix: "/menu" });
       await v1.register(qrRoutes, { prefix: "/public" });
       await v1.register(orderRoutes, { prefix: "/orders" });

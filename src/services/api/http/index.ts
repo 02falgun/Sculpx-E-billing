@@ -9,3 +9,6 @@ export * from "./printer.http";
 export * from "./room.http";
 export * from "./table.http";
 export * from "./user.http";
+export * from "./tenant.http";
+export * from "./role.http";
+export * from "./audit.http";

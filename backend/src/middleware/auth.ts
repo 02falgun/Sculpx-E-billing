@@ -3,6 +3,8 @@ import type { Role } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
 
+import { ROLE_DEFAULT_PERMISSIONS } from "../config/permissions.js";
+
 export interface AuthenticatedUser {
   id: string;
   tenantId: string;
@@ -11,6 +13,7 @@ export interface AuthenticatedUser {
   role: Role;
   phoneNumber?: string | null;
   isActive: boolean;
+  tokenVersion: number;
   permissions: string[];
 }
 
@@ -21,12 +24,14 @@ declare module "@fastify/jwt" {
       email: string;
       role: Role;
       tenantId: string;
+      tokenVersion?: number;
     };
     user: {
       sub: string;
       email: string;
       role: Role;
       tenantId: string;
+      tokenVersion?: number;
     };
   }
 }
@@ -79,6 +84,19 @@ export async function authenticate(
     );
   }
 
+  // Session revocation validation via tokenVersion
+  if (
+    request.user?.tokenVersion !== undefined &&
+    user.tokenVersion !== undefined &&
+    request.user.tokenVersion < user.tokenVersion
+  ) {
+    throw new AppError("Session has been revoked. Please sign in again.", 401, "SESSION_REVOKED");
+  }
+
+  const explicitPerms = user.permissions.map((p) => p.permissionKey);
+  const roleDefaults = ROLE_DEFAULT_PERMISSIONS[user.role] || [];
+  const effectivePermissions = Array.from(new Set([...roleDefaults, ...explicitPerms]));
+
   request.authenticatedUser = {
     id: user.id,
     tenantId: user.tenantId,
@@ -87,7 +105,8 @@ export async function authenticate(
     role: user.role,
     phoneNumber: user.phoneNumber,
     isActive: user.isActive,
-    permissions: user.permissions.map((p) => p.permissionKey),
+    tokenVersion: user.tokenVersion,
+    permissions: effectivePermissions,
   };
 }
 

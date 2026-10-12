@@ -175,6 +175,14 @@ export class ApiClient {
     });
   }
 
+  put<T>(endpoint: string, body?: unknown, options?: Omit<RequestOptions, "method" | "body">) {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: "PUT",
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
   delete<T>(endpoint: string, options?: Omit<RequestOptions, "method" | "body">) {
     return this.request<T>(endpoint, { ...options, method: "DELETE" });
   }

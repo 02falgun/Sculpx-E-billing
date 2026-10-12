@@ -49,6 +49,10 @@ export const useAuthStore = create<AuthStoreState>()(
       },
 
       switchRole: (roleKey: string) => {
+        if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_USE_MOCK_API !== "true") {
+          // Never allow unauthenticated role switching when connected to real backend
+          return null;
+        }
         const demoUser = DEMO_USERS[roleKey];
         if (!demoUser) return null;
         const session = mockAuthenticate(demoUser.user.email);

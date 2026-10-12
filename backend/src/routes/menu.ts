@@ -59,6 +59,7 @@ export const menuRoutes: FastifyPluginAsync = async (fastify) => {
           name: `Guest (${validated.type})`,
           role: "WAITER" as any,
           isActive: true,
+          tokenVersion: 1,
           permissions: [],
         };
         return;

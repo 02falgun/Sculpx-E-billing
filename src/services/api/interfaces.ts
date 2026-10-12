@@ -138,19 +138,91 @@ export interface IPrinterService {
 }
 
 export interface IRoomService {
-  getRooms(): Promise<ApiResponse<Room[]>>;
+  getRooms(params?: { includeInactive?: boolean; floor?: string }): Promise<ApiResponse<Room[]>>;
   getRoomById(id: string): Promise<ApiResponse<Room>>;
+  createRoom?(data: { roomNumber: string; floor: string; roomType?: string; capacity?: number }): Promise<ApiResponse<Room>>;
+  updateRoom?(id: string, data: Partial<{ roomNumber: string; floor: string; roomType: string; capacity: number; status: Room["status"]; guestName?: string; folioId?: string; isActive: boolean }>): Promise<ApiResponse<Room>>;
   updateRoomStatus(id: string, status: Room["status"]): Promise<ApiResponse<Room>>;
+  rotateRoomQr?(id: string): Promise<ApiResponse<{ roomId: string; qrToken: string }>>;
+  deactivateRoom?(id: string): Promise<ApiResponse<null>>;
 }
 
 export interface ITableService {
-  getTables(): Promise<ApiResponse<Table[]>>;
+  getTables(params?: { includeInactive?: boolean; section?: string }): Promise<ApiResponse<Table[]>>;
   getTableById(id: string): Promise<ApiResponse<Table>>;
+  createTable?(data: { tableNumber: string; displayName: string; capacity: number; section: string }): Promise<ApiResponse<Table>>;
+  updateTable?(id: string, data: Partial<{ tableNumber: string; displayName: string; capacity: number; section: string; status: Table["status"]; isActive: boolean }>): Promise<ApiResponse<Table>>;
   updateTableStatus(id: string, status: Table["status"]): Promise<ApiResponse<Table>>;
+  rotateTableQr?(id: string): Promise<ApiResponse<{ tableId: string; qrToken: string }>>;
+  deactivateTable?(id: string): Promise<ApiResponse<null>>;
 }
 
 export interface IUserService {
   getUsers(): Promise<ApiResponse<User[]>>;
-  createUser(user: Omit<User, "id" | "createdAt" | "updatedAt">): Promise<ApiResponse<User>>;
+  createUser(user: Omit<User, "id" | "createdAt" | "updatedAt"> & { password?: string }): Promise<ApiResponse<User>>;
+  updateUser?(id: string, data: Partial<{ name: string; phoneNumber?: string | null; role: Role; isActive: boolean }>): Promise<ApiResponse<User>>;
   updateUserRole(id: string, role: Role): Promise<ApiResponse<User>>;
+  updateUserPermissions?(id: string, permissions: string[]): Promise<ApiResponse<{ id: string; permissions: string[] }>>;
+  resetPassword?(id: string, newPassword: string): Promise<ApiResponse<null>>;
+  revokeSessions?(id: string): Promise<ApiResponse<null>>;
+  deactivateUser?(id: string): Promise<ApiResponse<null>>;
 }
+
+export interface TenantProfile {
+  id: string;
+  name: string;
+  code: string;
+  timezone: string;
+  currency: string;
+  currencySymbol: string;
+  gstin?: string | null;
+  cgstRate: number;
+  sgstRate: number;
+  serviceChargeRate: number;
+  hasAccommodation: boolean;
+  hasRestaurant: boolean;
+  isActive: boolean;
+  settings?: Record<string, unknown>;
+}
+
+export interface PilotReadiness {
+  tenant: Partial<TenantProfile>;
+  metrics: {
+    tablesCount: number;
+    roomsCount: number;
+    menuCategoriesCount: number;
+    menuItemsCount: number;
+    staffCount: number;
+  };
+  readiness: {
+    percentage: number;
+    isPilotReady: boolean;
+    completedCount: number;
+    totalSteps: number;
+    steps: Array<{
+      key: string;
+      label: string;
+      completed: boolean;
+      details: string;
+    }>;
+  };
+}
+
+export interface ITenantService {
+  getCurrentTenant(): Promise<ApiResponse<TenantProfile>>;
+  updateCurrentTenant(data: Partial<TenantProfile>): Promise<ApiResponse<TenantProfile>>;
+  getReadiness(): Promise<ApiResponse<PilotReadiness>>;
+  onboardHotel(data: Record<string, unknown>): Promise<ApiResponse<{ tenant: TenantProfile; adminUser: User }>>;
+}
+
+export interface IRoleService {
+  getPermissionCatalog(): Promise<ApiResponse<{ catalog: Array<{ key: string; name: string; category: string; description: string; isSensitive?: boolean }>; roleDefaults: Record<string, string[]>; roles: string[] }>>;
+  getCustomRoles(): Promise<ApiResponse<Array<{ id: string; name: string; description?: string; baseRole: Role; permissions: string[] }>>>;
+  createCustomRole(data: { name: string; description?: string; baseRole: Role; permissions: string[] }): Promise<ApiResponse<unknown>>;
+  deleteCustomRole(id: string): Promise<ApiResponse<null>>;
+}
+
+export interface IAuditService {
+  getAuditLogs(query?: { limit?: number; offset?: number; action?: string; resource?: string }): Promise<ApiResponse<{ logs: Array<{ id: string; actorEmail?: string; actorRole?: string; action: string; resource: string; resourceId?: string; details?: Record<string, unknown>; ipAddress?: string; createdAt: string }>; total: number }>>;
+}
+

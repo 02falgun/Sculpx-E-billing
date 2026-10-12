@@ -24,7 +24,7 @@ export class MockUserService implements IUserService {
     return { success: true, data: newUser, message: "User created" };
   }
 
-  async updateUserRole(id: string, role: Role): Promise<ApiResponse<User>> {
+  async updateUser(id: string, data: Partial<{ name: string; phoneNumber?: string | null; role: Role; isActive: boolean }>): Promise<ApiResponse<User>> {
     await delay(150);
     const user = this.users.find((u) => u.id === id);
     if (!user) {
@@ -34,9 +34,58 @@ export class MockUserService implements IUserService {
         error: { code: "USER_NOT_FOUND", message: "User not found" },
       };
     }
-    user.role = role;
+    if (data.name !== undefined) user.name = data.name;
+    if (data.phoneNumber !== undefined) user.phoneNumber = data.phoneNumber || undefined;
+    if (data.role !== undefined) user.role = data.role;
+    if (data.isActive !== undefined) user.isActive = data.isActive;
     user.updatedAt = new Date().toISOString();
-    return { success: true, data: user, message: "Role updated" };
+    return { success: true, data: user, message: "User updated" };
+  }
+
+  async updateUserRole(id: string, role: Role): Promise<ApiResponse<User>> {
+    return this.updateUser(id, { role });
+  }
+
+  async updateUserPermissions(id: string, permissions: string[]): Promise<ApiResponse<{ id: string; permissions: string[] }>> {
+    await delay(150);
+    const user = this.users.find((u) => u.id === id);
+    if (!user) {
+      return {
+        success: false,
+        data: null as unknown as { id: string; permissions: string[] },
+        error: { code: "USER_NOT_FOUND", message: "User not found" },
+      };
+    }
+    user.permissions = permissions;
+    return { success: true, data: { id, permissions }, message: "Permissions updated" };
+  }
+
+  async resetPassword(id: string): Promise<ApiResponse<null>> {
+    await delay(150);
+    const user = this.users.find((u) => u.id === id);
+    if (!user) {
+      return { success: false, data: null, error: { code: "USER_NOT_FOUND", message: "User not found" } };
+    }
+    return { success: true, data: null, message: "Password reset successfully" };
+  }
+
+  async revokeSessions(id: string): Promise<ApiResponse<null>> {
+    await delay(150);
+    const user = this.users.find((u) => u.id === id);
+    if (!user) {
+      return { success: false, data: null, error: { code: "USER_NOT_FOUND", message: "User not found" } };
+    }
+    return { success: true, data: null, message: "All sessions revoked" };
+  }
+
+  async deactivateUser(id: string): Promise<ApiResponse<null>> {
+    await delay(150);
+    const user = this.users.find((u) => u.id === id);
+    if (!user) {
+      return { success: false, data: null, error: { code: "USER_NOT_FOUND", message: "User not found" } };
+    }
+    user.isActive = false;
+    return { success: true, data: null, message: "User deactivated" };
   }
 }
 

@@ -24,18 +24,23 @@ export interface Room extends Timestamped {
   roomNumber: string;
   floor: string;
   guestName?: string;
+  roomType?: string;
+  capacity?: number;
   status: "OCCUPIED" | "VACANT" | "CLEANING" | "MAINTENANCE";
   qrToken: string;
   notes?: string;
+  isActive?: boolean;
 }
 
 export interface Table extends Timestamped {
   id: ID;
   tableNumber: string;
+  displayName?: string;
   section: string;
   capacity: number;
   status: "AVAILABLE" | "OCCUPIED" | "RESERVED" | "BILLED";
   qrToken: string;
   activeOrderId?: ID;
   activeBillId?: ID;
+  isActive?: boolean;
 }

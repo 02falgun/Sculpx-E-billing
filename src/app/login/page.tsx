@@ -20,19 +20,18 @@ function LoginForm() {
 
   const setSession = useAuthStore((s) => s.setSession);
 
-  const [email, setEmail] = React.useState("admin@ebilling.com");
-  const [password, setPassword] = React.useState("demo-secure-pass");
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
 
   const doLogin = async (targetEmail: string, targetPass?: string) => {
     setLoading(true);
     setError(null);
+    setInfoMessage(null);
 
-    const effectivePass =
-      targetPass && targetPass !== "••••••••"
-        ? targetPass
-        : "demo-secure-pass";
+    const effectivePass = targetPass || "";
 
     if (!ENV.USE_MOCK_API) {
       try {
@@ -44,7 +43,7 @@ function LoginForm() {
         if (!res.success || !res.data) {
           setError(
             res.error?.message ||
-              "Invalid credentials. Use a registered pilot staff account (e.g. admin@ebilling.com, manager@ebilling.com, cashier@ebilling.com, waiter@ebilling.com)."
+              "Invalid credentials. Please verify your email and password."
           );
           setLoading(false);
           return;
@@ -66,7 +65,7 @@ function LoginForm() {
       const session = mockAuthenticate(targetEmail);
       if (!session) {
         setError(
-          "Unrecognized staff account. Use a registered hospitality email (e.g. admin@demo.com, waiter@demo.com, kitchen@demo.com, cashier@demo.com)."
+          "Unrecognized staff account in mock mode."
         );
         setLoading(false);
         return;
@@ -82,6 +81,10 @@ function LoginForm() {
     e.preventDefault();
     if (!email.trim()) {
       setError("Please enter your staff email.");
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password.");
       return;
     }
     doLogin(email, password);
@@ -144,7 +147,7 @@ function LoginForm() {
                 <button
                   type="button"
                   onClick={() =>
-                    alert("Demo System: Any password is accepted for mock accounts.")
+                    setInfoMessage("Please contact your hotel administrator or platform administrator to reset your credentials.")
                   }
                   className="text-[11px] text-neutral-500 hover:text-black transition-colors cursor-pointer"
                 >
@@ -162,6 +165,12 @@ function LoginForm() {
               />
             </div>
 
+            {infoMessage && (
+              <div className="p-3 rounded-[6px] border border-blue-200 bg-blue-50 text-blue-900 text-xs">
+                {infoMessage}
+              </div>
+            )}
+
             <Button
               type="submit"
               variant="primary"
@@ -174,14 +183,10 @@ function LoginForm() {
             </Button>
           </form>
 
-          {/* Discreet Demo Note for verification without role buttons */}
-          <div className="mt-8 pt-6 border-t border-neutral-200 text-left">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 block mb-1.5">
-              Authorized Demo Accounts
+          <div className="mt-8 pt-6 border-t border-neutral-100 text-left">
+            <span className="text-[11px] text-neutral-400 block">
+              Secure Tenant-Isolated Authentication · V1 Production Architecture
             </span>
-            <p className="text-[11px] text-neutral-500 leading-relaxed font-mono">
-              waiter@demo.com · cashier@demo.com · kitchen@demo.com · manager@demo.com · admin@demo.com
-            </p>
           </div>
         </div>
 

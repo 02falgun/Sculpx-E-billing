@@ -5,6 +5,7 @@ import { env } from "../config/env.js";
 import { verifyPassword, normalizeEmail } from "../lib/password.js";
 import { formatSuccessResponse, AppError } from "../lib/errors.js";
 import { authenticate, requireRoles, requireTenantScope } from "../middleware/auth.js";
+import { ROLE_DEFAULT_PERMISSIONS } from "../config/permissions.js";
 
 const loginBodySchema = z
   .object({
@@ -87,18 +88,23 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       const expiresInSeconds = 8 * 60 * 60;
       const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
 
-      // Sign JWT with subject, email, role, and tenant boundary claims
+      // Sign JWT with subject, email, role, tenant boundary, and tokenVersion claims
       const token = fastify.jwt.sign(
         {
           sub: user.id,
           email: user.email,
           role: user.role,
           tenantId: user.tenantId,
+          tokenVersion: user.tokenVersion,
         },
         {
           expiresIn: env.JWT_EXPIRES_IN,
         }
       );
+
+      const explicitPerms = user.permissions.map((p) => p.permissionKey);
+      const roleDefaults = ROLE_DEFAULT_PERMISSIONS[user.role] || [];
+      const effectivePermissions = Array.from(new Set([...roleDefaults, ...explicitPerms]));
 
       const userProfile = {
         id: user.id,
@@ -108,7 +114,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         role: user.role,
         phoneNumber: user.phoneNumber,
         isActive: user.isActive,
-        permissions: user.permissions.map((p) => p.permissionKey),
+        permissions: effectivePermissions,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       };

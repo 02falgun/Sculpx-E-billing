@@ -11,6 +11,9 @@ import {
   ITableService,
   IUserService,
   IAuthService,
+  ITenantService,
+  IRoleService,
+  IAuditService,
 } from "./interfaces";
 
 import { MockMenuService } from "./mock/menu.mock";
@@ -23,6 +26,9 @@ import { MockPrinterService } from "./mock/printer.mock";
 import { MockRoomService } from "./mock/room.mock";
 import { MockTableService } from "./mock/table.mock";
 import { MockUserService, MockAuthService } from "./mock/user.mock";
+import { MockTenantService } from "./mock/tenant.mock";
+import { MockRoleService } from "./mock/role.mock";
+import { MockAuditService } from "./mock/audit.mock";
 
 import {
   HttpMenuService,
@@ -36,6 +42,9 @@ import {
   HttpTableService,
   HttpUserService,
   HttpAuthService,
+  HttpTenantService,
+  HttpRoleService,
+  HttpAuditService,
 } from "./http";
 
 // Instances of mock services
@@ -50,6 +59,9 @@ const mockRoom = new MockRoomService();
 const mockTable = new MockTableService();
 const mockUser = new MockUserService();
 const mockAuth = new MockAuthService();
+const mockTenant = new MockTenantService();
+const mockRole = new MockRoleService();
+const mockAudit = new MockAuditService();
 
 // Instances of live HTTP services
 const httpMenu = new HttpMenuService();
@@ -63,6 +75,9 @@ const httpRoom = new HttpRoomService();
 const httpTable = new HttpTableService();
 const httpUser = new HttpUserService();
 const httpAuth = new HttpAuthService();
+const httpTenant = new HttpTenantService();
+const httpRole = new HttpRoleService();
+const httpAudit = new HttpAuditService();
 
 export function getMenuService(): IMenuService {
   return ENV.USE_MOCK_API ? mockMenu : httpMenu;
@@ -106,6 +121,18 @@ export function getUserService(): IUserService {
 
 export function getAuthService(): IAuthService {
   return ENV.USE_MOCK_API ? mockAuth : httpAuth;
+}
+
+export function getTenantService(): ITenantService {
+  return ENV.USE_MOCK_API ? mockTenant : httpTenant;
+}
+
+export function getRoleService(): IRoleService {
+  return ENV.USE_MOCK_API ? mockRole : httpRole;
+}
+
+export function getAuditService(): IAuditService {
+  return ENV.USE_MOCK_API ? mockAudit : httpAudit;
 }
 
 // Dynamic proxies for direct hook/component consumption
@@ -153,3 +180,16 @@ export const userApi = new Proxy({} as IUserService, {
 export const authApi = new Proxy({} as IAuthService, {
   get: (_, prop: string | symbol) => (getAuthService() as unknown as Record<string | symbol, unknown>)[prop],
 });
+
+export const tenantApi = new Proxy({} as ITenantService, {
+  get: (_, prop: string | symbol) => (getTenantService() as unknown as Record<string | symbol, unknown>)[prop],
+});
+
+export const roleApi = new Proxy({} as IRoleService, {
+  get: (_, prop: string | symbol) => (getRoleService() as unknown as Record<string | symbol, unknown>)[prop],
+});
+
+export const auditApi = new Proxy({} as IAuditService, {
+  get: (_, prop: string | symbol) => (getAuditService() as unknown as Record<string | symbol, unknown>)[prop],
+});
+
