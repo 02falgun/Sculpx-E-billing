@@ -5,6 +5,7 @@ import { hashPassword, normalizeEmail } from "../lib/password.js";
 import { formatSuccessResponse, AppError } from "../lib/errors.js";
 import { authenticate, requireRoles } from "../middleware/auth.js";
 import { auditService } from "../services/audit.service.js";
+import { env } from "../config/env.js";
 
 const onboardHotelSchema = z.object({
   name: z.string().min(2, "Hotel name must be at least 2 characters").max(255),
@@ -71,10 +72,14 @@ export const tenantRoutes: FastifyPluginAsync = async (fastify) => {
     let actorId: string | undefined = undefined;
 
     const bootstrapTokenHeader = request.headers["x-bootstrap-token"];
-    const expectedBootstrapSecret =
-      process.env.BOOTSTRAP_SECRET || "sculpx-pilot-bootstrap-token-2026";
+    const configuredBootstrapSecret = env.BOOTSTRAP_SECRET;
 
-    if (bootstrapTokenHeader && bootstrapTokenHeader === expectedBootstrapSecret) {
+    if (
+      configuredBootstrapSecret &&
+      configuredBootstrapSecret.length >= 32 &&
+      typeof bootstrapTokenHeader === "string" &&
+      bootstrapTokenHeader === configuredBootstrapSecret
+    ) {
       isAuthorized = true;
     } else if (request.headers.authorization) {
       try {

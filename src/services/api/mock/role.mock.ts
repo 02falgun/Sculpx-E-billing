@@ -96,6 +96,24 @@ export class MockRoleService implements IRoleService {
     return { success: true, data: newRole, message: "Custom role created" };
   }
 
+  async updateCustomRole(
+    id: string,
+    data: Partial<{
+      name: string;
+      description?: string;
+      baseRole: Role;
+      permissions: string[];
+    }>
+  ): Promise<ApiResponse<unknown>> {
+    await delay(150);
+    const existing = this.customRoles.find((r) => r.id === id);
+    if (!existing) {
+      return { success: false, data: null, error: { code: "NOT_FOUND", message: "Custom role not found" } };
+    }
+    Object.assign(existing, data);
+    return { success: true, data: existing, message: "Custom role updated" };
+  }
+
   async deleteCustomRole(id: string): Promise<ApiResponse<null>> {
     await delay(150);
     this.customRoles = this.customRoles.filter((r) => r.id !== id);

@@ -209,6 +209,10 @@ export const roomRoutes: FastifyPluginAsync = async (fastify) => {
       throw new AppError("Room not found", 404, "NOT_FOUND");
     }
 
+    if (req.authenticatedUser && req.authenticatedUser.role !== "SUPER_ADMIN" && req.authenticatedUser.tenantId !== room.tenantId) {
+      throw new AppError("Forbidden: cross-tenant access denied", 403, "FORBIDDEN");
+    }
+
     return formatSuccessResponse(
       {
         id: room.id,

@@ -314,9 +314,35 @@ export class BillingService {
           subtotal = subtotal.add(it.totalPrice);
         }
 
-        // Indian GST Model: CGST 2.5% + SGST 2.5%
-        const cgstRate = 2.5;
-        const sgstRate = 2.5;
+        // Fetch tenant-specific taxation rules & service charge settings
+        const tenant = await tx.tenant.findUnique({
+          where: { id: tenantId },
+          select: {
+            cgstRate: true,
+            sgstRate: true,
+            serviceChargeRate: true,
+            gstin: true,
+            settings: true,
+          },
+        });
+
+        const cgstRate =
+          tenant?.cgstRate !== undefined && tenant?.cgstRate !== null
+            ? Number(tenant.cgstRate)
+            : 2.5;
+        const sgstRate =
+          tenant?.sgstRate !== undefined && tenant?.sgstRate !== null
+            ? Number(tenant.sgstRate)
+            : 2.5;
+        const serviceChargeRate =
+          tenant?.serviceChargeRate !== undefined && tenant?.serviceChargeRate !== null
+            ? Number(tenant.serviceChargeRate)
+            : 0.0;
+
+        const serviceCharge = new Prisma.Decimal(
+          (Number(subtotal) * (serviceChargeRate / 100)).toFixed(2)
+        );
+
         const cgstAmount = new Prisma.Decimal(
           (Number(subtotal) * (cgstRate / 100)).toFixed(2)
         );
@@ -324,14 +350,21 @@ export class BillingService {
           (Number(subtotal) * (sgstRate / 100)).toFixed(2)
         );
         const totalTax = cgstAmount.add(sgstAmount);
-        const serviceCharge = new Prisma.Decimal("0.00");
-        const grandTotal = subtotal.add(totalTax).add(serviceCharge);
+        const rawGrandTotal = subtotal.add(totalTax).add(serviceCharge);
+        const roundedGrandTotal = new Prisma.Decimal(
+          Math.round(Number(rawGrandTotal)).toFixed(2)
+        );
+        const roundingDiff = roundedGrandTotal.sub(rawGrandTotal);
+        const grandTotal = roundedGrandTotal;
 
         const taxDetails = {
           cgstRate,
           cgstAmount: Number(cgstAmount.toFixed(2)),
           sgstRate,
           sgstAmount: Number(sgstAmount.toFixed(2)),
+          serviceChargeRate,
+          serviceChargeAmount: Number(serviceCharge.toFixed(2)),
+          gstin: tenant?.gstin || null,
           taxes: [
             {
               name: `CGST (${cgstRate}%)`,
@@ -365,7 +398,7 @@ export class BillingService {
             serviceCharge,
             discountAmount: new Prisma.Decimal("0.00"),
             grandTotal,
-            roundingDifference: new Prisma.Decimal("0.00"),
+            roundingDifference: roundingDiff,
             paymentStatus: BillPaymentStatus.UNPAID,
           },
         });

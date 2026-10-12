@@ -30,6 +30,10 @@ export default function AdminSettingsPage() {
   const [serviceChargeRate, setServiceChargeRate] = React.useState(0);
   const [hasAccommodation, setHasAccommodation] = React.useState(true);
   const [hasRestaurant, setHasRestaurant] = React.useState(true);
+  const [contactPhone, setContactPhone] = React.useState("");
+  const [contactEmail, setContactEmail] = React.useState("");
+  const [address, setAddress] = React.useState("");
+  const [taxConfirmed, setTaxConfirmed] = React.useState(false);
 
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
@@ -47,6 +51,11 @@ export default function AdminSettingsPage() {
       setServiceChargeRate(tenant.serviceChargeRate ?? 0);
       setHasAccommodation(tenant.hasAccommodation ?? true);
       setHasRestaurant(tenant.hasRestaurant ?? true);
+      const s = (tenant.settings as Record<string, any>) || {};
+      setContactPhone(s.contactPhone || "");
+      setContactEmail(s.contactEmail || "");
+      setAddress(s.address || "");
+      setTaxConfirmed(s.taxConfirmed === true);
     }
   }, [tenant]);
 
@@ -63,6 +72,14 @@ export default function AdminSettingsPage() {
         serviceChargeRate: Number(serviceChargeRate),
         hasAccommodation,
         hasRestaurant,
+        settings: {
+          ...((tenant?.settings as Record<string, unknown>) || {}),
+          contactPhone: contactPhone.trim(),
+          contactEmail: contactEmail.trim(),
+          address: address.trim(),
+          taxConfirmed,
+          confirmedAt: taxConfirmed ? new Date().toISOString() : undefined,
+        },
       });
       if (!res.success) throw new Error(res.error?.message || "Failed to save settings");
       return res.data;
@@ -165,6 +182,37 @@ export default function AdminSettingsPage() {
                 className="font-mono"
               />
             </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Official Contact Phone
+              </label>
+              <Input
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="e.g. +91 98765 43210"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Official Billing / Inquiries Email
+              </label>
+              <Input
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="e.g. billing@hotel.com"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Physical Hotel / Restaurant Address
+              </label>
+              <Input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="e.g. 101 Marine Drive, Nariman Point, Mumbai 400021"
+              />
+            </div>
           </div>
         </div>
 
@@ -252,6 +300,25 @@ export default function AdminSettingsPage() {
                 className="font-mono"
               />
             </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100">
+            <label className="flex items-start gap-3 p-3 rounded-xl border border-amber-200 bg-amber-50/50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={taxConfirmed}
+                onChange={(e) => setTaxConfirmed(e.target.checked)}
+                className="mt-0.5 rounded border-amber-300 text-amber-900 focus:ring-amber-900"
+              />
+              <div>
+                <span className="text-xs font-bold text-slate-900 block">
+                  Authoritative Tax &amp; Surcharge Confirmation
+                </span>
+                <p className="text-[11px] text-slate-600 mt-0.5">
+                  I explicitly verify that the legal business name, GSTIN ({gstin || "N/A"}), CGST ({cgstRate}%), SGST ({sgstRate}%), and Service Charge ({serviceChargeRate}%) settings configured above match this property&apos;s registration and will be applied to all live bills and GST invoices.
+                </p>
+              </div>
+            </label>
           </div>
         </div>
 

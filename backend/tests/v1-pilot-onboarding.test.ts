@@ -32,12 +32,32 @@ describe("SCULPX E-Billing — V1 Pilot Hotel Onboarding & Granular RBAC Verific
     await app.close();
   });
 
+  it("Step 0: Reject predictable or invalid bootstrap tokens with HTTP 403 FORBIDDEN", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tenants/onboard",
+      headers: {
+        "x-bootstrap-token": "sculpx-pilot-bootstrap-token-2026", // obsolete predictable string
+      },
+      payload: {
+        name: "Unauthorized Hotel",
+        code: `HACK-${Date.now().toString().slice(-4)}`,
+        adminName: "Attacker",
+        adminEmail: "attacker@hack.local",
+        adminPassword: "Password123!",
+      },
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
+
   it("Step 1: Onboard a new hotel tenant without inheriting demo rooms, tables, or menu data", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/tenants/onboard",
       headers: {
-        "x-bootstrap-token": process.env.BOOTSTRAP_SECRET || "sculpx-pilot-bootstrap-token-2026",
+        "x-bootstrap-token":
+          process.env.BOOTSTRAP_SECRET || "test-bootstrap-secret-token-32-chars-long-secure-suite",
       },
       payload: {
         name: "Sculpx Heritage Grand Resort",

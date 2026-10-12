@@ -36,6 +36,7 @@ const envSchema = z.object({
     }),
   RATE_LIMIT_MAX: z.coerce.number().min(1).default(10),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().min(1000).default(60000),
+  BOOTSTRAP_SECRET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -52,8 +53,14 @@ function loadEnv(): Env {
 
   const data = parsed.data;
 
-  // Enforce secure JWT Secret in production
+  // Enforce secure secrets and database connection in production
   if (data.NODE_ENV === "production") {
+    if (!data.DATABASE_URL || data.DATABASE_URL.trim() === "") {
+      throw new Error(
+        "Production startup aborted: DATABASE_URL must be explicitly configured."
+      );
+    }
+
     if (
       !data.JWT_SECRET ||
       data.JWT_SECRET.length < 32 ||
@@ -62,6 +69,19 @@ function loadEnv(): Env {
       throw new Error(
         "Production startup aborted: JWT_SECRET must be configured with at least 32 cryptographically secure characters."
       );
+    }
+
+    if (data.BOOTSTRAP_SECRET) {
+      if (
+        data.BOOTSTRAP_SECRET.length < 32 ||
+        data.BOOTSTRAP_SECRET.toLowerCase().includes("sculpx-pilot-bootstrap") ||
+        data.BOOTSTRAP_SECRET.toLowerCase().includes("default") ||
+        data.BOOTSTRAP_SECRET.toLowerCase().includes("secret")
+      ) {
+        throw new Error(
+          "Production startup aborted: When configured, BOOTSTRAP_SECRET must contain at least 32 cryptographically secure characters without predictable default words."
+        );
+      }
     }
 
     if (data.ALLOW_DEMO_SEED) {

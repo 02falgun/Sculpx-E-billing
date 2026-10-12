@@ -273,9 +273,14 @@ export const userRoutes: FastifyPluginAsync = async (fastify) => {
 
       const data = parseResult.data;
 
-      // Prevent non-superadmins from escalating anyone to SUPER_ADMIN
-      if (data.role === "SUPER_ADMIN" && caller.role !== "SUPER_ADMIN") {
-        throw new AppError("Forbidden: only Super Admins can assign the SUPER_ADMIN role", 403, "FORBIDDEN");
+      // Prevent non-superadmins from escalating anyone to SUPER_ADMIN or modifying SUPER_ADMIN
+      if (caller.role !== "SUPER_ADMIN" && (data.role === "SUPER_ADMIN" || existing.role === "SUPER_ADMIN")) {
+        throw new AppError("Forbidden: only Super Admins can assign or modify the SUPER_ADMIN role", 403, "FORBIDDEN");
+      }
+
+      // Prevent non-superadmins from altering their own role
+      if (caller.id === id && data.role && data.role !== caller.role && caller.role !== "SUPER_ADMIN") {
+        throw new AppError("Forbidden: cannot alter your own administrative role", 403, "FORBIDDEN");
       }
 
       // If user is deactivated, increment tokenVersion to revoke active sessions
@@ -360,6 +365,10 @@ export const userRoutes: FastifyPluginAsync = async (fastify) => {
         throw new AppError("Forbidden: cannot assign or modify Super Admin role", 403, "FORBIDDEN");
       }
 
+      if (caller.id === id && caller.role !== "SUPER_ADMIN") {
+        throw new AppError("Forbidden: cannot alter your own administrative role", 403, "FORBIDDEN");
+      }
+
       const updated = await prisma.user.update({
         where: { id },
         data: {
@@ -425,7 +434,19 @@ export const userRoutes: FastifyPluginAsync = async (fastify) => {
         throw new AppError("Forbidden: cross-tenant access denied", 403, "FORBIDDEN");
       }
 
+      if (caller.role !== "SUPER_ADMIN" && user.role === "SUPER_ADMIN") {
+        throw new AppError("Forbidden: cannot modify Super Admin permissions", 403, "FORBIDDEN");
+      }
+
+      if (caller.id === id && caller.role !== "SUPER_ADMIN") {
+        throw new AppError("Forbidden: cannot modify your own administrative permissions", 403, "FORBIDDEN");
+      }
+
       const { permissions } = parseResult.data;
+
+      if (caller.role !== "SUPER_ADMIN" && permissions.includes("tenant.manage")) {
+        throw new AppError("Forbidden: cannot grant platform governance permission", 403, "FORBIDDEN");
+      }
 
       // Update permissions and bump tokenVersion in a transaction
       await prisma.$transaction(async (tx) => {
@@ -493,6 +514,10 @@ export const userRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (caller.role !== "SUPER_ADMIN" && user.tenantId !== caller.tenantId) {
         throw new AppError("Forbidden: cross-tenant access denied", 403, "FORBIDDEN");
+      }
+
+      if (caller.role !== "SUPER_ADMIN" && user.role === "SUPER_ADMIN") {
+        throw new AppError("Forbidden: cannot reset password of Super Admin", 403, "FORBIDDEN");
       }
 
       // Hotel Admin cannot reset Super Admin passwords
@@ -591,6 +616,10 @@ export const userRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (caller.role !== "SUPER_ADMIN" && user.tenantId !== caller.tenantId) {
         throw new AppError("Forbidden: cross-tenant access denied", 403, "FORBIDDEN");
+      }
+
+      if (caller.role !== "SUPER_ADMIN" && user.role === "SUPER_ADMIN") {
+        throw new AppError("Forbidden: cannot deactivate Super Admin account", 403, "FORBIDDEN");
       }
 
       await prisma.user.update({

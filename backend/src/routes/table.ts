@@ -209,6 +209,10 @@ export const tableRoutes: FastifyPluginAsync = async (fastify) => {
       throw new AppError("Table not found", 404, "NOT_FOUND");
     }
 
+    if (req.authenticatedUser && req.authenticatedUser.role !== "SUPER_ADMIN" && req.authenticatedUser.tenantId !== table.tenantId) {
+      throw new AppError("Forbidden: cross-tenant access denied", 403, "FORBIDDEN");
+    }
+
     return formatSuccessResponse(
       {
         id: table.id,

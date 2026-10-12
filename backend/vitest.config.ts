@@ -10,6 +10,9 @@ export default defineConfig({
     globals: true,
     testTimeout: 20000,
     fileParallelism: false,
+    env: {
+      BOOTSTRAP_SECRET: "test-bootstrap-secret-token-32-chars-long-secure-suite",
+    },
   },
   resolve: {
     alias: {

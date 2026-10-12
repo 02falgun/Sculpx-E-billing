@@ -219,6 +219,7 @@ export interface IRoleService {
   getPermissionCatalog(): Promise<ApiResponse<{ catalog: Array<{ key: string; name: string; category: string; description: string; isSensitive?: boolean }>; roleDefaults: Record<string, string[]>; roles: string[] }>>;
   getCustomRoles(): Promise<ApiResponse<Array<{ id: string; name: string; description?: string; baseRole: Role; permissions: string[] }>>>;
   createCustomRole(data: { name: string; description?: string; baseRole: Role; permissions: string[] }): Promise<ApiResponse<unknown>>;
+  updateCustomRole(id: string, data: Partial<{ name: string; description?: string; baseRole: Role; permissions: string[] }>): Promise<ApiResponse<unknown>>;
   deleteCustomRole(id: string): Promise<ApiResponse<null>>;
 }
 

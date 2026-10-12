@@ -28,6 +28,18 @@ export class HttpRoleService implements IRoleService {
     return apiClient.post("/roles/custom", data);
   }
 
+  async updateCustomRole(
+    id: string,
+    data: Partial<{
+      name: string;
+      description?: string;
+      baseRole: Role;
+      permissions: string[];
+    }>
+  ): Promise<ApiResponse<unknown>> {
+    return apiClient.patch(`/roles/custom/${encodeURIComponent(id)}`, data);
+  }
+
   async deleteCustomRole(id: string): Promise<ApiResponse<null>> {
     return apiClient.delete(`/roles/custom/${encodeURIComponent(id)}`);
   }
