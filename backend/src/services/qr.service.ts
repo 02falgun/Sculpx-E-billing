@@ -71,7 +71,7 @@ export class QrService {
                 tenantId: candidateTable.tenantId,
                 type: "TABLE",
                 tableId: candidateTable.id,
-                token: `tbl-${candidateTable.tableNumber.toLowerCase()}-${Date.now().toString(36)}`,
+                token: token,
                 isActive: true,
               },
               include: {
@@ -80,6 +80,34 @@ export class QrService {
               },
             });
           }
+        } else {
+          // Dynamic provisioning for pilot testing
+          const defaultTenant = await db.tenant.findFirst() || { id: "e1b1d1f0-0000-4000-8000-000000000001" };
+          const tblNum = raw1 || token.replace(/^table-?/i, "");
+          const newTable = await db.table.create({
+            data: {
+              tenantId: defaultTenant.id,
+              tableNumber: tblNum,
+              displayName: `Table ${tblNum}`,
+              capacity: 4,
+              section: "Main Dining",
+              status: "VACANT",
+              isActive: true,
+            },
+          });
+          qr = await db.qrCode.create({
+            data: {
+              tenantId: defaultTenant.id,
+              type: "TABLE",
+              tableId: newTable.id,
+              token: token,
+              isActive: true,
+            },
+            include: {
+              table: true,
+              room: true,
+            },
+          });
         }
       }
 
@@ -115,7 +143,7 @@ export class QrService {
                 tenantId: candidateRoom.tenantId,
                 type: "ROOM",
                 roomId: candidateRoom.id,
-                token: `room-${candidateRoom.roomNumber.toLowerCase()}-${Date.now().toString(36)}`,
+                token: token,
                 isActive: true,
               },
               include: {
@@ -124,6 +152,37 @@ export class QrService {
               },
             });
           }
+        } else {
+          // Dynamic provisioning for pilot testing
+          const defaultTenant = await db.tenant.findFirst() || { id: "e1b1d1f0-0000-4000-8000-000000000001" };
+          const roomNum = raw1 || token.replace(/^room-?/i, "");
+          const floorNumber = roomNum.charAt(0);
+          const floorLabel = /^\d+$/.test(floorNumber)
+            ? `${floorNumber}${floorNumber === "1" ? "st" : floorNumber === "2" ? "nd" : floorNumber === "3" ? "rd" : "th"} Floor`
+            : "Main Wing";
+
+          const newRoom = await db.room.create({
+            data: {
+              tenantId: defaultTenant.id,
+              roomNumber: roomNum,
+              floor: floorLabel,
+              status: "VACANT",
+              isActive: true,
+            },
+          });
+          qr = await db.qrCode.create({
+            data: {
+              tenantId: defaultTenant.id,
+              type: "ROOM",
+              roomId: newRoom.id,
+              token: token,
+              isActive: true,
+            },
+            include: {
+              table: true,
+              room: true,
+            },
+          });
         }
       }
     }
