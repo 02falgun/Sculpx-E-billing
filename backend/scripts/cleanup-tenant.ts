@@ -33,6 +33,8 @@ async function main() {
   const [
     usersCount,
     demoUsersCount,
+    employeeUsersCount,
+    adminsCount,
     tablesCount,
     roomsCount,
     qrCodesCount,
@@ -48,6 +50,8 @@ async function main() {
   ] = await Promise.all([
     prisma.user.count({ where: { tenantId } }),
     prisma.user.count({ where: { tenantId, email: { contains: "@demo.com" } } }),
+    prisma.user.count({ where: { tenantId, role: { notIn: ["ADMIN", "SUPER_ADMIN"] } } }),
+    prisma.user.count({ where: { tenantId, role: { in: ["ADMIN", "SUPER_ADMIN"] } } }),
     prisma.table.count({ where: { tenantId } }),
     prisma.room.count({ where: { tenantId } }),
     prisma.qrCode.count({ where: { tenantId } }),
@@ -70,7 +74,7 @@ async function main() {
   console.log(`Target Tenant GSTIN: ${targetTenant.gstin || "N/A"}`);
   console.log(`Cleanup Strategy:    ${keepTenant ? "RESET TO EMPTY (Preserve Tenant Profile & Admin)" : "COMPLETE TENANT PURGE"}`);
   console.log("-------------------------------------------------------");
-  console.log(`Staff Users Total:   ${usersCount} (Demo @demo.com: ${demoUsersCount})`);
+  console.log(`Staff Users Total:   ${usersCount} (Demo @demo.com: ${demoUsersCount}, Seeded Employees: ${employeeUsersCount}, Retained Admins: ${adminsCount})`);
   console.log(`Tables:              ${tablesCount}`);
   console.log(`Rooms:               ${roomsCount}`);
   console.log(`QR Codes:            ${qrCodesCount}`);
@@ -125,6 +129,9 @@ async function main() {
       where: { tenantId },
       data: { currentOrderId: null },
     });
+    await tx.idempotencyKey.deleteMany({ where: { tenantId } });
+    await tx.dailyCounter.deleteMany({ where: { tenantId } });
+    await tx.outboxEvent.deleteMany({ where: { tenantId } });
     await tx.order.deleteMany({ where: { tenantId } });
 
     // 4. Inventory & Recipes
@@ -159,11 +166,21 @@ async function main() {
           email: { contains: "@demo.com" },
         },
       });
+
+      // Remove seeded employee accounts (Waiters, Cooks, Cashiers, Captains, Managers)
+      // Zero demo employee accounts rule: keep only the legitimate hotel administrator
+      await tx.user.deleteMany({
+        where: {
+          tenantId,
+          role: { notIn: ["ADMIN", "SUPER_ADMIN"] },
+        },
+      });
+
       // Neutralize property profile
       await tx.tenant.update({
         where: { id: tenantId },
         data: {
-          name: "Sculpx Pilot Hotel",
+          name: "Sculpx Pilot Hotel & Restaurant",
           gstin: null,
           serviceChargeRate: 0,
         },
@@ -176,6 +193,24 @@ async function main() {
       // Delete tenant container
       await tx.tenant.deleteMany({ where: { id: tenantId } });
     }
+
+    // 9. Clean up any orphaned test fixtures (users, QR codes, printers outside registered tenants)
+    const validTenants = (await tx.tenant.findMany({ select: { id: true } })).map((t) => t.id);
+    await tx.user.deleteMany({
+      where: {
+        tenantId: { notIn: validTenants },
+        role: { not: "SUPER_ADMIN" },
+      },
+    });
+    await tx.qrCode.deleteMany({
+      where: { tenantId: { notIn: validTenants } },
+    });
+    await tx.printer.deleteMany({
+      where: { tenantId: { notIn: validTenants } },
+    });
+  }, {
+    maxWait: 30000,
+    timeout: 120000,
   });
 
   await auditService.record({

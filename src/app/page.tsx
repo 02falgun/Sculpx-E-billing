@@ -103,7 +103,7 @@ export default function HomePage() {
         {/* Minimal Hero */}
         <section className="max-w-3xl space-y-6 text-left">
           <div className="inline-flex items-center gap-2 rounded-[4px] border border-neutral-300 bg-neutral-100 px-2.5 py-1 text-[11px] font-semibold text-neutral-800">
-            <span>SCULPX E-Billing &middot; Grand Palace Hotel</span>
+            <span>SCULPX E-Billing &middot; Multi-Tenant Hospitality Engine</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-neutral-900 leading-[1.1]">
@@ -202,14 +202,14 @@ export default function HomePage() {
                   <span className="text-[10px] font-mono uppercase">Guest Dine-in</span>
                   <UtensilsCrossed className="h-4 w-4 text-neutral-800" />
                 </div>
-                <h4 className="text-sm font-bold text-neutral-900">Table 05 QR</h4>
+                <h4 className="text-sm font-bold text-neutral-900">QR Dine-in Ordering</h4>
                 <p className="text-xs text-neutral-500 mt-1">
-                  Browse restaurant dishes, customize modifiers, send order.
+                  Contactless digital menu scanned directly from active restaurant tables.
                 </p>
               </div>
-              <Link href="/menu/table/T05">
+              <Link href="/admin/qr">
                 <Button variant="secondary" size="sm" className="w-full">
-                  Open Guest Menu
+                  QR Studio &amp; Tokens
                 </Button>
               </Link>
             </div>
@@ -221,14 +221,14 @@ export default function HomePage() {
                   <span className="text-[10px] font-mono uppercase">In-Room Dining</span>
                   <BedDouble className="h-4 w-4 text-neutral-800" />
                 </div>
-                <h4 className="text-sm font-bold text-neutral-900">Room 301 QR</h4>
+                <h4 className="text-sm font-bold text-neutral-900">Guestroom Folio Service</h4>
                 <p className="text-xs text-neutral-500 mt-1">
-                  Deluxe suite in-room ordering with folio settlement.
+                  In-room dining ordering and settlement dispatched to guest folios.
                 </p>
               </div>
-              <Link href="/menu/room/301">
+              <Link href="/admin/rooms">
                 <Button variant="secondary" size="sm" className="w-full">
-                  Open Room Menu
+                  Manage Rooms
                 </Button>
               </Link>
             </div>

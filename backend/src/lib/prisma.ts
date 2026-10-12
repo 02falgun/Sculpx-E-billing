@@ -7,7 +7,7 @@ import { env } from "../config/env.js";
 let rawUrl = env.DIRECT_URL || env.DATABASE_URL;
 if (rawUrl && !rawUrl.includes("connection_limit")) {
   const separator = rawUrl.includes("?") ? "&" : "?";
-  rawUrl = `${rawUrl}${separator}connection_limit=3&pool_timeout=60`;
+  rawUrl = `${rawUrl}${separator}connection_limit=3&pool_timeout=60&connect_timeout=15`;
 }
 const effectiveDatabaseUrl = rawUrl;
 
