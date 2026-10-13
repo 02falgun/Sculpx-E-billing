@@ -6,6 +6,8 @@ import {
   canAccess,
   mockAuthenticate,
   getRoleDisplayName,
+  isSessionExpired,
+  sanitizeRedirect,
 } from "@/utils/auth";
 
 describe("Role-Based Authentication & Permissions Suite", () => {
@@ -76,5 +78,44 @@ describe("Role-Based Authentication & Permissions Suite", () => {
 
     // Admin has access
     expect(canAccess(admin, "/admin")).toBe(true);
+  });
+
+  it("should evaluate isSessionExpired correctly", () => {
+    const expiredSession = {
+      user: DEMO_USERS.admin.user,
+      token: "tok-expired",
+      expiresAt: new Date(Date.now() - 60000).toISOString(),
+    };
+    expect(isSessionExpired(expiredSession)).toBe(true);
+
+    const validSession = {
+      user: DEMO_USERS.admin.user,
+      token: "tok-valid",
+      expiresAt: new Date(Date.now() + 3600000).toISOString(),
+    };
+    expect(isSessionExpired(validSession)).toBe(false);
+
+    expect(isSessionExpired(null)).toBe(true);
+    expect(isSessionExpired({ user: DEMO_USERS.admin.user, token: "t", expiresAt: "invalid" })).toBe(true);
+  });
+
+  it("should sanitize redirect URLs and prevent open redirects and redirect loops", () => {
+    // Standard internal path allowed
+    expect(sanitizeRedirect("/admin/menu", "ADMIN")).toBe("/admin/menu");
+
+    // Open redirects blocked and fallen back to role default
+    expect(sanitizeRedirect("https://evil.com/phish", "ADMIN")).toBe("/admin");
+    expect(sanitizeRedirect("http://evil.com/phish", "ADMIN")).toBe("/admin");
+    expect(sanitizeRedirect("//evil.com", "ADMIN")).toBe("/admin");
+    expect(sanitizeRedirect("/\\evil.com", "ADMIN")).toBe("/admin");
+    expect(sanitizeRedirect("javascript:alert(1)", "ADMIN")).toBe("/admin");
+
+    // Redirect loop to login blocked
+    expect(sanitizeRedirect("/login", "ADMIN")).toBe("/admin");
+    expect(sanitizeRedirect("/login?redirect=/admin", "ADMIN")).toBe("/admin");
+
+    // Role unauthorized destination fallback
+    expect(sanitizeRedirect("/admin/audit", "WAITER")).toBe("/staff");
+    expect(sanitizeRedirect("/kitchen", "CASHIER")).toBe("/cashier");
   });
 });

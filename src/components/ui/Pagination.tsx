@@ -18,10 +18,10 @@ export function Pagination({
   if (totalPages <= 1) return null;
 
   return (
-    <div className={`flex items-center justify-between text-xs text-slate-500 ${className || ""}`}>
+    <div className={`flex items-center justify-between text-xs text-neutral-500 ${className || ""}`}>
       <span>
-        Page <span className="font-semibold text-slate-800">{currentPage}</span> of{" "}
-        <span className="font-semibold text-slate-800">{totalPages}</span>
+        Page <span className="font-semibold text-neutral-800">{currentPage}</span> of{" "}
+        <span className="font-semibold text-neutral-800">{totalPages}</span>
       </span>
       <div className="flex items-center space-x-1.5">
         <Button

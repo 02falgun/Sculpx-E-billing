@@ -60,46 +60,46 @@ export function LocationSelector() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all text-left shadow-xs focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
+        className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-[6px] border border-neutral-200 bg-white hover:bg-neutral-50 transition-all text-left shadow-xs focus:outline-hidden focus:ring-1 focus:ring-neutral-900"
         title="Switch Operational Location"
       >
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
-          <Building2 className="h-4 w-4" />
+        <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-[4px] bg-neutral-100 text-neutral-800">
+          <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </div>
         <div className="min-w-0 pr-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold text-slate-900 truncate max-w-[140px] sm:max-w-[180px]">
+            <span className="text-xs font-bold text-neutral-900 truncate max-w-[110px] sm:max-w-[160px]">
               {activeLocation?.name || "Select Location"}
             </span>
             {activeLocation?.status === "SUSPENDED" && (
-              <span className="px-1.5 py-0.2 text-[10px] font-bold bg-rose-50 text-rose-600 rounded">
+              <span className="px-1.5 py-0.2 text-[9px] font-bold bg-neutral-100 text-rose-700 rounded border border-neutral-300">
                 Suspended
               </span>
             )}
           </div>
-          <p className="text-[10px] text-slate-500 truncate">
+          <p className="text-[10px] text-neutral-500 truncate hidden sm:block">
             {activeLocation?.organization?.name ? (
-              <span className="text-amber-700 font-medium">{activeLocation.organization.name}</span>
+              <span className="text-neutral-700 font-medium">{activeLocation.organization.name}</span>
             ) : (
               "Independent Property"
             )}
             {activeLocation?.city ? ` • ${activeLocation.city}` : ""}
           </p>
         </div>
-        <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        <ChevronDown className={`h-3.5 w-3.5 text-neutral-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-          <div className="p-2 border-b border-slate-100">
+        <div className="absolute right-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] rounded-[8px] border border-neutral-200 bg-white p-2 shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="p-2 border-b border-neutral-100">
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-neutral-400" />
               <input
                 type="text"
                 placeholder="Search locations or franchises..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-[6px] bg-neutral-50 border border-neutral-200 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-neutral-900 focus:border-neutral-900 transition-all text-neutral-900"
                 autoFocus
               />
             </div>
@@ -107,7 +107,7 @@ export function LocationSelector() {
 
           <div className="max-h-64 overflow-y-auto p-1 space-y-1">
             {filteredLocations.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-400">
+              <div className="p-4 text-center text-xs text-neutral-400">
                 No matching locations found
               </div>
             ) : (
@@ -118,30 +118,30 @@ export function LocationSelector() {
                     key={loc.id}
                     type="button"
                     onClick={() => handleSelectLocation(loc)}
-                    className={`w-full flex items-start justify-between p-2 rounded-xl text-left transition-all ${
+                    className={`w-full flex items-start justify-between p-2 rounded-[6px] text-left transition-all ${
                       isSelected
-                        ? "bg-amber-50/80 border border-amber-200/60"
-                        : "hover:bg-slate-50 border border-transparent"
+                        ? "bg-neutral-100 border border-neutral-300 font-semibold"
+                        : "hover:bg-neutral-50 border border-transparent"
                     }`}
                   >
                     <div className="flex items-start gap-2.5 min-w-0">
                       <div
-                        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+                        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] ${
                           loc.organizationId
-                            ? "bg-indigo-50 text-indigo-600"
-                            : "bg-emerald-50 text-emerald-600"
+                            ? "bg-neutral-200 text-neutral-800"
+                            : "bg-neutral-100 text-neutral-700"
                         }`}
                       >
                         {loc.organizationId ? <Store className="h-3.5 w-3.5" /> : <MapPin className="h-3.5 w-3.5" />}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <p className="text-xs font-bold text-slate-900 truncate">
+                          <p className="text-xs font-bold text-neutral-900 truncate">
                             {loc.name}
                           </p>
-                          <span className="text-[10px] text-slate-400 font-mono">({loc.code})</span>
+                          <span className="text-[10px] text-neutral-400 font-mono">({loc.code})</span>
                         </div>
-                        <p className="text-[10px] text-slate-500 truncate">
+                        <p className="text-[10px] text-neutral-500 truncate">
                           {loc.organization?.name || "Independent"} • {loc.currency} ({loc.currencySymbol})
                           {loc.city ? ` • ${loc.city}` : ""}
                         </p>
@@ -149,7 +149,7 @@ export function LocationSelector() {
                     </div>
 
                     {isSelected && (
-                      <Check className="h-4 w-4 text-amber-600 shrink-0 mt-1" />
+                      <Check className="h-4 w-4 text-neutral-900 shrink-0 mt-1" />
                     )}
                   </button>
                 );
@@ -158,11 +158,11 @@ export function LocationSelector() {
           </div>
 
           {isSuperAdmin && (
-            <div className="pt-2 border-t border-slate-100 p-1 flex items-center justify-between gap-2">
+            <div className="pt-2 border-t border-neutral-100 p-1 flex items-center justify-between gap-2">
               <Link
                 href="/admin/locations/new"
                 onClick={() => setIsOpen(false)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 hover:text-amber-700 p-1.5 rounded-lg hover:bg-amber-50 transition-colors"
+                className="flex items-center gap-1.5 text-xs font-semibold text-neutral-800 hover:text-black p-1.5 rounded-[6px] hover:bg-neutral-100 transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>New Location</span>
@@ -170,7 +170,7 @@ export function LocationSelector() {
               <Link
                 href="/admin/franchises/new"
                 onClick={() => setIsOpen(false)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 p-1.5 rounded-lg hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:text-neutral-900 p-1.5 rounded-[6px] hover:bg-neutral-100 transition-colors"
               >
                 <Store className="h-3.5 w-3.5" />
                 <span>New Franchise</span>

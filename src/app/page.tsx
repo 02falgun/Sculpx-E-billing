@@ -23,8 +23,8 @@ export default function HomePage() {
       title: "QR ORDERING",
       tagline: "Guests order from their table or room.",
       desc: "Fast, contactless guest ordering with category filtering, portion modifiers, chef instructions, and instant digital tax invoices. No logins required.",
-      link: "/admin/tables",
-      linkLabel: "Fleet & QR Setup",
+      link: "/menu/table/tbl-1",
+      linkLabel: "Guest Menu Demo",
       icon: QrCode,
     },
     {
@@ -32,8 +32,8 @@ export default function HomePage() {
       title: "KITCHEN",
       tagline: "KOTs stay organized from order to preparation.",
       desc: "High-contrast kitchen display system with cooking timers, station routing, and ticket progression. Clear visibility for line cooks and expediters.",
-      link: "/kitchen",
-      linkLabel: "Open Kitchen (KDS)",
+      link: "/login?redirect=%2Fkitchen",
+      linkLabel: "Kitchen Sign In",
       icon: ChefHat,
     },
     {
@@ -41,8 +41,8 @@ export default function HomePage() {
       title: "BILLING",
       tagline: "Payments and bills stay connected.",
       desc: "Instant GST invoices, split billing, payment settlement via UPI and cards, and direct printing with audit trails.",
-      link: "/cashier",
-      linkLabel: "Open Cashier Desk",
+      link: "/login?redirect=%2Fcashier",
+      linkLabel: "Cashier Sign In",
       icon: Receipt,
     },
     {
@@ -50,8 +50,8 @@ export default function HomePage() {
       title: "INVENTORY",
       tagline: "Know what's available before accepting orders.",
       desc: "Raw ingredient tracking, low stock alerts, recipe-linked depletion formulas, and automated 86 item availability toggles.",
-      link: "/admin/inventory",
-      linkLabel: "View Inventory",
+      link: "/login?redirect=%2Fadmin%2Finventory",
+      linkLabel: "Inventory Access",
       icon: Package,
     },
     {
@@ -59,8 +59,8 @@ export default function HomePage() {
       title: "OPERATIONS",
       tagline: "Manage tables, rooms and daily activity.",
       desc: "Floor occupancy maps, room service coordination, staff dispatching, and live shift exceptions in real-time.",
-      link: "/manager",
-      linkLabel: "Launch Operations",
+      link: "/login?redirect=%2Fmanager",
+      linkLabel: "Operations Sign In",
       icon: ShieldCheck,
     },
   ];
@@ -201,9 +201,9 @@ export default function HomePage() {
                   Contactless digital menu scanned directly from active restaurant tables.
                 </p>
               </div>
-              <Link href="/admin/qr">
+              <Link href="/menu/table/tbl-1">
                 <Button variant="secondary" size="sm" className="w-full">
-                  QR Studio &amp; Tokens
+                  View Dine-in Menu
                 </Button>
               </Link>
             </div>
@@ -220,9 +220,9 @@ export default function HomePage() {
                   In-room dining ordering and settlement dispatched to guest folios.
                 </p>
               </div>
-              <Link href="/admin/rooms">
+              <Link href="/menu/room/rm-101">
                 <Button variant="secondary" size="sm" className="w-full">
-                  Manage Rooms
+                  View Room Menu
                 </Button>
               </Link>
             </div>
@@ -239,9 +239,9 @@ export default function HomePage() {
                   Tables overview, fast mobile POS, fire orders to kitchen.
                 </p>
               </div>
-              <Link href="/staff">
+              <Link href="/login?redirect=%2Fstaff">
                 <Button variant="secondary" size="sm" className="w-full">
-                  Launch /staff
+                  Staff Access
                 </Button>
               </Link>
             </div>
@@ -258,9 +258,9 @@ export default function HomePage() {
                   Live KOT tickets, preparation timers, one-tap ready alerts.
                 </p>
               </div>
-              <Link href="/kitchen">
+              <Link href="/login?redirect=%2Fkitchen">
                 <Button variant="secondary" size="sm" className="w-full">
-                  Launch /kitchen
+                  Kitchen Access
                 </Button>
               </Link>
             </div>
@@ -277,9 +277,9 @@ export default function HomePage() {
                   GST tax bills, UPI / Card payments, split checks, receipts.
                 </p>
               </div>
-              <Link href="/cashier">
+              <Link href="/login?redirect=%2Fcashier">
                 <Button variant="secondary" size="sm" className="w-full">
-                  Launch /cashier
+                  Cashier Access
                 </Button>
               </Link>
             </div>
@@ -296,9 +296,9 @@ export default function HomePage() {
                   Shift velocity, live table occupancy, operational exceptions.
                 </p>
               </div>
-              <Link href="/manager">
+              <Link href="/login?redirect=%2Fmanager">
                 <Button variant="secondary" size="sm" className="w-full">
-                  Launch /manager
+                  Manager Access
                 </Button>
               </Link>
             </div>
@@ -315,9 +315,9 @@ export default function HomePage() {
                   Menu catalog, QR studio, printers fleet, inventory ledger.
                 </p>
               </div>
-              <Link href="/admin">
+              <Link href="/login?redirect=%2Fadmin">
                 <Button variant="secondary" size="sm" className="w-full">
-                  Launch /admin
+                  Admin Access
                 </Button>
               </Link>
             </div>
@@ -336,7 +336,7 @@ export default function HomePage() {
               </div>
               <Link href="/login">
                 <Button variant="secondary" size="sm" className="w-full">
-                  Go to /login
+                  Staff Sign In
                 </Button>
               </Link>
             </div>

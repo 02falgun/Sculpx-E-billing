@@ -38,9 +38,9 @@ export function ToastContainer() {
             {icons[toast.type]}
             <div className="flex-1 text-left">
               {toast.title && (
-                <h5 className="text-xs font-bold text-slate-900">{toast.title}</h5>
+                <h5 className="text-xs font-bold text-neutral-900">{toast.title}</h5>
               )}
-              <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+              <p className="text-xs text-neutral-600 mt-0.5 leading-relaxed">
                 {toast.message}
               </p>
             </div>
@@ -48,7 +48,7 @@ export function ToastContainer() {
               type="button"
               onClick={() => removeToast(toast.id)}
               aria-label="Dismiss notification"
-              className="p-0.5 text-slate-400 hover:text-slate-600 rounded-md transition-colors"
+              className="p-0.5 text-neutral-400 hover:text-neutral-700 rounded-md transition-colors cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>

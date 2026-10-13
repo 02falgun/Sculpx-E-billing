@@ -9,6 +9,7 @@ interface AuthStoreState {
   isAuthenticated: boolean;
 
   setSession: (session: AuthSession) => void;
+  updateUser: (user: User) => void;
   clearSession: () => void;
   logout: () => void;
   switchRole: (roleKey: string) => AuthSession | null;
@@ -28,17 +29,33 @@ export const useAuthStore = create<AuthStoreState>()(
           isAuthenticated: true,
         }),
 
-      clearSession: () =>
+      updateUser: (user) =>
+        set((state) => ({
+          user,
+          session: state.session ? { ...state.session, user } : null,
+        })),
+
+      clearSession: () => {
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.removeItem("restro_staff_auth");
+          } catch {}
+        }
         set({
           session: null,
           user: null,
           isAuthenticated: false,
-        }),
+        });
+      },
 
       logout: () => {
         if (typeof window !== "undefined") {
           try {
             window.localStorage.removeItem("restro_staff_auth");
+            // Also notify backend if supported (fire and forget)
+            import("@/services/api").then(({ authApi }) => {
+              authApi.logout().catch(() => {});
+            }).catch(() => {});
           } catch {}
         }
         set({

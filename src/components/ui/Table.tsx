@@ -7,7 +7,7 @@ export function Table({
   ...props
 }: React.HTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-slate-200">
+    <div className="w-full overflow-x-auto rounded-[8px] border border-neutral-200">
       <table className={cn("w-full caption-bottom text-sm text-left", className)} {...props}>
         {children}
       </table>
@@ -21,7 +21,7 @@ export function TableHeader({
   ...props
 }: React.HTMLAttributes<HTMLTableSectionElement>) {
   return (
-    <thead className={cn("bg-slate-50 border-b border-slate-200", className)} {...props}>
+    <thead className={cn("bg-neutral-50 border-b border-neutral-200", className)} {...props}>
       {children}
     </thead>
   );
@@ -33,7 +33,7 @@ export function TableBody({
   ...props
 }: React.HTMLAttributes<HTMLTableSectionElement>) {
   return (
-    <tbody className={cn("divide-y divide-slate-100 bg-white", className)} {...props}>
+    <tbody className={cn("divide-y divide-neutral-100 bg-white", className)} {...props}>
       {children}
     </tbody>
   );
@@ -46,7 +46,7 @@ export function TableRow({
 }: React.HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr
-      className={cn("hover:bg-slate-50/80 transition-colors", className)}
+      className={cn("hover:bg-neutral-50/80 transition-colors", className)}
       {...props}
     >
       {children}
@@ -62,7 +62,7 @@ export function TableHead({
   return (
     <th
       className={cn(
-        "h-10 px-4 text-xs font-semibold uppercase tracking-wider text-slate-500",
+        "h-10 px-4 text-xs font-semibold uppercase tracking-wider text-neutral-500",
         className,
       )}
       {...props}
@@ -78,7 +78,7 @@ export function TableCell({
   ...props
 }: React.TdHTMLAttributes<HTMLTableCellElement>) {
   return (
-    <td className={cn("p-4 align-middle text-slate-700", className)} {...props}>
+    <td className={cn("p-4 align-middle text-neutral-700", className)} {...props}>
       {children}
     </td>
   );

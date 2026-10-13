@@ -4,7 +4,9 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store";
 import { Role } from "@/types";
-import { canAccess, getDefaultRouteForRole, getRoleDisplayName } from "@/utils/auth";
+import { canAccess, getDefaultRouteForRole, getRoleDisplayName, isSessionExpired } from "@/utils/auth";
+import { authApi } from "@/services/api";
+import { ENV } from "@/config";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { ShieldAlert, ArrowRight, LogIn } from "lucide-react";
@@ -17,8 +19,11 @@ interface RoleGuardProps {
 export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const session = useAuthStore((s) => s.session);
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const clearSession = useAuthStore((s) => s.clearSession);
+  const updateUser = useAuthStore((s) => s.updateUser);
 
   const [checking, setChecking] = React.useState(true);
   const [hasHydrated, setHasHydrated] = React.useState(
@@ -57,39 +62,69 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
       return;
     }
 
-    if (!isAuthenticated || !user) {
+    let activeSession = session;
+    let activeUser = user;
+
+    if (!isAuthenticated || !activeUser || !activeSession) {
       if (typeof window !== "undefined") {
         try {
           const raw = window.localStorage.getItem("restro_staff_auth");
           if (raw) {
             const parsed = JSON.parse(raw);
-            if (parsed?.state?.user && parsed?.state?.isAuthenticated) {
-              // Persisted state exists; trigger rehydration and do not redirect
+            if (parsed?.state?.user && parsed?.state?.session) {
+              activeSession = parsed.state.session;
+              activeUser = parsed.state.user;
               useAuthStore.persist?.rehydrate?.();
-              return;
             }
           }
         } catch {}
       }
+    }
 
+    if (!activeSession || !activeUser) {
       // Truly unauthenticated, redirect to login
       router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
       return;
     }
 
-    if (allowedRoles && !allowedRoles.includes(user.role) && user.role !== "SUPER_ADMIN") {
+    // Check expiration timestamp
+    if (isSessionExpired(activeSession)) {
+      clearSession();
+      router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+      return;
+    }
+
+    // If live API, validate session with backend to detect revoked sessions or role updates
+    if (!ENV.USE_MOCK_API && activeSession.token) {
+      authApi
+        .getCurrentUser()
+        .then((res) => {
+          if (res.success && res.data) {
+            updateUser(res.data);
+          } else {
+            // Backend rejected session
+            clearSession();
+            router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+          }
+        })
+        .catch(() => {
+          // Network failure: do not clear session on network blip
+        });
+    }
+
+    if (allowedRoles && !allowedRoles.includes(activeUser.role) && activeUser.role !== "SUPER_ADMIN") {
       // Allowed roles specified and user role not matched
       setChecking(false);
       return;
     }
 
-    if (!canAccess(user, pathname)) {
+    if (!canAccess(activeUser, pathname)) {
       setChecking(false);
       return;
     }
 
     setChecking(false);
-  }, [pathname, isAuthenticated, user, allowedRoles, router, hasHydrated]);
+  }, [pathname, isAuthenticated, user, session, allowedRoles, router, hasHydrated, clearSession, updateUser]);
 
   if (checking) {
     return (

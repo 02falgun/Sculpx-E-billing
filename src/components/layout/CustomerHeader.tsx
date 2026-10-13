@@ -16,7 +16,7 @@ export function CustomerHeader() {
   const isConnected = wsState === "CONNECTED";
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-xs">
+    <header className="sticky top-0 z-40 w-full border-b border-neutral-200 bg-white/95 backdrop-blur-xs">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
         {/* Left: Context Badge */}
         <div className="flex items-center gap-3">

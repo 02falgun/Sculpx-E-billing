@@ -19,14 +19,14 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-xs font-semibold text-slate-700 tracking-wide"
+            className="block text-xs font-semibold text-neutral-700 tracking-wide"
           >
             {label}
           </label>
         )}
         <div className="relative flex items-center">
           {leftIcon && (
-            <div className="pointer-events-none absolute left-3 flex items-center text-slate-400">
+            <div className="pointer-events-none absolute left-3 flex items-center text-neutral-400">
               {leftIcon}
             </div>
           )}
@@ -46,7 +46,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
           {rightIcon && (
-            <div className="absolute right-3 flex items-center text-slate-400">
+            <div className="absolute right-3 flex items-center text-neutral-400">
               {rightIcon}
             </div>
           )}
@@ -57,7 +57,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           </p>
         )}
         {!error && hint && (
-          <p id={`${inputId}-hint`} className="text-xs text-slate-500">
+          <p id={`${inputId}-hint`} className="text-xs text-neutral-500">
             {hint}
           </p>
         )}

@@ -24,7 +24,12 @@ import {
 } from "lucide-react";
 import { UserWorkspaceMenu } from "./UserWorkspaceMenu";
 
-export function AdminSidebar() {
+export interface AdminSidebarProps {
+  onNavigate?: () => void;
+  isMobile?: boolean;
+}
+
+export function AdminSidebar({ onNavigate, isMobile = false }: AdminSidebarProps = {}) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
 
@@ -107,26 +112,28 @@ export function AdminSidebar() {
     },
   ];
 
-  return (
-    <aside className="w-60 shrink-0 border-r border-neutral-200 bg-white min-h-screen p-3.5 flex flex-col justify-between select-none">
+  const content = (
+    <div className="flex flex-col justify-between h-full select-none space-y-4">
       <div className="space-y-4">
-        {/* Brand & Role Header */}
-        <div className="flex items-center gap-2.5 px-2 py-2 border-b border-neutral-100 pb-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-black text-white font-bold text-xs">
-            {isSuperAdmin ? "SA" : "S"}
+        {/* Brand & Role Header (Shown only on desktop aside; on mobile Drawer header displays it) */}
+        {!isMobile && (
+          <div className="flex items-center gap-2.5 px-2 py-2 border-b border-neutral-100 pb-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-black text-white font-bold text-xs">
+              {isSuperAdmin ? "SA" : "S"}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-neutral-900 tracking-tight uppercase">
+                SCULPX Admin
+              </span>
+              <span className="text-[10px] text-neutral-500">
+                {isSuperAdmin ? "Super Admin" : "Administrator"}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-xs font-bold text-neutral-900 tracking-tight uppercase">
-              SCULPX Admin
-            </span>
-            <span className="text-[10px] text-neutral-500">
-              {isSuperAdmin ? "Super Admin" : "Administrator"}
-            </span>
-          </div>
-        </div>
+        )}
 
         {/* Grouped Sidebar Items */}
-        <div className="space-y-4 overflow-y-auto max-h-[calc(100vh-160px)] pr-1 scrollbar-thin">
+        <div className={`space-y-4 overflow-y-auto pr-1 scrollbar-thin ${isMobile ? "max-h-[calc(100dvh-180px)]" : "max-h-[calc(100vh-160px)]"}`}>
           {navigationGroups.map((grp) => (
             <div key={grp.group}>
               <h4 className="px-2 text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
@@ -144,6 +151,7 @@ export function AdminSidebar() {
                     <Link
                       key={link.href}
                       href={link.href}
+                      onClick={() => onNavigate?.()}
                       className={`flex items-center justify-between rounded-[6px] px-2.5 py-1.5 text-xs font-medium transition-colors ${
                         isActive
                           ? "bg-black text-white font-semibold"
@@ -167,6 +175,16 @@ export function AdminSidebar() {
       <div className="pt-3 border-t border-neutral-200">
         <UserWorkspaceMenu theme="light" />
       </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return <div className="h-full">{content}</div>;
+  }
+
+  return (
+    <aside className="w-64 shrink-0 border-r border-neutral-200 bg-white min-h-screen p-3.5 hidden lg:flex flex-col justify-between select-none">
+      {content}
     </aside>
   );
 }

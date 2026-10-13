@@ -3,7 +3,7 @@ import { CustomerHeader } from "@/components/layout";
 
 export default function BillLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
+    <div className="min-h-screen bg-neutral-50 flex flex-col justify-between">
       <div className="print:hidden">
         <CustomerHeader />
       </div>

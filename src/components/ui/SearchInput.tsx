@@ -20,7 +20,7 @@ export function SearchInput({
 }: SearchInputProps) {
   return (
     <div className={cn("relative flex items-center w-full", className)}>
-      <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-slate-400" />
+      <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-neutral-400" />
       <input
         type="text"
         value={value}
@@ -34,7 +34,7 @@ export function SearchInput({
           type="button"
           onClick={() => onChange("")}
           aria-label="Clear search"
-          className="absolute right-3 rounded-md p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+          className="absolute right-3 rounded-md p-0.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 transition-colors cursor-pointer"
         >
           <X className="h-3.5 w-3.5" />
         </button>

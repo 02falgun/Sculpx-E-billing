@@ -9,7 +9,7 @@ export interface DrawerProps {
   onClose: () => void;
   title?: React.ReactNode;
   children: React.ReactNode;
-  position?: "bottom" | "right";
+  position?: "bottom" | "right" | "left";
 }
 
 export function Drawer({
@@ -41,7 +41,7 @@ export function Drawer({
     <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/40 transition-opacity"
+        className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -53,6 +53,8 @@ export function Drawer({
             "inset-x-0 bottom-0 max-h-[90vh] rounded-t-xl border-t p-6 overflow-y-auto animate-in slide-in-from-bottom",
           position === "right" &&
             "inset-y-0 right-0 w-full max-w-md border-l p-6 overflow-y-auto animate-in slide-in-from-right",
+          position === "left" &&
+            "inset-y-0 left-0 w-full max-w-xs sm:max-w-sm border-r p-5 overflow-y-auto animate-in slide-in-from-left",
         )}
         role="dialog"
         aria-modal="true"

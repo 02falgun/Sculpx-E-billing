@@ -11,10 +11,26 @@
   --border-strong: #222222;
   --muted: #666666;
   --muted-light: #888888;
-  --brand-primary: #000000;
-  --brand-hover: #222222;
+  --brand-primary: #0a0a0a;
+  --brand-hover: #1f1f1f;
   --brand-light: #f5f5f5;
-  --brand-text: #000000;
+  --brand-text: #0a0a0a;
+  /* SCULPX Accent Orange */
+  --brand-accent: #ea580c;
+  --brand-accent-hover: #c2410c;
+  --brand-accent-light: #fff7ed;
+  --brand-accent-border: #fed7aa;
+  /* Semantic Tokens */
+  --color-success: #15803d;
+  --color-success-bg: #f0fdf4;
+  --color-success-border: #bbf7d0;
+  --color-warning: #b45309;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fde68a;
+  --color-error: #b91c1c;
+  --color-error-bg: #fef2f2;
+  --color-error-border: #fecaca;
+  --focus-ring: #ea580c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -33,6 +49,20 @@
     --brand-hover: #e5e5e5;
     --brand-light: #1f1f1f;
     --brand-text: #ffffff;
+    --brand-accent: #f97316;
+    --brand-accent-hover: #fb923c;
+    --brand-accent-light: #2c1a11;
+    --brand-accent-border: #431f0d;
+    --color-success: #22c55e;
+    --color-success-bg: #052e16;
+    --color-success-border: #14532d;
+    --color-warning: #f59e0b;
+    --color-warning-bg: #451a03;
+    --color-warning-border: #78350f;
+    --color-error: #ef4444;
+    --color-error-bg: #450a0a;
+    --color-error-border: #7f1d1d;
+    --focus-ring: #f97316;
   }
 }
 
@@ -66,12 +96,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d4d4d4;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #a3a3a3;
 }
 
 @media (prefers-reduced-motion: reduce) {

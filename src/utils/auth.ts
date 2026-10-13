@@ -287,6 +287,46 @@ export function canAccess(user: User | null | undefined, pathname: string): bool
 }
 
 /**
+ * Checks whether an auth session is expired based on expiresAt timestamp.
+ */
+export function isSessionExpired(session: AuthSession | null | undefined): boolean {
+  if (!session || !session.expiresAt) return true;
+  const expiry = new Date(session.expiresAt).getTime();
+  if (isNaN(expiry)) return true;
+  return expiry <= Date.now();
+}
+
+/**
+ * Safely sanitizes redirect parameter to prevent open redirects and redirect loops.
+ */
+export function sanitizeRedirect(redirect: string | null | undefined, userRole?: Role | null): string {
+  const fallback = getDefaultRouteForRole(userRole);
+  if (!redirect) return fallback;
+
+  try {
+    const decoded = decodeURIComponent(redirect).trim();
+    // Must be an internal path starting with / and not // or /\ or containing protocol
+    if (!decoded.startsWith("/") || decoded.startsWith("//") || decoded.startsWith("/\\") || decoded.includes("://")) {
+      return fallback;
+    }
+    // Prevent redirect loop to login
+    if (decoded === "/login" || decoded.startsWith("/login?")) {
+      return fallback;
+    }
+    // Validate role accessibility if userRole provided
+    if (userRole) {
+      const dummyUser: any = { role: userRole, permissions: ["all_admin"] };
+      if (!canAccess(dummyUser, decoded)) {
+        return fallback;
+      }
+    }
+    return decoded;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
  * Mock authentication resolver for demo / dev login
  */
 export function mockAuthenticate(email: string, _password?: string): AuthSession | null {

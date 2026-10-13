@@ -24,7 +24,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         {label && (
           <label
             htmlFor={selectId}
-            className="block text-xs font-semibold text-slate-700 tracking-wide"
+            className="block text-xs font-semibold text-neutral-700 tracking-wide"
           >
             {label}
           </label>
@@ -53,7 +53,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           </p>
         )}
         {!error && hint && (
-          <p id={`${selectId}-hint`} className="text-xs text-slate-500">
+          <p id={`${selectId}-hint`} className="text-xs text-neutral-500">
             {hint}
           </p>
         )}

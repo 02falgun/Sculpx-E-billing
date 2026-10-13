@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuthStore } from "@/store";
-import { mockAuthenticate, getDefaultRouteForRole } from "@/utils/auth";
+import { mockAuthenticate, sanitizeRedirect, isSessionExpired } from "@/utils/auth";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 import { AlertCircle, ArrowRight } from "lucide-react";
 
 import { authApi } from "@/services/api";
@@ -18,13 +19,82 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get("redirect");
 
+  const session = useAuthStore((s) => s.session);
+  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const setSession = useAuthStore((s) => s.setSession);
+  const updateUser = useAuthStore((s) => s.updateUser);
+  const clearSession = useAuthStore((s) => s.clearSession);
 
+  const [isVerifyingSession, setIsVerifyingSession] = React.useState(true);
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [infoMessage, setInfoMessage] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+
+  // Check if authenticated user opened /login and redirect to authorized workspace
+  React.useEffect(() => {
+    let activeSession = session;
+    let activeUser = user;
+
+    // Check localStorage fallback if store has not rehydrated yet
+    if ((!activeSession || !activeUser) && typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem("restro_staff_auth");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.state?.session && parsed?.state?.user) {
+            activeSession = parsed.state.session;
+            activeUser = parsed.state.user;
+          }
+        }
+      } catch {}
+    }
+
+    if (!activeSession || !activeUser || !activeSession.token) {
+      // No active session, display login form
+      setIsVerifyingSession(false);
+      return;
+    }
+
+    // Verify token expiration
+    if (isSessionExpired(activeSession)) {
+      clearSession();
+      setError("Your previous station session has expired. Please sign in again.");
+      setIsVerifyingSession(false);
+      return;
+    }
+
+    // If using mock mode, session is valid, redirect immediately
+    if (ENV.USE_MOCK_API) {
+      const destination = sanitizeRedirect(redirectPath, activeUser.role);
+      router.replace(destination);
+      return;
+    }
+
+    // Live backend mode: validate session with backend
+    authApi
+      .getCurrentUser()
+      .then((res) => {
+        if (res.success && res.data) {
+          updateUser(res.data);
+          const destination = sanitizeRedirect(redirectPath, res.data.role);
+          router.replace(destination);
+        } else {
+          // Token is invalid, account deactivated, or session revoked
+          clearSession();
+          setError(
+            res.error?.message || "Session has been revoked or expired. Please sign in."
+          );
+          setIsVerifyingSession(false);
+        }
+      })
+      .catch(() => {
+        // Network failure during session validation - do not cause infinite redirect
+        setIsVerifyingSession(false);
+      });
+  }, [session, user, redirectPath, router, clearSession, updateUser]);
 
   const doLogin = async (targetEmail: string, targetPass?: string) => {
     setLoading(true);
@@ -50,7 +120,7 @@ function LoginForm() {
         }
 
         setSession(res.data);
-        const destination = redirectPath || getDefaultRouteForRole(res.data.user.role);
+        const destination = sanitizeRedirect(redirectPath, res.data.user.role);
         router.replace(destination);
         return;
       } catch (err: any) {
@@ -62,8 +132,8 @@ function LoginForm() {
 
     // Mock API fallback when explicitly configured for mock-only testing
     setTimeout(() => {
-      const session = mockAuthenticate(targetEmail);
-      if (!session) {
+      const mockSess = mockAuthenticate(targetEmail);
+      if (!mockSess) {
         setError(
           "Unrecognized staff account in mock mode."
         );
@@ -71,8 +141,8 @@ function LoginForm() {
         return;
       }
 
-      setSession(session);
-      const destination = redirectPath || getDefaultRouteForRole(session.user.role);
+      setSession(mockSess);
+      const destination = sanitizeRedirect(redirectPath, mockSess.user.role);
       router.replace(destination);
     }, 300);
   };
@@ -89,6 +159,22 @@ function LoginForm() {
     }
     doLogin(email, password);
   };
+
+  if (isVerifyingSession) {
+    return (
+      <div className="min-h-screen bg-white text-neutral-900 flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-[6px] bg-black text-white font-bold text-sm">
+            S
+          </div>
+          <Spinner size="md" className="text-neutral-900" />
+          <p className="text-xs font-semibold text-neutral-500">
+            Checking station authorization...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 flex flex-col lg:flex-row">
