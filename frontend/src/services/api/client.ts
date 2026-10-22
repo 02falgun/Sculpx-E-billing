@@ -7,15 +7,44 @@ export interface RequestOptions extends RequestInit {
   timeoutMs?: number;
 }
 
+export type UnauthorizedHandler = () => void;
+
+// A 401 from these endpoints means "wrong credentials", not "session expired".
+const AUTH_ENDPOINTS_WITHOUT_SESSION = ["auth/login", "auth/logout"];
+
 export class ApiClient {
   private baseUrl: string;
   private authToken: string | null = null;
   private activeQrToken: string | null = null;
   private activeLocationId: string | null = null;
   private activeTenantId: string | null = null;
+  private unauthorizedHandlers = new Set<UnauthorizedHandler>();
+  private isHandlingUnauthorized = false;
 
   constructor(baseUrl: string = ENV.API_URL) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
+  }
+
+  /**
+   * Register a callback for when a staff request is rejected with 401
+   * (expired, revoked or invalid token). Returns an unsubscribe function.
+   */
+  onUnauthorized(handler: UnauthorizedHandler): () => void {
+    this.unauthorizedHandlers.add(handler);
+    return () => {
+      this.unauthorizedHandlers.delete(handler);
+    };
+  }
+
+  private notifyUnauthorized(): void {
+    // Several requests usually fail together; handle the burst once.
+    if (this.isHandlingUnauthorized) return;
+    this.isHandlingUnauthorized = true;
+    this.authToken = null;
+    this.unauthorizedHandlers.forEach((handler) => handler());
+    setTimeout(() => {
+      this.isHandlingUnauthorized = false;
+    }, 1000);
   }
 
   setAuthToken(token: string | null): void {
@@ -158,6 +187,15 @@ export class ApiClient {
       const json = await response.json().catch(() => null);
 
       if (!response.ok) {
+        const normalizedEndpoint = endpoint.replace(/^\//, "");
+        if (
+          response.status === 401 &&
+          resolvedToken &&
+          !AUTH_ENDPOINTS_WITHOUT_SESSION.some((path) => normalizedEndpoint.startsWith(path))
+        ) {
+          this.notifyUnauthorized();
+        }
+
         return {
           success: false,
           data: null as unknown as T,

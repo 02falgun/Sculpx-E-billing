@@ -27,6 +27,7 @@ function LoginForm() {
   const clearSession = useAuthStore((s) => s.clearSession);
 
   const [isVerifyingSession, setIsVerifyingSession] = React.useState(true);
+  const sessionCheckStartedRef = React.useRef(false);
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
@@ -73,27 +74,21 @@ function LoginForm() {
       return;
     }
 
-    // Live backend mode: validate session with backend
-    authApi
-      .getCurrentUser()
-      .then((res) => {
-        if (res.success && res.data) {
-          updateUser(res.data);
-          const destination = sanitizeRedirect(redirectPath, res.data.role);
-          router.replace(destination);
-        } else {
-          // Token is invalid, account deactivated, or session revoked
-          clearSession();
-          setError(
-            res.error?.message || "Session has been revoked or expired. Please sign in."
-          );
-          setIsVerifyingSession(false);
-        }
-      })
-      .catch(() => {
-        // Network failure during session validation - do not cause infinite redirect
-        setIsVerifyingSession(false);
-      });
+    // Live backend mode: validate the stored session once (updateUser below re-runs this effect)
+    if (sessionCheckStartedRef.current) return;
+    sessionCheckStartedRef.current = true;
+
+    authApi.getCurrentUser().then((res) => {
+      if (res.success && res.data) {
+        updateUser(res.data);
+        router.replace(sanitizeRedirect(redirectPath, res.data.role));
+        return;
+      }
+      // A 401 has already cleared the session via the global handler; any other
+      // failure (network, 5xx) keeps it so the user can simply retry.
+      setError(res.error?.message || "Could not verify your session. Please sign in.");
+      setIsVerifyingSession(false);
+    });
   }, [session, user, redirectPath, router, clearSession, updateUser]);
 
   const doLogin = async (targetEmail: string, targetPass?: string) => {

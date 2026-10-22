@@ -6,9 +6,12 @@ import { createQueryClient } from "@/lib/query-client";
 import { CartDrawer } from "@/features/cart/CartDrawer";
 import { ToastContainer } from "@/components/ui/Toast";
 import { PWARegister } from "@/components/common/PWARegister";
+import { useSessionExpiry } from "@/hooks/useSessionExpiry";
+
 export function AppProviders({ children }: { children: React.ReactNode }) {
   // QueryClient initialized once per client session
   const [queryClient] = React.useState(() => createQueryClient());
+  useSessionExpiry(queryClient);
 
   return (
     <QueryClientProvider client={queryClient}>

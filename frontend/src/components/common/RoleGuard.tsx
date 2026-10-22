@@ -16,6 +16,9 @@ interface RoleGuardProps {
   allowedRoles?: Role[];
 }
 
+// Token already checked against /auth/me during this page load (shared across guard instances).
+let validatedToken: string | null = null;
+
 export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -94,24 +97,6 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
       return;
     }
 
-    // If live API, validate session with backend to detect revoked sessions or role updates
-    if (!ENV.USE_MOCK_API && activeSession.token) {
-      authApi
-        .getCurrentUser()
-        .then((res) => {
-          if (res.success && res.data) {
-            updateUser(res.data);
-          } else {
-            // Backend rejected session
-            clearSession();
-            router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
-          }
-        })
-        .catch(() => {
-          // Network failure: do not clear session on network blip
-        });
-    }
-
     if (allowedRoles && !allowedRoles.includes(activeUser.role) && activeUser.role !== "SUPER_ADMIN") {
       // Allowed roles specified and user role not matched
       setChecking(false);
@@ -124,7 +109,22 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
     }
 
     setChecking(false);
-  }, [pathname, isAuthenticated, user, session, allowedRoles, router, hasHydrated, clearSession, updateUser]);
+  }, [pathname, isAuthenticated, user, session, allowedRoles, router, hasHydrated, clearSession]);
+
+  // Confirm the stored token with the backend once per token, to pick up revoked
+  // sessions and role changes. A 401 is handled globally (useSessionExpiry clears the
+  // session and redirects); network errors or 5xx keep the session so a blip never logs staff out.
+  const token = session?.token;
+  React.useEffect(() => {
+    if (!hasHydrated || ENV.USE_MOCK_API || !token || validatedToken === token) return;
+    validatedToken = token;
+
+    authApi.getCurrentUser().then((res) => {
+      if (res.success && res.data) {
+        updateUser(res.data);
+      }
+    });
+  }, [hasHydrated, token, updateUser]);
 
   if (checking) {
     return (
