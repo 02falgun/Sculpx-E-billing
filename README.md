@@ -18,7 +18,15 @@ Designed with clean architecture and strict tenant isolation: supports a dual-mo
 
 ## 🏗️ Architecture & Technology Stack
 
-### Frontend Application (`/`)
+### Project Structure
+```
+Sculpx-E-billing/
+├── frontend/   # Next.js web app (customer, staff, kitchen, cashier, admin UIs)
+├── backend/    # Fastify + Prisma API server and database schema
+└── docs/       # Architecture and integration documentation
+```
+
+### Frontend Application (`frontend/`)
 - **Framework**: Next.js 16.4 (App Router, Turbopack)
 - **Language**: TypeScript 6.0 (Strict mode, zero `any`)
 - **Styling**: Tailwind CSS 4.3 (Custom HSL theme tokens, dark mode KDS)
@@ -101,9 +109,9 @@ Runtime mocks are disabled by default (`NEXT_PUBLIC_USE_MOCK_API=false`). All di
 ```bash
 # Clone the repository
 git clone https://github.com/02falgun/Sculpx-E-billing.git
-cd Sculpx-E-billing
+cd Sculpx-E-billing/frontend
 
-# Install root dependencies
+# Install frontend dependencies
 npm install
 
 # Start Next.js development server (Port 3000)
@@ -113,7 +121,7 @@ npm run dev
 
 ### 3. Backend Setup
 ```bash
-# Navigate to backend directory
+# Navigate to backend directory (from the repository root)
 cd backend
 
 # Install backend dependencies
@@ -151,8 +159,8 @@ npm run typecheck         # Type check backend (tsc --noEmit)
 npm test                  # Run 61 backend tests (health, readiness, auth, menu catalog, qr context)
 npm run build             # Verify production build (rimraf dist && tsc)
 
-# --- Root Frontend Verification (root /) ---
-cd ..
+# --- Frontend Verification (frontend/) ---
+cd ../frontend
 npm run typecheck         # Strict Next.js TypeScript typecheck
 npm run lint              # ESLint check
 npm test                  # Run full test suite (154 tests total)
