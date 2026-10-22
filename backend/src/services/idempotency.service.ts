@@ -1,14 +1,12 @@
 import crypto from "node:crypto";
-import { Prisma, type PrismaClient, IdempotencyStatus } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
-import { AppError } from "../lib/errors.js";
-
-export interface IdempotencyCheckResult {
-  isCached: boolean;
-  cachedResponse?: unknown;
-  statusCode?: number;
-  existingRecordId?: string;
-}
+import { Prisma, IdempotencyStatus } from "@prisma/client";
+import { ConflictError } from "../lib/errors.js";
+import { ErrorCode } from "../constants/error-codes.js";
+import { idempotencyModel } from "../models/idempotency.model.js";
+import type {
+  IdempotencyCheckResult,
+  ReserveIdempotencyKeyParams,
+} from "../types/idempotency.types.js";
 
 export class IdempotencyService {
   /**
@@ -45,15 +43,7 @@ export class IdempotencyService {
     endpoint: string,
     requestHash: string
   ): Promise<IdempotencyCheckResult> {
-    const existing = await prisma.idempotencyKey.findUnique({
-      where: {
-        tenantId_key_endpoint: {
-          tenantId,
-          key,
-          endpoint,
-        },
-      },
-    });
+    const existing = await idempotencyModel.findByKey(tenantId, key, endpoint);
 
     if (!existing) {
       return { isCached: false };
@@ -62,18 +52,13 @@ export class IdempotencyService {
     // Check expiry (default 24h retention)
     if (existing.expiresAt < new Date()) {
       // Record expired; allow clean recreation
-      await prisma.idempotencyKey.delete({ where: { id: existing.id } }).catch(() => {});
+      await idempotencyModel.delete(existing.id).catch(() => {});
       return { isCached: false };
     }
 
     // Hash conflict check: Same key with different payload must be rejected
     if (existing.requestHash !== requestHash) {
-      throw new AppError(
-        "Idempotency key was previously used with a different request payload",
-        409,
-        "IDEMPOTENCY_CONFLICT",
-        { key, endpoint }
-      );
+      throw new ConflictError("Idempotency key was previously used with a different request payload", ErrorCode.IDEMPOTENCY_CONFLICT, { key, endpoint });
     }
 
     if (existing.status === IdempotencyStatus.COMPLETED && existing.responseBody) {
@@ -92,12 +77,7 @@ export class IdempotencyService {
         return { isCached: false, existingRecordId: existing.id };
       }
 
-      throw new AppError(
-        "A request with this idempotency key is currently being processed",
-        409,
-        "IDEMPOTENCY_IN_PROGRESS",
-        { key }
-      );
+      throw new ConflictError("A request with this idempotency key is currently being processed", ErrorCode.IDEMPOTENCY_IN_PROGRESS, { key });
     }
 
     return { isCached: false, existingRecordId: existing.id };
@@ -108,32 +88,27 @@ export class IdempotencyService {
    */
   async reserveKey(
     tx: Prisma.TransactionClient,
-    params: {
-      tenantId: string;
-      key: string;
-      endpoint: string;
-      requestHash: string;
-      existingRecordId?: string;
-    }
+    params: ReserveIdempotencyKeyParams
   ): Promise<string> {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     if (params.existingRecordId) {
-      const updated = await tx.idempotencyKey.update({
-        where: { id: params.existingRecordId },
-        data: {
+      const updated = await idempotencyModel.update(
+        params.existingRecordId,
+        {
           status: IdempotencyStatus.IN_PROGRESS,
           requestHash: params.requestHash,
           expiresAt,
           updatedAt: new Date(),
         },
-      });
+        tx
+      );
       return updated.id;
     }
 
     try {
-      const created = await tx.idempotencyKey.create({
-        data: {
+      const created = await idempotencyModel.create(
+        {
           tenantId: params.tenantId,
           key: params.key,
           endpoint: params.endpoint,
@@ -141,7 +116,8 @@ export class IdempotencyService {
           status: IdempotencyStatus.IN_PROGRESS,
           expiresAt,
         },
-      });
+        tx
+      );
       return created.id;
     } catch (err) {
       if (
@@ -149,12 +125,7 @@ export class IdempotencyService {
         err.code === "P2002"
       ) {
         // Unique constraint violation due to concurrent insertion
-        throw new AppError(
-          "A request with this idempotency key is currently being processed",
-          409,
-          "IDEMPOTENCY_IN_PROGRESS",
-          { key: params.key }
-        );
+        throw new ConflictError("A request with this idempotency key is currently being processed", ErrorCode.IDEMPOTENCY_IN_PROGRESS, { key: params.key });
       }
       throw err;
     }
@@ -170,16 +141,18 @@ export class IdempotencyService {
     statusCode: number,
     responseBody: unknown
   ): Promise<void> {
-    await tx.idempotencyKey.update({
-      where: { id: recordId },
-      data: {
+    await idempotencyModel.update(
+      recordId,
+      {
         status: IdempotencyStatus.COMPLETED,
         orderId,
         responseStatus: statusCode,
-        responseBody: responseBody as any,
+        // Callers pass plain JSON-serializable response objects.
+        responseBody: responseBody as Prisma.InputJsonValue,
         updatedAt: new Date(),
       },
-    });
+      tx
+    );
   }
 }
 

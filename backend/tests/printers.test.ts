@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
-import { prisma } from "../src/lib/prisma.js";
+import { prisma } from "../src/database/prisma.js";
 import { printerService } from "../src/services/printer.service.js";
 import { printJobService } from "../src/services/print-job.service.js";
 import { printWorkerService } from "../src/services/print-worker.service.js";
-import { MockPrinterAdapter } from "../src/services/printer-adapters/mock.adapter.js";
-import { PrinterRenderer } from "../src/services/printer-renderer.js";
+import { MockPrinterAdapter } from "../src/integrations/printer/adapters/mock.adapter.js";
+import { PrinterRenderer } from "../src/integrations/printer/escpos-renderer.js";
 import { PrinterType, PrintJobStatus } from "@prisma/client";
 
 describe("SCULPX E-Billing — Phase 6: Hardware Printing & Print Queue Suite", () => {

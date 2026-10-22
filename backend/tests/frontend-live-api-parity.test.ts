@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify";
 import crypto from "node:crypto";
 import WebSocket from "ws";
 import { buildApp } from "../src/app.js";
-import { prisma } from "../src/lib/prisma.js";
+import { prisma } from "../src/database/prisma.js";
 import { apiClient } from "@/services/api/client";
 import { HttpAuthService } from "@/services/api/http/auth.http";
 import { HttpMenuService } from "@/services/api/http/menu.http";

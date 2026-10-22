@@ -1,15 +1,15 @@
 import fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import cors from "@fastify/cors";
-import fastifyJwt from "@fastify/jwt";
+import { fastifyJwt, type FastifyJWTOptions } from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
 import crypto from "node:crypto";
 import { env } from "./config/env.js";
 import { getFastifyLoggerConfig } from "./lib/logger.js";
-import { fastifyErrorHandler } from "./lib/errors.js";
+import { errorHandler } from "./middleware/error-handler.js";
 import fastifyWebsocket from "@fastify/websocket";
-import { healthRoutes } from "./routes/health.js";
+import { healthRoutes } from "./routes/health.routes.js";
 import { apiRoutes } from "./routes/index.js";
-import { websocketRoutes } from "./routes/websocket.js";
+import { websocketRoutes } from "./routes/websocket.routes.js";
 import { websocketService } from "./services/websocket.service.js";
 import { outboxService } from "./services/outbox.service.js";
 import { printWorkerService } from "./services/print-worker.service.js";
@@ -79,8 +79,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     exposedHeaders: ["x-request-id", "x-target-tenant-id", "x-location-id"],
   });
 
-  // Register JWT Plugin
-  await app.register(fastifyJwt as any, {
+  // `issuer`/`audience` are not in @fastify/jwt's option types (it names them iss/aud
+  // and allowedIss/allowedAud), so the options object is asserted to the plugin's type.
+  await app.register(fastifyJwt, {
     secret: env.JWT_SECRET,
     sign: {
       issuer: "sculpx-ebilling-api",
@@ -90,7 +91,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       issuer: "sculpx-ebilling-api",
       audience: "sculpx-staff",
     },
-  });
+  } as FastifyJWTOptions);
 
   // Register Rate Limiting Plugin
   await app.register(rateLimit, {
@@ -98,7 +99,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   });
 
   // Global Error Handler
-  app.setErrorHandler(fastifyErrorHandler);
+  app.setErrorHandler(errorHandler);
 
   // Register WebSocket plugin
   await app.register(fastifyWebsocket);

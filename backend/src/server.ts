@@ -1,6 +1,6 @@
 import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
-import { disconnectPrisma } from "./lib/prisma.js";
+import { disconnectPrisma } from "./database/prisma.js";
 import { outboxService } from "./services/outbox.service.js";
 import { printWorkerService } from "./services/print-worker.service.js";
 

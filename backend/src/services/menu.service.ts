@@ -1,8 +1,12 @@
 import { Prisma, Dietary, SpiceLevel } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
-import { AppError } from "../lib/errors.js";
+import { withTransaction } from "../database/prisma.js";
+import { BadRequestError } from "../lib/errors.js";
+import { ErrorCode } from "../constants/error-codes.js";
+import { ensureFound } from "../lib/guards.js";
+import { menuCategoryModel, menuItemModel, modifierModel } from "../models/menu.model.js";
+import type { CategoryFilters } from "../types/menu.types.js";
 
-// Helper to slugify a category name
+/** URL-friendly slug derived from a category name. */
 export function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -12,7 +16,7 @@ export function slugify(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-// Helper to normalize dietary input to Prisma enum
+/** Map API dietary input (which also accepts "EGG") to the Prisma enum. */
 function mapDietary(input?: string): Dietary | undefined {
   if (!input) return undefined;
   if (input === "EGG" || input === "CONTAINS_EGG") return Dietary.CONTAINS_EGG;
@@ -22,13 +26,11 @@ function mapDietary(input?: string): Dietary | undefined {
   return undefined;
 }
 
-// Helper to serialize Decimal to clean JSON float
 function decimalToNumber(d: Prisma.Decimal | null | undefined): number {
   if (!d) return 0;
   return Number(d.toString());
 }
 
-// Format Category entity to client contract
 export function formatCategory(category: {
   id: string;
   name: string;
@@ -50,7 +52,6 @@ export function formatCategory(category: {
   };
 }
 
-// Format MenuItem entity with nested modifier groups to client contract
 export function formatMenuItem(item: {
   id: string;
   categoryId: string;
@@ -116,55 +117,87 @@ export function formatMenuItem(item: {
   };
 }
 
+function ensureCategory<T>(category: T | null | undefined): T {
+  return ensureFound(category, "Menu category not found", ErrorCode.CATEGORY_NOT_FOUND);
+}
+
+function ensureMenuItem<T>(item: T | null | undefined): T {
+  return ensureFound(item, "Menu item not found", ErrorCode.ITEM_NOT_FOUND);
+}
+
+async function assertValidCategory(tenantId: string, categoryId: string): Promise<void> {
+  const category = await menuCategoryModel.findByIdInTenant(categoryId, tenantId);
+  if (!category) {
+    throw new BadRequestError("Invalid category: target category does not exist or belongs to another organization", ErrorCode.INVALID_CATEGORY);
+  }
+}
+
+async function getOwnedModifierGroup(tenantId: string, groupId: string) {
+  return ensureFound(
+    await modifierModel.findGroupByIdInTenant(groupId, tenantId),
+    "Modifier group not found",
+    ErrorCode.MODIFIER_GROUP_NOT_FOUND
+  );
+}
+
+async function getOwnedModifierOption(tenantId: string, optionId: string) {
+  return ensureFound(
+    await modifierModel.findOptionByIdInTenant(optionId, tenantId),
+    "Modifier option not found",
+    ErrorCode.MODIFIER_OPTION_NOT_FOUND
+  );
+}
+
+function formatModifierGroup(group: {
+  id: string;
+  menuItemId: string;
+  name: string;
+  isRequired: boolean;
+  minSelections: number;
+  maxSelections: number;
+  options: Array<{ id: string; name: string; price: Prisma.Decimal }>;
+}) {
+  return {
+    id: group.id,
+    menuItemId: group.menuItemId,
+    name: group.name,
+    isRequired: group.isRequired,
+    minSelections: group.minSelections,
+    maxSelections: group.maxSelections,
+    options: group.options.map((opt) => ({
+      id: opt.id,
+      name: opt.name,
+      price: decimalToNumber(opt.price),
+    })),
+  };
+}
+
+function formatModifierOption(option: {
+  id: string;
+  groupId: string;
+  name: string;
+  price: Prisma.Decimal;
+}) {
+  return {
+    id: option.id,
+    groupId: option.groupId,
+    name: option.name,
+    price: decimalToNumber(option.price),
+  };
+}
+
 export class MenuService {
-  // ==========================================
   // Categories
-  // ==========================================
 
-  async listCategories(
-    tenantId: string,
-    filters: { isActive?: boolean; search?: string }
-  ) {
-    const where: Prisma.MenuCategoryWhereInput = {
-      tenantId,
-      ...(filters.isActive !== undefined ? { isActive: filters.isActive } : {}),
-      ...(filters.search
-        ? {
-            OR: [
-              { name: { contains: filters.search, mode: "insensitive" } },
-              { description: { contains: filters.search, mode: "insensitive" } },
-            ],
-          }
-        : {}),
-    };
-
-    const categories = await prisma.menuCategory.findMany({
-      where,
-      orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-      include: {
-        _count: {
-          select: { items: true },
-        },
-      },
-    });
-
+  async listCategories(tenantId: string, filters: CategoryFilters) {
+    const categories = await menuCategoryModel.findManyForTenant(tenantId, filters);
     return categories.map(formatCategory);
   }
 
   async getCategoryById(tenantId: string, id: string) {
-    const category = await prisma.menuCategory.findFirst({
-      where: { id, tenantId },
-      include: {
-        _count: {
-          select: { items: true },
-        },
-      },
-    });
-
-    if (!category) {
-      throw new AppError("Menu category not found", 404, "CATEGORY_NOT_FOUND");
-    }
-
+    const category = ensureCategory(
+      await menuCategoryModel.findByIdInTenantWithItemCount(id, tenantId)
+    );
     return formatCategory(category);
   }
 
@@ -177,14 +210,12 @@ export class MenuService {
       isActive?: boolean;
     }
   ) {
-    const category = await prisma.menuCategory.create({
-      data: {
-        tenantId,
-        name: data.name,
-        description: data.description,
-        displayOrder: data.displayOrder ?? 0,
-        isActive: data.isActive ?? true,
-      },
+    const category = await menuCategoryModel.create({
+      tenantId,
+      name: data.name,
+      description: data.description,
+      displayOrder: data.displayOrder ?? 0,
+      isActive: data.isActive ?? true,
     });
 
     return formatCategory(category);
@@ -200,67 +231,34 @@ export class MenuService {
       isActive?: boolean;
     }
   ) {
-    // Confirm existence and tenant ownership
-    const existing = await prisma.menuCategory.findFirst({
-      where: { id, tenantId },
-    });
+    ensureCategory(await menuCategoryModel.findByIdInTenant(id, tenantId));
 
-    if (!existing) {
-      throw new AppError("Menu category not found", 404, "CATEGORY_NOT_FOUND");
-    }
-
-    const updated = await prisma.menuCategory.update({
-      where: { id },
-      data: {
-        ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.displayOrder !== undefined ? { displayOrder: data.displayOrder } : {}),
-        ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
-      },
-      include: {
-        _count: {
-          select: { items: true },
-        },
-      },
+    const updated = await menuCategoryModel.updateWithItemCount(id, {
+      ...(data.name !== undefined ? { name: data.name } : {}),
+      ...(data.description !== undefined ? { description: data.description } : {}),
+      ...(data.displayOrder !== undefined ? { displayOrder: data.displayOrder } : {}),
+      ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
     });
 
     return formatCategory(updated);
   }
 
   async deleteCategory(tenantId: string, id: string) {
-    const existing = await prisma.menuCategory.findFirst({
-      where: { id, tenantId },
-      include: {
-        _count: {
-          select: { items: true },
-        },
-      },
-    });
+    const existing = ensureCategory(
+      await menuCategoryModel.findByIdInTenantWithItemCount(id, tenantId)
+    );
 
-    if (!existing) {
-      throw new AppError("Menu category not found", 404, "CATEGORY_NOT_FOUND");
-    }
-
-    // If category has existing menu items, soft-delete to maintain foreign key integrity
+    // Soft-delete categories that still have items to keep foreign keys intact
     if (existing._count.items > 0) {
-      await prisma.menuCategory.update({
-        where: { id },
-        data: { isActive: false },
-      });
+      await menuCategoryModel.update(id, { isActive: false });
       return { softDeleted: true, message: "Category deactivated due to associated items" };
     }
 
-    // Otherwise, safe hard delete
-    await prisma.menuCategory.delete({
-      where: { id },
-    });
-
+    await menuCategoryModel.delete(id);
     return { softDeleted: false, message: "Category permanently removed" };
   }
 
-  // ==========================================
-  // Menu Items
-  // ==========================================
+  // Menu items
 
   async listMenuItems(
     tenantId: string,
@@ -277,24 +275,12 @@ export class MenuService {
       sortOrder: "asc" | "desc";
     }
   ) {
-    const dietaryValue = mapDietary(filters.dietary || filters.dietaryType);
-
-    const where: Prisma.MenuItemWhereInput = {
-      category: {
-        tenantId,
-      },
-      ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
-      ...(filters.isAvailable !== undefined ? { isAvailable: filters.isAvailable } : {}),
-      ...(dietaryValue ? { dietary: dietaryValue } : {}),
-      ...(filters.spiceLevel ? { spiceLevel: filters.spiceLevel as SpiceLevel } : {}),
-      ...(filters.search
-        ? {
-            OR: [
-              { name: { contains: filters.search, mode: "insensitive" } },
-              { description: { contains: filters.search, mode: "insensitive" } },
-            ],
-          }
-        : {}),
+    const itemFilters = {
+      categoryId: filters.categoryId,
+      isAvailable: filters.isAvailable,
+      dietary: mapDietary(filters.dietary || filters.dietaryType),
+      spiceLevel: filters.spiceLevel,
+      search: filters.search,
     };
 
     const page = Math.max(1, filters.page);
@@ -302,22 +288,11 @@ export class MenuService {
     const skip = (page - 1) * limit;
 
     const [totalItems, items] = await Promise.all([
-      prisma.menuItem.count({ where }),
-      prisma.menuItem.findMany({
-        where,
+      menuItemModel.countForTenant(tenantId, itemFilters),
+      menuItemModel.findPageForTenant(tenantId, itemFilters, {
         skip,
         take: limit,
         orderBy: { [filters.sortBy]: filters.sortOrder },
-        include: {
-          category: {
-            select: { id: true, name: true },
-          },
-          modifierGroups: {
-            include: {
-              options: true,
-            },
-          },
-        },
       }),
     ]);
 
@@ -337,29 +312,7 @@ export class MenuService {
   }
 
   async getMenuItemById(tenantId: string, id: string) {
-    const item = await prisma.menuItem.findFirst({
-      where: {
-        id,
-        category: {
-          tenantId,
-        },
-      },
-      include: {
-        category: {
-          select: { id: true, name: true },
-        },
-        modifierGroups: {
-          include: {
-            options: true,
-          },
-        },
-      },
-    });
-
-    if (!item) {
-      throw new AppError("Menu item not found", 404, "ITEM_NOT_FOUND");
-    }
-
+    const item = ensureMenuItem(await menuItemModel.findByIdInTenantWithDetails(id, tenantId));
     return formatMenuItem(item);
   }
 
@@ -388,25 +341,14 @@ export class MenuService {
       }>;
     }
   ) {
-    // 1. Verify category exists and belongs to tenant
-    const category = await prisma.menuCategory.findFirst({
-      where: { id: data.categoryId, tenantId },
-    });
-
-    if (!category) {
-      throw new AppError(
-        "Invalid category: target category does not exist or belongs to another organization",
-        400,
-        "INVALID_CATEGORY"
-      );
-    }
+    await assertValidCategory(tenantId, data.categoryId);
 
     const dietaryValue = mapDietary(data.dietary || data.dietaryType);
 
-    // 2. Atomic creation of item and optional modifier groups/options
-    const createdItem = await prisma.$transaction(async (tx) => {
-      const item = await tx.menuItem.create({
-        data: {
+    // Item and its modifier groups/options are created atomically
+    const createdItem = await withTransaction(async (tx) => {
+      const item = await menuItemModel.create(
+        {
           categoryId: data.categoryId,
           name: data.name,
           description: data.description,
@@ -417,29 +359,30 @@ export class MenuService {
           preparationTimeMinutes: data.preparationTimeMinutes ?? 15,
           taxRatePercentage: new Prisma.Decimal(data.taxRatePercentage ?? 5.0),
         },
-      });
+        tx
+      );
 
-      if (data.modifierGroups && data.modifierGroups.length > 0) {
-        for (const mg of data.modifierGroups) {
-          const group = await tx.modifierGroup.create({
-            data: {
-              menuItemId: item.id,
-              name: mg.name,
-              isRequired: mg.isRequired ?? false,
-              minSelections: mg.minSelections ?? 0,
-              maxSelections: mg.maxSelections ?? 1,
-            },
-          });
+      for (const mg of data.modifierGroups ?? []) {
+        const group = await modifierModel.createGroup(
+          {
+            menuItemId: item.id,
+            name: mg.name,
+            isRequired: mg.isRequired ?? false,
+            minSelections: mg.minSelections ?? 0,
+            maxSelections: mg.maxSelections ?? 1,
+          },
+          tx
+        );
 
-          if (mg.options && mg.options.length > 0) {
-            await tx.modifierOption.createMany({
-              data: mg.options.map((opt) => ({
-                groupId: group.id,
-                name: opt.name,
-                price: new Prisma.Decimal(opt.price ?? 0),
-              })),
-            });
-          }
+        if (mg.options?.length) {
+          await modifierModel.createOptions(
+            mg.options.map((opt) => ({
+              groupId: group.id,
+              name: opt.name,
+              price: new Prisma.Decimal(opt.price ?? 0),
+            })),
+            tx
+          );
         }
       }
 
@@ -465,120 +408,55 @@ export class MenuService {
       taxRatePercentage?: number;
     }
   ) {
-    // 1. Verify item exists and belongs to tenant
-    const existing = await prisma.menuItem.findFirst({
-      where: {
-        id,
-        category: { tenantId },
-      },
-    });
+    const existing = ensureMenuItem(await menuItemModel.findByIdInTenant(id, tenantId));
 
-    if (!existing) {
-      throw new AppError("Menu item not found", 404, "ITEM_NOT_FOUND");
-    }
-
-    // 2. If category is being modified, verify target category belongs to tenant
     if (data.categoryId && data.categoryId !== existing.categoryId) {
-      const newCategory = await prisma.menuCategory.findFirst({
-        where: { id: data.categoryId, tenantId },
-      });
-      if (!newCategory) {
-        throw new AppError(
-          "Invalid category: target category does not exist or belongs to another organization",
-          400,
-          "INVALID_CATEGORY"
-        );
-      }
+      await assertValidCategory(tenantId, data.categoryId);
     }
 
     const dietaryValue = mapDietary(data.dietary || data.dietaryType);
 
-    await prisma.menuItem.update({
-      where: { id },
-      data: {
-        ...(data.categoryId ? { categoryId: data.categoryId } : {}),
-        ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.price !== undefined ? { price: new Prisma.Decimal(data.price) } : {}),
-        ...(data.isAvailable !== undefined ? { isAvailable: data.isAvailable } : {}),
-        ...(dietaryValue !== undefined ? { dietary: dietaryValue } : {}),
-        ...(data.spiceLevel !== undefined ? { spiceLevel: data.spiceLevel as SpiceLevel } : {}),
-        ...(data.preparationTimeMinutes !== undefined
-          ? { preparationTimeMinutes: data.preparationTimeMinutes }
-          : {}),
-        ...(data.taxRatePercentage !== undefined
-          ? { taxRatePercentage: new Prisma.Decimal(data.taxRatePercentage) }
-          : {}),
-      },
+    await menuItemModel.update(id, {
+      ...(data.categoryId ? { categoryId: data.categoryId } : {}),
+      ...(data.name !== undefined ? { name: data.name } : {}),
+      ...(data.description !== undefined ? { description: data.description } : {}),
+      ...(data.price !== undefined ? { price: new Prisma.Decimal(data.price) } : {}),
+      ...(data.isAvailable !== undefined ? { isAvailable: data.isAvailable } : {}),
+      ...(dietaryValue !== undefined ? { dietary: dietaryValue } : {}),
+      ...(data.spiceLevel !== undefined ? { spiceLevel: data.spiceLevel as SpiceLevel } : {}),
+      ...(data.preparationTimeMinutes !== undefined
+        ? { preparationTimeMinutes: data.preparationTimeMinutes }
+        : {}),
+      ...(data.taxRatePercentage !== undefined
+        ? { taxRatePercentage: new Prisma.Decimal(data.taxRatePercentage) }
+        : {}),
     });
 
     return this.getMenuItemById(tenantId, id);
   }
 
   async deleteMenuItem(tenantId: string, id: string) {
-    const existing = await prisma.menuItem.findFirst({
-      where: {
-        id,
-        category: { tenantId },
-      },
-      include: {
-        _count: {
-          select: {
-            orderItems: true,
-            billItems: true,
-          },
-        },
-      },
-    });
+    const existing = ensureMenuItem(
+      await menuItemModel.findByIdInTenantWithUsageCounts(id, tenantId)
+    );
 
-    if (!existing) {
-      throw new AppError("Menu item not found", 404, "ITEM_NOT_FOUND");
-    }
-
-    // If item is referenced in historical orders or bills, soft-deactivate to preserve audit trail
+    // Items referenced by historical orders or bills are deactivated to preserve the audit trail
     if (existing._count.orderItems > 0 || existing._count.billItems > 0) {
-      await prisma.menuItem.update({
-        where: { id },
-        data: { isAvailable: false },
-      });
+      await menuItemModel.update(id, { isAvailable: false });
       return { softDeleted: true, message: "Menu item deactivated due to historical order references" };
     }
 
-    // Otherwise, safe delete
-    await prisma.menuItem.delete({
-      where: { id },
-    });
-
+    await menuItemModel.delete(id);
     return { softDeleted: false, message: "Menu item permanently deleted" };
   }
 
-  // ==========================================
-  // Modifier Groups & Options Sub-Endpoints
-  // ==========================================
+  // Modifier groups & options
 
   async listModifierGroups(tenantId: string, menuItemId: string) {
-    // Verify item belongs to tenant
     await this.getMenuItemById(tenantId, menuItemId);
 
-    const groups = await prisma.modifierGroup.findMany({
-      where: { menuItemId },
-      include: { options: true },
-      orderBy: { name: "asc" },
-    });
-
-    return groups.map((g) => ({
-      id: g.id,
-      menuItemId: g.menuItemId,
-      name: g.name,
-      isRequired: g.isRequired,
-      minSelections: g.minSelections,
-      maxSelections: g.maxSelections,
-      options: g.options.map((opt) => ({
-        id: opt.id,
-        name: opt.name,
-        price: decimalToNumber(opt.price),
-      })),
-    }));
+    const groups = await modifierModel.findGroupsForMenuItem(menuItemId);
+    return groups.map(formatModifierGroup);
   }
 
   async createModifierGroup(
@@ -593,26 +471,15 @@ export class MenuService {
   ) {
     await this.getMenuItemById(tenantId, menuItemId);
 
-    const group = await prisma.modifierGroup.create({
-      data: {
-        menuItemId,
-        name: data.name,
-        isRequired: data.isRequired ?? false,
-        minSelections: data.minSelections ?? 0,
-        maxSelections: data.maxSelections ?? 1,
-      },
-      include: { options: true },
+    const group = await modifierModel.createGroupWithOptions({
+      menuItemId,
+      name: data.name,
+      isRequired: data.isRequired ?? false,
+      minSelections: data.minSelections ?? 0,
+      maxSelections: data.maxSelections ?? 1,
     });
 
-    return {
-      id: group.id,
-      menuItemId: group.menuItemId,
-      name: group.name,
-      isRequired: group.isRequired,
-      minSelections: group.minSelections,
-      maxSelections: group.maxSelections,
-      options: [],
-    };
+    return { ...formatModifierGroup(group), options: [] };
   }
 
   async updateModifierGroup(
@@ -625,58 +492,16 @@ export class MenuService {
       maxSelections?: number;
     }
   ) {
-    const group = await prisma.modifierGroup.findFirst({
-      where: {
-        id: groupId,
-        menuItem: {
-          category: { tenantId },
-        },
-      },
-    });
+    await getOwnedModifierGroup(tenantId, groupId);
 
-    if (!group) {
-      throw new AppError("Modifier group not found", 404, "MODIFIER_GROUP_NOT_FOUND");
-    }
-
-    const updated = await prisma.modifierGroup.update({
-      where: { id: groupId },
-      data,
-      include: { options: true },
-    });
-
-    return {
-      id: updated.id,
-      menuItemId: updated.menuItemId,
-      name: updated.name,
-      isRequired: updated.isRequired,
-      minSelections: updated.minSelections,
-      maxSelections: updated.maxSelections,
-      options: updated.options.map((opt) => ({
-        id: opt.id,
-        name: opt.name,
-        price: decimalToNumber(opt.price),
-      })),
-    };
+    const updated = await modifierModel.updateGroup(groupId, data);
+    return formatModifierGroup(updated);
   }
 
   async deleteModifierGroup(tenantId: string, groupId: string) {
-    const group = await prisma.modifierGroup.findFirst({
-      where: {
-        id: groupId,
-        menuItem: {
-          category: { tenantId },
-        },
-      },
-    });
+    await getOwnedModifierGroup(tenantId, groupId);
 
-    if (!group) {
-      throw new AppError("Modifier group not found", 404, "MODIFIER_GROUP_NOT_FOUND");
-    }
-
-    await prisma.modifierGroup.delete({
-      where: { id: groupId },
-    });
-
+    await modifierModel.deleteGroup(groupId);
     return { message: "Modifier group deleted" };
   }
 
@@ -685,33 +510,15 @@ export class MenuService {
     groupId: string,
     data: { name: string; price?: number }
   ) {
-    const group = await prisma.modifierGroup.findFirst({
-      where: {
-        id: groupId,
-        menuItem: {
-          category: { tenantId },
-        },
-      },
+    await getOwnedModifierGroup(tenantId, groupId);
+
+    const option = await modifierModel.createOption({
+      groupId,
+      name: data.name,
+      price: new Prisma.Decimal(data.price ?? 0),
     });
 
-    if (!group) {
-      throw new AppError("Modifier group not found", 404, "MODIFIER_GROUP_NOT_FOUND");
-    }
-
-    const option = await prisma.modifierOption.create({
-      data: {
-        groupId,
-        name: data.name,
-        price: new Prisma.Decimal(data.price ?? 0),
-      },
-    });
-
-    return {
-      id: option.id,
-      groupId: option.groupId,
-      name: option.name,
-      price: decimalToNumber(option.price),
-    };
+    return formatModifierOption(option);
   }
 
   async updateModifierOption(
@@ -719,57 +526,20 @@ export class MenuService {
     optionId: string,
     data: { name?: string; price?: number }
   ) {
-    const option = await prisma.modifierOption.findFirst({
-      where: {
-        id: optionId,
-        group: {
-          menuItem: {
-            category: { tenantId },
-          },
-        },
-      },
+    await getOwnedModifierOption(tenantId, optionId);
+
+    const updated = await modifierModel.updateOption(optionId, {
+      ...(data.name !== undefined ? { name: data.name } : {}),
+      ...(data.price !== undefined ? { price: new Prisma.Decimal(data.price) } : {}),
     });
 
-    if (!option) {
-      throw new AppError("Modifier option not found", 404, "MODIFIER_OPTION_NOT_FOUND");
-    }
-
-    const updated = await prisma.modifierOption.update({
-      where: { id: optionId },
-      data: {
-        ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(data.price !== undefined ? { price: new Prisma.Decimal(data.price) } : {}),
-      },
-    });
-
-    return {
-      id: updated.id,
-      groupId: updated.groupId,
-      name: updated.name,
-      price: decimalToNumber(updated.price),
-    };
+    return formatModifierOption(updated);
   }
 
   async deleteModifierOption(tenantId: string, optionId: string) {
-    const option = await prisma.modifierOption.findFirst({
-      where: {
-        id: optionId,
-        group: {
-          menuItem: {
-            category: { tenantId },
-          },
-        },
-      },
-    });
+    await getOwnedModifierOption(tenantId, optionId);
 
-    if (!option) {
-      throw new AppError("Modifier option not found", 404, "MODIFIER_OPTION_NOT_FOUND");
-    }
-
-    await prisma.modifierOption.delete({
-      where: { id: optionId },
-    });
-
+    await modifierModel.deleteOption(optionId);
     return { message: "Modifier option deleted" };
   }
 }

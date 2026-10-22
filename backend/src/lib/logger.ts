@@ -16,7 +16,6 @@ export const sensitiveRedactPaths = [
   "databaseUrl",
   "directUrl",
   "DATABASE_URL",
-  "DIRECT_URL",
 ];
 
 export const logger = pino({

@@ -22,26 +22,56 @@ backend/
 ├── prisma/
 │   └── schema.prisma         # Hospitality entity data models (aligned with docs/DATA_MODELS.md)
 ├── src/
-│   ├── config/
-│   │   ├── env.ts            # Validated environment loader with Zod
-│   │   └── index.ts          # Config exports
+│   ├── routes/               # <module>.routes.ts — URL paths, guards, rate limits only
+│   │   └── index.ts          # Registers every module at /api and /api/v1
+│   ├── controllers/          # <module>.controller.ts — validate request → call service → send response
+│   ├── services/             # <module>.service.ts — business rules only (no Prisma imports)
+│   ├── models/               # <entity>.model.ts — every Prisma query, one file per table group
+│   ├── validations/          # <module>.validation.ts — Zod schemas and their z.infer input types
+│   ├── types/                # <domain>.types.ts — shared interfaces; fastify.d.ts request typing
+│   ├── constants/            # error-codes.ts — every API error code (typo = compile error)
+│   ├── middleware/           # auth.ts (JWT, roles, permissions), qr-guest-auth.ts, error-handler.ts
+│   ├── database/
+│   │   ├── prisma.ts         # Prisma client, DbClient type, withTransaction(), DB health check
+│   │   └── seeds/            # demo-users.seed.ts, canonical.seed.ts
+│   ├── integrations/
+│   │   └── printer/          # ESC/POS renderer + network, agent and mock printer adapters
 │   ├── lib/
-│   │   ├── errors.ts         # Standard API response envelopes & error handlers
+│   │   ├── errors.ts         # AppError + BadRequest/Unauthorized/Forbidden/NotFound/ConflictError
+│   │   ├── validate.ts       # validate(schema, data, message?, code?) → typed data or 400
+│   │   ├── response.ts       # sendSuccess() and the standard success/error envelopes
+│   │   ├── context.ts        # getActor(request) → { user, ipAddress } for services
+│   │   ├── guards.ts         # ensureFound() 404, assertTenantAccess() / assertSuperAdmin() 403
 │   │   ├── logger.ts         # Structured logging configuration with redaction
-│   │   └── prisma.ts         # Singleton Prisma client & DB health check helper
-│   ├── routes/
-│   │   ├── health.ts         # GET /api/health and GET /api/ready endpoints
-│   │   └── index.ts          # API route registration
+│   │   └── password.ts       # bcrypt hashing & email normalisation
+│   ├── config/               # env.ts (Zod-validated env), permissions.ts
+│   ├── scripts/              # seed & outbox worker entry points
 │   ├── app.ts                # Fastify factory function (buildApp)
 │   └── server.ts             # Process lifecycle, port listener, and graceful shutdown
-├── tests/
-│   ├── health.test.ts        # Automated liveness & request-id tests
-│   └── ready.test.ts         # Automated database readiness & failure recovery tests
+├── tests/                    # Vitest suites (fastify.inject against a real database)
 ├── .env.example              # Placeholder environment variable template
 ├── package.json              # Backend scripts and dependencies
 ├── tsconfig.json             # TypeScript configuration
 └── vitest.config.ts          # Vitest test runner configuration
 ```
+
+### Adding a new module
+
+Every feature follows the same five files (see `role` for the smallest example):
+
+1. `validations/foo.validation.ts` — Zod schemas for params, query and body.
+2. `models/foo.model.ts` — `export const fooModel = { findById, create, ... }`; thin Prisma queries, each taking `db: DbClient = prisma` last so it works inside `withTransaction`.
+3. `services/foo.service.ts` — `export const fooService = { ... }`; business rules using models, `ensureFound`, `assertTenantAccess` and `auditService.recordAction(actor, …)`. Takes plain arguments (`ActorContext`, ids, validated input), never the Fastify request.
+4. `controllers/foo.controller.ts` — `validate()` the input, call the service, `sendSuccess()` the result.
+5. `routes/foo.routes.ts` — map paths to controller methods with `authenticate` / `requireRoles` guards, then add it to the `modules` list in `routes/index.ts`.
+
+Request flow: `route → controller → service → model → database`.
+
+### Conventions
+
+- **Errors**: throw `NotFoundError`, `ForbiddenError`, `BadRequestError`, `ConflictError` or `UnauthorizedError` with an `ErrorCode` constant — never `reply.send` an error by hand. The global handler in `middleware/error-handler.ts` formats every error the same way.
+- **Types**: shared interfaces live in `types/`; request-body types come from `z.infer` next to their schema in `validations/`. No `any`.
+- **Transactions**: wrap multi-step writes in `withTransaction(async (tx) => …)` and pass `tx` as the last argument to every model call inside it.
 
 ---
 
@@ -62,18 +92,13 @@ cp .env.example .env
 | `NODE_ENV` | String | `development` | Environment (`development`, `test`, `production`) |
 | `LOG_LEVEL` | String | `info` | Logging verbosity (`info`, `debug`, `warn`, `error`, `silent`) |
 | `CORS_ORIGIN` | String | `http://localhost:3000` | Allowed CORS origins (comma-separated or `*`) |
-| `DATABASE_URL` | String | — | Supabase PostgreSQL pooled connection URL (`:6543`) |
-| `DATABASE_URL` | String | — | Supabase PostgreSQL pooled connection URL (`:6543`) |
-| `DIRECT_URL` | String | — | Supabase PostgreSQL direct session URL (`:5432`) |
+| `DATABASE_URL` | String | — | PostgreSQL connection URL (used by the app and Prisma migrations) |
 | `JWT_SECRET` | String | Required in prod (min 32 chars) | Cryptographic signing secret for Fastify JWT tokens |
 | `JWT_EXPIRES_IN` | String | `8h` | Token expiration duration (shift-based) |
 | `DEMO_SEED_PASSWORD` | String | `demo-secure-pass` | Default password used when running development seed script |
 | `ALLOW_DEMO_SEED` | Boolean | `true` (dev/test) | Security guard preventing demo account seeding in production |
 | `RATE_LIMIT_MAX` | Number | `10` | Maximum requests per IP window on sensitive endpoints like `/login` |
 | `RATE_LIMIT_WINDOW_MS` | Number | `60000` | Rate limiting sliding window in milliseconds (1 min) |
-
-> **Note on Supabase Connection**:  
-> In Supabase, `DIRECT_URL` connects to port `5432` for direct execution and migrations. When connection pooling on port `6543` is unreachable or unconfigured, the application client automatically utilizes `DIRECT_URL` to maintain uninterrupted database operations.
 
 ---
 

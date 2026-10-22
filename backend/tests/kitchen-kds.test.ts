@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
-import { prisma, disconnectPrisma } from "../src/lib/prisma.js";
+import { prisma, disconnectPrisma } from "../src/database/prisma.js";
 import { KotStatus, OrderStatus, OutboxStatus } from "@prisma/client";
 import { kitchenService } from "../src/services/kitchen.service.js";
 import { outboxService } from "../src/services/outbox.service.js";

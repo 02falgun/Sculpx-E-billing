@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { prisma } from "../src/lib/prisma.js";
+import { prisma } from "../src/database/prisma.js";
 import { hashPassword, normalizeEmail } from "../src/lib/password.js";
 import { auditService } from "../src/services/audit.service.js";
 

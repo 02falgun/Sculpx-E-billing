@@ -1,15 +1,8 @@
-import { prisma } from "../lib/prisma.js";
-import { AppError } from "../lib/errors.js";
-import type { PublicQrContextResponse } from "../schemas/qr.schema.js";
-import type { PrismaClient, Prisma, QrCode, Table, Room } from "@prisma/client";
-
-export interface ValidatedQrEntity {
-  qr: QrCode;
-  tenantId: string;
-  type: "TABLE" | "ROOM";
-  table?: Table | null;
-  room?: Room | null;
-}
+import { BadRequestError, NotFoundError } from "../lib/errors.js";
+import { ErrorCode } from "../constants/error-codes.js";
+import { qrModel } from "../models/qr.model.js";
+import type { DbClient } from "../database/prisma.js";
+import type { PublicQrContextResponse, ValidatedQrEntity } from "../types/qr.types.js";
 
 export class QrService {
   /**
@@ -23,58 +16,44 @@ export class QrService {
    */
   async resolveValidatedQrEntity(
     token: string,
-    client?: Prisma.TransactionClient | PrismaClient
+    client?: DbClient
   ): Promise<ValidatedQrEntity> {
-    const db = client || prisma;
-    let qr = await db.qrCode.findUnique({
-      where: { token },
-      include: {
-        table: true,
-        room: true,
-      },
-    });
+    const qr = await qrModel.findByTokenWithAssignment(token, client);
 
     if (!qr) {
-      throw new AppError("QR code not found or invalid", 404, "QR_NOT_FOUND");
+      throw new NotFoundError("QR code not found or invalid", ErrorCode.QR_NOT_FOUND);
     }
 
     if (!qr.isActive) {
-      throw new AppError("QR code is inactive or has been disabled", 400, "QR_INACTIVE");
+      throw new BadRequestError("QR code is inactive or has been disabled", ErrorCode.QR_INACTIVE);
     }
 
-    // Check optional dynamic expiry or revocation fields if present in schema
+    // Expiry/revocation columns are not in the schema yet; honour them if they are added
     const dynamicQr = qr as unknown as { expiresAt?: Date | null; revokedAt?: Date | null };
     if (dynamicQr.expiresAt && dynamicQr.expiresAt < new Date()) {
-      throw new AppError("QR code has expired", 400, "QR_EXPIRED");
+      throw new BadRequestError("QR code has expired", ErrorCode.QR_EXPIRED);
     }
     if (dynamicQr.revokedAt) {
-      throw new AppError("QR code has been revoked", 400, "QR_REVOKED");
+      throw new BadRequestError("QR code has been revoked", ErrorCode.QR_REVOKED);
     }
 
-    // Update lastScannedAt asynchronously in background (non-blocking)
-    prisma.qrCode
-      .update({
-        where: { id: qr.id },
-        data: { lastScannedAt: new Date() },
-      })
-      .catch(() => {
-        // Suppress background update error so it never fails the customer's scan
-      });
+    // Fire-and-forget: a failed timestamp update must never fail the customer's scan
+    qrModel.touchLastScanned(qr.id).catch(() => {});
 
     if (qr.type === "TABLE") {
       // Must have valid associated table
       if (!qr.tableId || !qr.table) {
-        throw new AppError("QR code assignment is invalid or missing table", 404, "QR_INVALID_ASSIGNMENT");
+        throw new NotFoundError("QR code assignment is invalid or missing table", ErrorCode.QR_INVALID_ASSIGNMENT);
       }
 
       // Ambiguous assignment check: a TABLE QR must not have a ROOM assigned
       if (qr.roomId || qr.room) {
-        throw new AppError("QR code assignment is ambiguous", 404, "QR_INVALID_ASSIGNMENT");
+        throw new NotFoundError("QR code assignment is ambiguous", ErrorCode.QR_INVALID_ASSIGNMENT);
       }
 
       // Enforce strict tenant isolation: Table must belong to same tenant as QR record
       if (qr.table.tenantId !== qr.tenantId) {
-        throw new AppError("QR code assignment is invalid", 404, "QR_INVALID_ASSIGNMENT");
+        throw new NotFoundError("QR code assignment is invalid", ErrorCode.QR_INVALID_ASSIGNMENT);
       }
 
       return {
@@ -88,17 +67,17 @@ export class QrService {
     if (qr.type === "ROOM") {
       // Must have valid associated room
       if (!qr.roomId || !qr.room) {
-        throw new AppError("QR code assignment is invalid or missing room", 404, "QR_INVALID_ASSIGNMENT");
+        throw new NotFoundError("QR code assignment is invalid or missing room", ErrorCode.QR_INVALID_ASSIGNMENT);
       }
 
       // Ambiguous assignment check: a ROOM QR must not have a TABLE assigned
       if (qr.tableId || qr.table) {
-        throw new AppError("QR code assignment is ambiguous", 404, "QR_INVALID_ASSIGNMENT");
+        throw new NotFoundError("QR code assignment is ambiguous", ErrorCode.QR_INVALID_ASSIGNMENT);
       }
 
       // Enforce strict tenant isolation: Room must belong to same tenant as QR record
       if (qr.room.tenantId !== qr.tenantId) {
-        throw new AppError("QR code assignment is invalid", 404, "QR_INVALID_ASSIGNMENT");
+        throw new NotFoundError("QR code assignment is invalid", ErrorCode.QR_INVALID_ASSIGNMENT);
       }
 
       return {
@@ -109,7 +88,7 @@ export class QrService {
       };
     }
 
-    throw new AppError("Unsupported QR code type", 400, "UNSUPPORTED_QR_TYPE");
+    throw new BadRequestError("Unsupported QR code type", ErrorCode.UNSUPPORTED_QR_TYPE);
   }
 
   /**
@@ -157,7 +136,7 @@ export class QrService {
       };
     }
 
-    throw new AppError("Unsupported QR code type", 400, "UNSUPPORTED_QR_TYPE");
+    throw new BadRequestError("Unsupported QR code type", ErrorCode.UNSUPPORTED_QR_TYPE);
   }
 }
 

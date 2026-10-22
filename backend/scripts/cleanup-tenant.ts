@@ -1,4 +1,4 @@
-import { prisma } from "../src/lib/prisma.js";
+import { prisma } from "../src/database/prisma.js";
 import { auditService } from "../src/services/audit.service.js";
 
 async function main() {

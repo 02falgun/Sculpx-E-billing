@@ -1,104 +1,59 @@
 import type { FastifyPluginAsync } from "fastify";
-import { healthRoutes } from "./health.js";
-import { authRoutes } from "./auth.js";
-import { menuRoutes } from "./menu.js";
-import { qrRoutes } from "./qr.js";
-import { orderRoutes } from "./order.js";
-import { kitchenRoutes } from "./kitchen.js";
-import { billingRoutes } from "./billing.js";
-import { inventoryRoutes } from "./inventory.js";
-import { printerRoutes, printJobRoutes } from "./printer.js";
-import { printAgentRoutes } from "./print-agent.js";
-import { tableRoutes } from "./table.js";
-import { roomRoutes } from "./room.js";
-import { userRoutes } from "./user.js";
-import { tenantRoutes } from "./tenant.js";
-import { roleRoutes } from "./role.js";
-import { auditRoutes } from "./audit.js";
-import { organizationRoutes } from "./organization.js";
-import { locationRoutes } from "./location.js";
+import { healthRoutes } from "./health.routes.js";
+import { authRoutes } from "./auth.routes.js";
+import { userRoutes } from "./user.routes.js";
+import { tenantRoutes } from "./tenant.routes.js";
+import { organizationRoutes } from "./organization.routes.js";
+import { locationRoutes } from "./location.routes.js";
+import { roleRoutes } from "./role.routes.js";
+import { auditRoutes } from "./audit.routes.js";
+import { menuRoutes } from "./menu.routes.js";
+import { qrRoutes } from "./qr.routes.js";
+import { orderRoutes } from "./order.routes.js";
+import { kitchenRoutes } from "./kitchen.routes.js";
+import { billingRoutes } from "./billing.routes.js";
+import { inventoryRoutes } from "./inventory.routes.js";
+import { printerRoutes, printJobRoutes } from "./printer.routes.js";
+import { printAgentRoutes } from "./print-agent.routes.js";
+import { tableRoutes } from "./table.routes.js";
+import { roomRoutes } from "./room.routes.js";
+
+/**
+ * Every API module and its URL prefix. Registered twice below:
+ * once at /api/<prefix> and once at /api/v1/<prefix>.
+ */
+const modules: Array<[FastifyPluginAsync, string | undefined]> = [
+  [healthRoutes, undefined], // /health, /ready
+  [authRoutes, "/auth"],
+  [userRoutes, "/users"],
+  [tenantRoutes, "/tenants"],
+  [organizationRoutes, "/organizations"],
+  [locationRoutes, "/locations"],
+  [roleRoutes, "/roles"],
+  [auditRoutes, "/audit"],
+  [menuRoutes, "/menu"],
+  [qrRoutes, "/public"],
+  [orderRoutes, "/orders"],
+  [kitchenRoutes, "/kitchen"],
+  [billingRoutes, "/bills"],
+  [inventoryRoutes, "/inventory"],
+  [printerRoutes, "/printers"],
+  [printJobRoutes, "/print-jobs"],
+  [printAgentRoutes, "/print-agents"],
+  [tableRoutes, "/tables"],
+  [roomRoutes, "/rooms"],
+];
+
+const registerModules: FastifyPluginAsync = async (fastify) => {
+  for (const [plugin, prefix] of modules) {
+    await fastify.register(plugin, prefix ? { prefix } : {});
+  }
+};
 
 export const apiRoutes: FastifyPluginAsync = async (fastify) => {
-  // Direct /api/health and /api/ready
-  await fastify.register(healthRoutes);
+  // Unversioned: /api/...
+  await fastify.register(registerModules);
 
-  // Direct /api/auth endpoints (/api/auth/login, /api/auth/me, /api/auth/logout)
-  await fastify.register(authRoutes, { prefix: "/auth" });
-
-  // Direct /api/users endpoints
-  await fastify.register(userRoutes, { prefix: "/users" });
-
-  // Direct /api/tenants endpoints
-  await fastify.register(tenantRoutes, { prefix: "/tenants" });
-
-  // Direct /api/organizations endpoints
-  await fastify.register(organizationRoutes, { prefix: "/organizations" });
-
-  // Direct /api/locations endpoints
-  await fastify.register(locationRoutes, { prefix: "/locations" });
-
-  // Direct /api/roles endpoints
-  await fastify.register(roleRoutes, { prefix: "/roles" });
-
-  // Direct /api/audit endpoints
-  await fastify.register(auditRoutes, { prefix: "/audit" });
-
-  // Direct /api/menu endpoints
-  await fastify.register(menuRoutes, { prefix: "/menu" });
-
-  // Direct /api/public endpoints (/api/public/qr-context/:token)
-  await fastify.register(qrRoutes, { prefix: "/public" });
-
-  // Direct /api/orders endpoints (/api/orders/validate)
-  await fastify.register(orderRoutes, { prefix: "/orders" });
-
-  // Direct /api/kitchen endpoints (/api/kitchen/kots)
-  await fastify.register(kitchenRoutes, { prefix: "/kitchen" });
-
-  // Direct /api/bills endpoints (/api/bills/order/:orderId/generate)
-  await fastify.register(billingRoutes, { prefix: "/bills" });
-
-  // Direct /api/inventory endpoints (/api/inventory/items)
-  await fastify.register(inventoryRoutes, { prefix: "/inventory" });
-
-  // Direct /api/printers endpoints
-  await fastify.register(printerRoutes, { prefix: "/printers" });
-
-  // Direct /api/print-jobs endpoints
-  await fastify.register(printJobRoutes, { prefix: "/print-jobs" });
-
-  // Direct /api/print-agents endpoints
-  await fastify.register(printAgentRoutes, { prefix: "/print-agents" });
-
-  // Direct /api/tables endpoints
-  await fastify.register(tableRoutes, { prefix: "/tables" });
-
-  // Direct /api/rooms endpoints
-  await fastify.register(roomRoutes, { prefix: "/rooms" });
-
-  // Mount under /v1 for versioned API contract (/api/v1/...)
-  await fastify.register(
-    async (v1) => {
-      await v1.register(healthRoutes);
-      await v1.register(authRoutes, { prefix: "/auth" });
-      await v1.register(userRoutes, { prefix: "/users" });
-      await v1.register(tenantRoutes, { prefix: "/tenants" });
-      await v1.register(organizationRoutes, { prefix: "/organizations" });
-      await v1.register(locationRoutes, { prefix: "/locations" });
-      await v1.register(roleRoutes, { prefix: "/roles" });
-      await v1.register(auditRoutes, { prefix: "/audit" });
-      await v1.register(menuRoutes, { prefix: "/menu" });
-      await v1.register(qrRoutes, { prefix: "/public" });
-      await v1.register(orderRoutes, { prefix: "/orders" });
-      await v1.register(kitchenRoutes, { prefix: "/kitchen" });
-      await v1.register(billingRoutes, { prefix: "/bills" });
-      await v1.register(inventoryRoutes, { prefix: "/inventory" });
-      await v1.register(printerRoutes, { prefix: "/printers" });
-      await v1.register(printJobRoutes, { prefix: "/print-jobs" });
-      await v1.register(printAgentRoutes, { prefix: "/print-agents" });
-      await v1.register(tableRoutes, { prefix: "/tables" });
-      await v1.register(roomRoutes, { prefix: "/rooms" });
-    },
-    { prefix: "/v1" }
-  );
+  // Versioned contract: /api/v1/...
+  await fastify.register(registerModules, { prefix: "/v1" });
 };

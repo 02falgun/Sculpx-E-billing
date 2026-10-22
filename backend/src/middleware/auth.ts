@@ -1,50 +1,10 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Role } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
-import { AppError } from "../lib/errors.js";
-
+import { ForbiddenError, UnauthorizedError } from "../lib/errors.js";
+import { ErrorCode } from "../constants/error-codes.js";
 import { ROLE_DEFAULT_PERMISSIONS } from "../config/permissions.js";
-
-export interface AuthenticatedUser {
-  id: string;
-  tenantId: string;
-  email: string;
-  name: string;
-  role: Role;
-  phoneNumber?: string | null;
-  isActive: boolean;
-  tokenVersion: number;
-  permissions: string[];
-  authorizedTenantIds: string[];
-  authorizedLocationIds: string[];
-  authorizedOrganizationIds: string[];
-  organizationRole?: string;
-}
-
-declare module "@fastify/jwt" {
-  interface FastifyJWT {
-    payload: {
-      sub: string;
-      email: string;
-      role: Role;
-      tenantId: string;
-      tokenVersion?: number;
-    };
-    user: {
-      sub: string;
-      email: string;
-      role: Role;
-      tenantId: string;
-      tokenVersion?: number;
-    };
-  }
-}
-
-declare module "fastify" {
-  interface FastifyRequest {
-    authenticatedUser?: AuthenticatedUser;
-  }
-}
+import { userModel } from "../models/user.model.js";
+import { locationModel } from "../models/location.model.js";
 
 /**
  * Fastify preHandler hook to verify Bearer JWT and load active user from database.
@@ -57,61 +17,28 @@ export async function authenticate(
     await request.jwtVerify();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Authentication required";
-    throw new AppError(message, 401, "UNAUTHORIZED");
+    throw new UnauthorizedError(message);
   }
 
   const userId = request.user?.sub;
   if (!userId) {
-    throw new AppError("Malformed token payload: missing subject identifier", 401, "UNAUTHORIZED");
+    throw new UnauthorizedError("Malformed token payload: missing subject identifier");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      permissions: {
-        select: {
-          permissionKey: true,
-        },
-      },
-      locationAssignments: {
-        include: {
-          location: {
-            select: {
-              id: true,
-              tenantId: true,
-              status: true,
-            },
-          },
-        },
-      },
-      organizationMemberships: {
-        select: {
-          organizationId: true,
-          role: true,
-        },
-      },
-    },
-  });
+  const user = await userModel.findByIdWithAuthContext(userId);
 
   if (!user) {
-    throw new AppError("User account not found or session revoked", 401, "UNAUTHORIZED");
+    throw new UnauthorizedError("User account not found or session revoked");
   }
 
   if (!user.isActive) {
-    throw new AppError(
-      "Account has been deactivated. Please contact your manager.",
-      403,
-      "ACCOUNT_DISABLED"
-    );
+    throw new ForbiddenError("Account has been deactivated. Please contact your manager.", ErrorCode.ACCOUNT_DISABLED);
   }
 
-  // Session revocation validation via tokenVersion
-  if (
-    request.user?.tokenVersion !== undefined &&
-    user.tokenVersion !== undefined &&
-    request.user.tokenVersion < user.tokenVersion
-  ) {
-    throw new AppError("Session has been revoked. Please sign in again.", 401, "SESSION_REVOKED");
+  // A tokenVersion older than the user's current one means the session was revoked
+  const tokenVersion = request.user?.tokenVersion;
+  if (tokenVersion !== undefined && tokenVersion < user.tokenVersion) {
+    throw new UnauthorizedError("Session has been revoked. Please sign in again.", ErrorCode.SESSION_REVOKED);
   }
 
   const explicitPerms = user.permissions.map((p) => p.permissionKey);
@@ -157,14 +84,10 @@ export function requireRoles(...allowedRoles: Role[]) {
     }
 
     if (!allowedRoles.includes(user.role)) {
-      throw new AppError(
+      throw new ForbiddenError(
         `Access forbidden: role ${user.role} is not permitted to perform this action`,
-        403,
-        "FORBIDDEN",
-        {
-          requiredRoles: allowedRoles,
-          currentRole: user.role,
-        }
+        ErrorCode.FORBIDDEN,
+        { requiredRoles: allowedRoles, currentRole: user.role }
       );
     }
   };
@@ -191,12 +114,9 @@ export function requirePermissions(...requiredPermissions: string[]) {
 
     const missing = requiredPermissions.filter((p) => !user.permissions.includes(p));
     if (missing.length > 0) {
-      throw new AppError(
-        "Access forbidden: missing required permissions",
-        403,
-        "FORBIDDEN",
-        { missingPermissions: missing }
-      );
+      throw new ForbiddenError("Access forbidden: missing required permissions", ErrorCode.FORBIDDEN, {
+        missingPermissions: missing,
+      });
     }
   };
 }
@@ -225,28 +145,22 @@ export async function requireTenantScope(
 
   const targetTenantId = params.tenantId || query.tenantId || body.tenantId || user.tenantId;
 
-  if (targetTenantId) {
-    if (!user.authorizedTenantIds.includes(targetTenantId)) {
-      throw new AppError(
-        "Cross-tenant access forbidden: resource belongs to another organization",
-        403,
-        "FORBIDDEN"
-      );
-    }
+  if (!targetTenantId) {
+    return;
+  }
 
-    // If target location is suspended, prevent non-GET operational mutations
-    if (request.method !== "GET") {
-      const loc = await prisma.location.findUnique({
-        where: { tenantId: targetTenantId },
-        select: { status: true },
-      });
-      if (loc && loc.status !== "ACTIVE") {
-        throw new AppError(
-          `Location is ${loc.status.toLowerCase()}. Operational modifications are suspended.`,
-          403,
-          "LOCATION_SUSPENDED"
-        );
-      }
+  if (!user.authorizedTenantIds.includes(targetTenantId)) {
+    throw new ForbiddenError("Cross-tenant access forbidden: resource belongs to another organization");
+  }
+
+  // A suspended/archived location blocks every non-GET operational mutation
+  if (request.method !== "GET") {
+    const loc = await locationModel.findStatusByTenantId(targetTenantId);
+    if (loc && loc.status !== "ACTIVE") {
+      throw new ForbiddenError(
+        `Location is ${loc.status.toLowerCase()}. Operational modifications are suspended.`,
+        ErrorCode.LOCATION_SUSPENDED
+      );
     }
   }
 }

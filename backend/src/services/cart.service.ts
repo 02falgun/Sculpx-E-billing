@@ -1,12 +1,13 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
+import { Prisma } from "@prisma/client";
+import type { DbClient } from "../database/prisma.js";
+import { menuItemModel } from "../models/menu.model.js";
 import { qrService } from "./qr.service.js";
+import type { ValidateCartRequest } from "../validations/cart.validation.js";
 import type {
-  ValidateCartRequest,
   CartValidationResponse,
   ValidatedLineItem,
   ValidatedModifierSelection,
-} from "../schemas/cart.schema.js";
+} from "../types/order.types.js";
 
 export class CartService {
   /**
@@ -16,31 +17,15 @@ export class CartService {
    */
   async validateCart(
     payload: ValidateCartRequest,
-    client?: Prisma.TransactionClient | PrismaClient
+    client?: DbClient
   ): Promise<CartValidationResponse> {
-    const db = client || prisma;
-
     // 1. Resolve and verify QR context and tenant scope
     const validatedQr = await qrService.resolveValidatedQrEntity(payload.qrToken, client);
     const tenantId = validatedQr.tenantId;
 
     // 2. Query all requested menu items belonging to the verified tenant in a single snapshot
     const requestedMenuItemIds = Array.from(new Set(payload.items.map((i) => i.menuItemId)));
-    const menuItems = await db.menuItem.findMany({
-      where: {
-        id: { in: requestedMenuItemIds },
-        category: {
-          tenantId, // Strict multi-tenant isolation
-        },
-      },
-      include: {
-        modifierGroups: {
-          include: {
-            options: true,
-          },
-        },
-      },
-    });
+    const menuItems = await menuItemModel.findManyForPricing(tenantId, requestedMenuItemIds, client);
 
     const menuItemsMap = new Map(menuItems.map((m) => [m.id, m]));
 
@@ -103,13 +88,11 @@ export class CartService {
 
       // Check selected options validity and availability
       const validSelectedOptions: ValidatedModifierSelection[] = [];
-      let itemModifierError = false;
 
       for (const optId of selectedOptionIds) {
         const found = optionMap.get(optId);
         if (!found) {
           isValid = false;
-          itemModifierError = true;
           unavailableItems.push({
             menuItemId: menuItem.id,
             reason: `Modifier option '${optId}' is not valid for item '${menuItem.name}'`,
@@ -117,9 +100,9 @@ export class CartService {
           continue;
         }
 
-        if ((found.option as any).isAvailable === false) {
+        // Modifier options have no availability column today; honour one if it is added.
+        if ("isAvailable" in found.option && found.option.isAvailable === false) {
           isValid = false;
-          itemModifierError = true;
           unavailableItems.push({
             menuItemId: menuItem.id,
             reason: `Modifier option '${found.option.name}' for item '${menuItem.name}' is sold out`,
@@ -144,7 +127,6 @@ export class CartService {
 
         if (countInGroup < group.minSelections || (group.isRequired && countInGroup === 0)) {
           isValid = false;
-          itemModifierError = true;
           const msg = `Modifier group '${group.name}' requires at least ${group.minSelections} selection(s), but ${countInGroup} were selected.`;
           warnings.push(msg);
           unavailableItems.push({
@@ -155,7 +137,6 @@ export class CartService {
 
         if (countInGroup > group.maxSelections) {
           isValid = false;
-          itemModifierError = true;
           const msg = `Modifier group '${group.name}' allows at most ${group.maxSelections} selection(s), but ${countInGroup} were selected.`;
           warnings.push(msg);
           unavailableItems.push({

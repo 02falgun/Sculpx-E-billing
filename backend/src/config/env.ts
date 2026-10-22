@@ -20,7 +20,6 @@ const envSchema = z.object({
     .default("info"),
   CORS_ORIGIN: z.string().default("http://localhost:3000,https://sculpx-e-billing.vercel.app"),
   DATABASE_URL: z.string().optional(),
-  DIRECT_URL: z.string().optional(),
   API_PREFIX: z.string().default("/api"),
   JWT_SECRET: z.string().default("sculpx-dev-jwt-secret-key-min-32-characters-for-security-2026"),
   JWT_EXPIRES_IN: z.string().default("8h"),

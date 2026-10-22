@@ -1,12 +1,20 @@
 import {
   Prisma,
-  type PrismaClient,
   InventoryUnit,
   InventoryTransactionType,
+  type InventoryItem,
+  type InventoryTransaction,
 } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
+import { withTransaction } from "../database/prisma.js";
 import { outboxService } from "./outbox.service.js";
-import { AppError } from "../lib/errors.js";
+import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors.js";
+import { ErrorCode } from "../constants/error-codes.js";
+import {
+  inventoryItemModel,
+  inventoryTransactionModel,
+  recipeModel,
+} from "../models/inventory.model.js";
+import { menuItemModel } from "../models/menu.model.js";
 import type {
   CreateInventoryItemBody,
   UpdateInventoryItemBody,
@@ -14,17 +22,16 @@ import type {
   UpsertRecipeBody,
   QueryInventoryItemsParams,
   QueryTransactionsParams,
-} from "../schemas/inventory.schema.js";
-
-// =============================================================================
-// UNIT CONVERSION UTILITIES
-// =============================================================================
+} from "../validations/inventory.validation.js";
+import type {
+  InventoryTransactionWithItem,
+  PaginationMeta,
+  RecipeWithDetails,
+} from "../types/inventory.types.js";
 
 /**
- * Decimal-safe unit conversion factor to base units.
- * Mass base: GRAM
- * Volume base: ML
- * Discrete units: Self (1)
+ * Decimal-safe unit conversion between compatible units
+ * (KG <-> GRAM, LITRE <-> ML; any unit to itself).
  */
 export function convertQuantity(
   qty: Prisma.Decimal | number,
@@ -53,24 +60,19 @@ export function convertQuantity(
     return decimalQty.div(1000);
   }
 
-  // Incompatible unit dimensions
-  throw new AppError(
-    `Cannot convert between incompatible units: ${fromUnit} and ${toUnit}`,
-    400,
-    "INCOMPATIBLE_UNIT_CONVERSION",
-    { fromUnit, toUnit }
-  );
+  throw new BadRequestError(`Cannot convert between incompatible units: ${fromUnit} and ${toUnit}`, ErrorCode.INCOMPATIBLE_UNIT_CONVERSION, { fromUnit, toUnit });
 }
 
-// =============================================================================
-// INVENTORY SERVICE
-// =============================================================================
+async function getOwnedItem(tenantId: string, id: string) {
+  const item = await inventoryItemModel.findByIdInTenant(id, tenantId);
+  if (!item) {
+    throw new NotFoundError("Inventory item not found", ErrorCode.ITEM_NOT_FOUND, { id });
+  }
+  return item;
+}
 
 export class InventoryService {
-  /**
-   * Format an inventory item into consistent client response.
-   */
-  formatItem(item: any) {
+  formatItem(item: InventoryItem) {
     const currentStock = Number(item.currentStock.toFixed(3));
     const minimumThreshold = Number(item.minimumThreshold.toFixed(3));
     const idealStock = item.idealStock ? Number(item.idealStock.toFixed(3)) : 0;
@@ -97,14 +99,11 @@ export class InventoryService {
     };
   }
 
-  /**
-   * Format an inventory transaction into consistent client response.
-   */
-  formatTransaction(tx: any) {
+  formatTransaction(tx: InventoryTransactionWithItem) {
     return {
       id: tx.id,
       inventoryItemId: tx.inventoryItemId,
-      inventoryItemName: tx.inventoryItem?.name || "Unknown Item",
+      inventoryItemName: tx.inventoryItem.name || "Unknown Item",
       type: tx.type,
       quantityChange: Number(tx.quantityChange.toFixed(3)),
       remainingStockAfter: Number(tx.remainingStockAfter.toFixed(3)),
@@ -116,19 +115,16 @@ export class InventoryService {
     };
   }
 
-  /**
-   * Format a recipe with ingredient details.
-   */
-  formatRecipe(recipe: any) {
+  formatRecipe(recipe: RecipeWithDetails) {
     return {
       id: recipe.id,
       menuItemId: recipe.menuItemId,
-      menuItemName: recipe.menuItem?.name || recipe.name,
+      menuItemName: recipe.menuItem.name || recipe.name,
       isActive: recipe.isActive,
-      ingredients: (recipe.ingredients || []).map((ing: any) => ({
+      ingredients: recipe.ingredients.map((ing) => ({
         id: ing.id,
         inventoryItemId: ing.inventoryItemId,
-        inventoryItemName: ing.inventoryItem?.name || "Unknown Ingredient",
+        inventoryItemName: ing.inventoryItem.name || "Unknown Ingredient",
         quantityRequired: Number(ing.quantityRequired.toFixed(3)),
         unit: ing.unit,
       })),
@@ -143,42 +139,16 @@ export class InventoryService {
   async getItems(
     tenantId: string,
     params: QueryInventoryItemsParams
-  ): Promise<{
-    items: ReturnType<InventoryService["formatItem"]>[];
-    pagination: {
-      page: number;
-      limit: number;
-      totalItems: number;
-      totalPages: number;
-      hasNextPage: boolean;
-      hasPrevPage: boolean;
-    };
-  }> {
+  ): Promise<{ items: ReturnType<InventoryService["formatItem"]>[]; pagination: PaginationMeta }> {
     const page = Math.max(1, params.page || 1);
     const limit = Math.min(100, Math.max(1, params.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: Prisma.InventoryItemWhereInput = {
-      tenantId,
-      isActive: true,
-      ...(params.category ? { category: params.category } : {}),
-      ...(params.search
-        ? {
-            OR: [
-              { name: { contains: params.search, mode: "insensitive" } },
-              { sku: { contains: params.search, mode: "insensitive" } },
-            ],
-          }
-        : {}),
-    };
+    const filters = { category: params.category, search: params.search };
+    const items = await inventoryItemModel.findActiveForTenant(tenantId, filters);
+    const total = await inventoryItemModel.countActiveForTenant(tenantId, filters);
 
-    const items = await prisma.inventoryItem.findMany({
-      where,
-      orderBy: { name: "asc" },
-    });
-    const total = await prisma.inventoryItem.count({ where });
-
-    // Apply isLowStock filter if specified
+    // isLowStock is derived, so it is filtered (and paginated) in memory
     let filtered = items.map((it) => this.formatItem(it));
     if (params.isLowStock !== undefined) {
       filtered = filtered.filter((it) => it.isLowStock === params.isLowStock);
@@ -201,129 +171,85 @@ export class InventoryService {
     };
   }
 
-  /**
-   * Get single inventory item by ID.
-   */
   async getItemById(tenantId: string, id: string) {
-    const item = await prisma.inventoryItem.findFirst({
-      where: { id, tenantId },
-    });
-
-    if (!item) {
-      throw new AppError("Inventory item not found", 404, "ITEM_NOT_FOUND", { id });
-    }
-
+    const item = await getOwnedItem(tenantId, id);
     return this.formatItem(item);
   }
 
-  /**
-   * Create a new inventory item.
-   */
   async createItem(
     tenantId: string,
     data: CreateInventoryItemBody,
     userId?: string
   ) {
-    // Check SKU collision within tenant
-    const existing = await prisma.inventoryItem.findFirst({
-      where: { tenantId, sku: data.sku },
-    });
-
+    const existing = await inventoryItemModel.findBySku(tenantId, data.sku);
     if (existing) {
-      throw new AppError(
-        `An inventory item with SKU '${data.sku}' already exists`,
-        409,
-        "SKU_COLLISION",
-        { sku: data.sku }
-      );
+      throw new ConflictError(`An inventory item with SKU '${data.sku}' already exists`, ErrorCode.SKU_COLLISION, { sku: data.sku });
     }
 
     const currentStock = new Prisma.Decimal(data.currentStock || 0);
 
-    const item = await prisma.inventoryItem.create({
-      data: {
-        tenantId,
-        name: data.name,
-        sku: data.sku,
-        category: data.category,
-        unit: data.unit as InventoryUnit,
-        currentStock,
-        minimumThreshold: new Prisma.Decimal(data.minimumThreshold || 0),
-        idealStock: data.idealStock ? new Prisma.Decimal(data.idealStock) : null,
-        unitCost: new Prisma.Decimal(data.unitCost || 0),
-        supplierName: data.supplierName || null,
-        lastRestockedAt: currentStock.gt(0) ? new Date() : null,
-      },
+    const item = await inventoryItemModel.create({
+      tenantId,
+      name: data.name,
+      sku: data.sku,
+      category: data.category,
+      unit: data.unit,
+      currentStock,
+      minimumThreshold: new Prisma.Decimal(data.minimumThreshold || 0),
+      idealStock: data.idealStock ? new Prisma.Decimal(data.idealStock) : null,
+      unitCost: new Prisma.Decimal(data.unitCost || 0),
+      supplierName: data.supplierName || null,
+      lastRestockedAt: currentStock.gt(0) ? new Date() : null,
     });
 
-    // If initial stock was provided, record opening stock transaction
+    // Record any opening stock as a RESTOCK transaction
     if (currentStock.gt(0)) {
-      await prisma.inventoryTransaction.create({
-        data: {
-          tenantId,
-          inventoryItemId: item.id,
-          type: InventoryTransactionType.RESTOCK,
-          quantityChange: currentStock,
-          remainingStockAfter: currentStock,
-          reason: "Initial stock intake on creation",
-          performedByUserId: userId || null,
-          performedByName: "Admin",
-        },
+      await inventoryTransactionModel.create({
+        tenantId,
+        inventoryItemId: item.id,
+        type: InventoryTransactionType.RESTOCK,
+        quantityChange: currentStock,
+        remainingStockAfter: currentStock,
+        reason: "Initial stock intake on creation",
+        performedByUserId: userId || null,
+        performedByName: "Admin",
       });
     }
 
     return this.formatItem(item);
   }
 
-  /**
-   * Update an existing inventory item.
-   */
   async updateItem(
     tenantId: string,
     id: string,
     data: UpdateInventoryItemBody
   ) {
-    const existing = await prisma.inventoryItem.findFirst({
-      where: { id, tenantId },
-    });
+    const existing = await getOwnedItem(tenantId, id);
 
-    if (!existing) {
-      throw new AppError("Inventory item not found", 404, "ITEM_NOT_FOUND", { id });
+    if (
+      data.sku &&
+      data.sku !== existing.sku &&
+      (await inventoryItemModel.findSkuCollision(tenantId, data.sku, id))
+    ) {
+      throw new ConflictError(`An inventory item with SKU '${data.sku}' already exists`, ErrorCode.SKU_COLLISION, { sku: data.sku });
     }
 
-    if (data.sku && data.sku !== existing.sku) {
-      const collision = await prisma.inventoryItem.findFirst({
-        where: { tenantId, sku: data.sku, id: { not: id } },
-      });
-      if (collision) {
-        throw new AppError(
-          `An inventory item with SKU '${data.sku}' already exists`,
-          409,
-          "SKU_COLLISION",
-          { sku: data.sku }
-        );
-      }
-    }
-
-    const updated = await prisma.inventoryItem.update({
-      where: { id },
-      data: {
-        ...(data.name ? { name: data.name } : {}),
-        ...(data.sku ? { sku: data.sku } : {}),
-        ...(data.category ? { category: data.category } : {}),
-        ...(data.unit ? { unit: data.unit as InventoryUnit } : {}),
-        ...(data.minimumThreshold !== undefined
-          ? { minimumThreshold: new Prisma.Decimal(data.minimumThreshold) }
-          : {}),
-        ...(data.idealStock !== undefined
-          ? { idealStock: new Prisma.Decimal(data.idealStock) }
-          : {}),
-        ...(data.unitCost !== undefined
-          ? { unitCost: new Prisma.Decimal(data.unitCost) }
-          : {}),
-        ...(data.supplierName !== undefined ? { supplierName: data.supplierName } : {}),
-        ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
-      },
+    const updated = await inventoryItemModel.update(id, {
+      ...(data.name ? { name: data.name } : {}),
+      ...(data.sku ? { sku: data.sku } : {}),
+      ...(data.category ? { category: data.category } : {}),
+      ...(data.unit ? { unit: data.unit } : {}),
+      ...(data.minimumThreshold !== undefined
+        ? { minimumThreshold: new Prisma.Decimal(data.minimumThreshold) }
+        : {}),
+      ...(data.idealStock !== undefined
+        ? { idealStock: new Prisma.Decimal(data.idealStock) }
+        : {}),
+      ...(data.unitCost !== undefined
+        ? { unitCost: new Prisma.Decimal(data.unitCost) }
+        : {}),
+      ...(data.supplierName !== undefined ? { supplierName: data.supplierName } : {}),
+      ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
     });
 
     return this.formatItem(updated);
@@ -339,20 +265,13 @@ export class InventoryService {
     userId?: string,
     userName = "Staff"
   ) {
-    return await prisma.$transaction(async (tx) => {
-      // 1. Lock inventory item row
-      await tx.$queryRaw`
-        SELECT id, current_stock, minimum_threshold, tenant_id FROM inventory_items
-        WHERE id = ${data.itemId}::uuid AND tenant_id = ${tenantId}::uuid
-        FOR UPDATE
-      `;
+    return await withTransaction(async (tx) => {
+      await inventoryItemModel.lockForAdjustment(data.itemId, tenantId, tx);
 
-      const item = await tx.inventoryItem.findUnique({
-        where: { id: data.itemId },
-      });
+      const item = await inventoryItemModel.findById(data.itemId, tx);
 
       if (!item || item.tenantId !== tenantId) {
-        throw new AppError("Inventory item not found", 404, "ITEM_NOT_FOUND", {
+        throw new NotFoundError("Inventory item not found", ErrorCode.ITEM_NOT_FOUND, {
           itemId: data.itemId,
         });
       }
@@ -360,15 +279,17 @@ export class InventoryService {
       const currentStock = item.currentStock;
       const changeDecimal = new Prisma.Decimal(data.quantityChange);
 
-      // Determine sign based on transaction type if user provided unsigned quantity
+      // The type decides the sign: USAGE/WASTAGE always deduct, RESTOCK/RETURN always add
       let normalizedDelta = changeDecimal;
       if (
-        (data.type === "USAGE" || data.type === "WASTAGE") &&
+        (data.type === InventoryTransactionType.USAGE ||
+          data.type === InventoryTransactionType.WASTAGE) &&
         changeDecimal.gt(0)
       ) {
         normalizedDelta = changeDecimal.neg();
       } else if (
-        (data.type === "RESTOCK" || data.type === "RETURN") &&
+        (data.type === InventoryTransactionType.RESTOCK ||
+          data.type === InventoryTransactionType.RETURN) &&
         changeDecimal.lt(0)
       ) {
         normalizedDelta = changeDecimal.abs();
@@ -376,35 +297,29 @@ export class InventoryService {
 
       const newStock = currentStock.add(normalizedDelta);
 
-      // Insufficient stock policy: prevent stock from dropping below 0
+      // Stock may never go negative through a manual adjustment
       if (newStock.lt(0)) {
-        throw new AppError(
-          `Insufficient stock: Item '${item.name}' current stock is ${currentStock} ${item.unit}. Requested deduction: ${normalizedDelta.abs()} ${item.unit}.`,
-          400,
-          "INSUFFICIENT_STOCK",
-          {
+        throw new BadRequestError(`Insufficient stock: Item '${item.name}' current stock is ${currentStock} ${item.unit}. Requested deduction: ${normalizedDelta.abs()} ${item.unit}.`, ErrorCode.INSUFFICIENT_STOCK, {
             currentStock: Number(currentStock),
             requestedChange: Number(normalizedDelta),
             unit: item.unit,
-          }
-        );
+          });
       }
 
-      // 2. Update stock balance
-      const updatedItem = await tx.inventoryItem.update({
-        where: { id: item.id },
-        data: {
+      await inventoryItemModel.update(
+        item.id,
+        {
           currentStock: newStock,
           ...(normalizedDelta.gt(0) ? { lastRestockedAt: new Date() } : {}),
         },
-      });
+        tx
+      );
 
-      // 3. Persist transaction record
-      const transaction = await tx.inventoryTransaction.create({
-        data: {
+      const transaction = await inventoryTransactionModel.createWithItem(
+        {
           tenantId,
           inventoryItemId: item.id,
-          type: data.type as InventoryTransactionType,
+          type: data.type,
           quantityChange: normalizedDelta,
           remainingStockAfter: newStock,
           reason: data.reason,
@@ -412,14 +327,10 @@ export class InventoryService {
           performedByUserId: userId || null,
           performedByName: userName,
         },
-        include: {
-          inventoryItem: true,
-        },
-      });
+        tx
+      );
 
-      // 4. Trigger Outbox alerts if low stock threshold crossed
-      const isLowStock = newStock.lte(item.minimumThreshold);
-      if (isLowStock) {
+      if (newStock.lte(item.minimumThreshold)) {
         await outboxService.createEvent(tx, {
           tenantId,
           eventType: "inventory.low_stock",
@@ -439,43 +350,23 @@ export class InventoryService {
     });
   }
 
-  /**
-   * List inventory transactions with filtering and pagination.
-   */
   async getTransactions(
     tenantId: string,
     params: QueryTransactionsParams
   ): Promise<{
     transactions: ReturnType<InventoryService["formatTransaction"]>[];
-    pagination: {
-      page: number;
-      limit: number;
-      totalItems: number;
-      totalPages: number;
-      hasNextPage: boolean;
-      hasPrevPage: boolean;
-    };
+    pagination: PaginationMeta;
   }> {
     const page = Math.max(1, params.page || 1);
     const limit = Math.min(100, Math.max(1, params.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: Prisma.InventoryTransactionWhereInput = {
-      tenantId,
-      ...(params.itemId ? { inventoryItemId: params.itemId } : {}),
-      ...(params.type ? { type: params.type as InventoryTransactionType } : {}),
-    };
-
-    const txs = await prisma.inventoryTransaction.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
+    const filters = { itemId: params.itemId, type: params.type };
+    const txs = await inventoryTransactionModel.findPageForTenant(tenantId, filters, {
       skip,
       take: limit,
-      include: {
-        inventoryItem: true,
-      },
     });
-    const total = await prisma.inventoryTransaction.count({ where });
+    const total = await inventoryTransactionModel.countForTenant(tenantId, filters);
 
     const totalPages = Math.ceil(total / limit) || 1;
 
@@ -492,44 +383,16 @@ export class InventoryService {
     };
   }
 
-  /**
-   * Get all recipes defined for the tenant.
-   */
   async getRecipes(tenantId: string) {
-    const recipes = await prisma.recipe.findMany({
-      where: { tenantId, isActive: true },
-      include: {
-        menuItem: true,
-        ingredients: {
-          include: {
-            inventoryItem: true,
-          },
-        },
-      },
-      orderBy: { name: "asc" },
-    });
-
+    const recipes = await recipeModel.findActiveForTenant(tenantId);
     return recipes.map((r) => this.formatRecipe(r));
   }
 
-  /**
-   * Get recipe for a specific menu item.
-   */
   async getRecipeByMenuItemId(tenantId: string, menuItemId: string) {
-    const recipe = await prisma.recipe.findFirst({
-      where: { tenantId, menuItemId, isActive: true },
-      include: {
-        menuItem: true,
-        ingredients: {
-          include: {
-            inventoryItem: true,
-          },
-        },
-      },
-    });
+    const recipe = await recipeModel.findActiveByMenuItemInTenant(tenantId, menuItemId);
 
     if (!recipe) {
-      throw new AppError("Recipe not found for this menu item", 404, "RECIPE_NOT_FOUND", {
+      throw new NotFoundError("Recipe not found for this menu item", ErrorCode.RECIPE_NOT_FOUND, {
         menuItemId,
       });
     }
@@ -537,98 +400,64 @@ export class InventoryService {
     return this.formatRecipe(recipe);
   }
 
-  /**
-   * Create or update a Recipe (BOM) for a menu item.
-   */
+  /** Create or replace the recipe (BOM) of a menu item. */
   async upsertRecipe(tenantId: string, payload: UpsertRecipeBody) {
-    // 1. Verify MenuItem exists and belongs to the tenant
-    const menuItem = await prisma.menuItem.findFirst({
-      where: { id: payload.menuItemId, category: { tenantId } },
-    });
+    const menuItem = await menuItemModel.findByIdInTenant(payload.menuItemId, tenantId);
 
     if (!menuItem) {
-      throw new AppError("Menu item not found", 404, "MENU_ITEM_NOT_FOUND", {
+      throw new NotFoundError("Menu item not found", ErrorCode.MENU_ITEM_NOT_FOUND, {
         menuItemId: payload.menuItemId,
       });
     }
 
-    // 2. Validate all ingredients exist and belong to the tenant
+    // Every ingredient must be an active item of this tenant
     const ingredientItemIds = payload.ingredients.map((i) => i.inventoryItemId);
-    const inventoryItems = await prisma.inventoryItem.findMany({
-      where: {
-        id: { in: ingredientItemIds },
-        tenantId,
-        isActive: true,
-      },
-    });
+    const inventoryItems = await inventoryItemModel.findActiveByIdsInTenant(
+      ingredientItemIds,
+      tenantId
+    );
 
     if (inventoryItems.length !== ingredientItemIds.length) {
       const foundIds = new Set(inventoryItems.map((i) => i.id));
       const missingIds = ingredientItemIds.filter((id) => !foundIds.has(id));
-      throw new AppError(
-        "One or more ingredients do not exist or belong to another tenant",
-        400,
-        "INVALID_INGREDIENTS",
-        { missingIds }
-      );
+      throw new BadRequestError("One or more ingredients do not exist or belong to another tenant", ErrorCode.INVALID_INGREDIENTS, { missingIds });
     }
 
-    // 3. Upsert recipe within transaction
-    return await prisma.$transaction(async (tx) => {
-      // Find existing recipe
-      const existing = await tx.recipe.findUnique({
-        where: { menuItemId: payload.menuItemId },
-      });
+    return await withTransaction(async (tx) => {
+      const existing = await recipeModel.findByMenuItemId(payload.menuItemId, tx);
 
-      let recipeId = existing?.id;
-
+      let recipeId: string;
       if (existing) {
-        // Delete old ingredients
-        await tx.recipeIngredient.deleteMany({
-          where: { recipeId: existing.id },
-        });
-
-        await tx.recipe.update({
-          where: { id: existing.id },
-          data: {
-            name: payload.name,
-            isActive: true,
-          },
-        });
+        // Replace the old ingredient list
+        await recipeModel.deleteIngredients(existing.id, tx);
+        await recipeModel.update(existing.id, { name: payload.name, isActive: true }, tx);
+        recipeId = existing.id;
       } else {
-        const created = await tx.recipe.create({
-          data: {
+        const created = await recipeModel.create(
+          {
             tenantId,
             menuItemId: payload.menuItemId,
             name: payload.name,
           },
-        });
+          tx
+        );
         recipeId = created.id;
       }
 
-      // Insert new ingredients
       for (const ing of payload.ingredients) {
-        await tx.recipeIngredient.create({
-          data: {
-            recipeId: recipeId!,
+        await recipeModel.createIngredient(
+          {
+            recipeId,
             inventoryItemId: ing.inventoryItemId,
             quantityRequired: new Prisma.Decimal(ing.quantityRequired),
-            unit: ing.unit as InventoryUnit,
+            unit: ing.unit,
           },
-        });
+          tx
+        );
       }
 
-      const fullRecipe = await tx.recipe.findUnique({
-        where: { id: recipeId },
-        include: {
-          menuItem: true,
-          ingredients: {
-            include: {
-              inventoryItem: true,
-            },
-          },
-        },
-      });
+      // Written above in this same transaction, so it exists
+      const fullRecipe = (await recipeModel.findByIdWithDetails(recipeId, tx))!;
 
       return this.formatRecipe(fullRecipe);
     });
@@ -644,67 +473,35 @@ export class InventoryService {
     tenantId: string,
     orderId: string,
     kotId?: string
-  ): Promise<{ deductedCount: number; transactions: any[] }> {
-    // 1. Idempotency Check: if deductions have already occurred for this order/kot, skip!
-    const existingDeductions = await tx.inventoryTransaction.count({
-      where: {
-        tenantId,
-        type: InventoryTransactionType.USAGE,
-        ...(kotId ? { referenceKotId: kotId } : { referenceOrderId: orderId }),
-      },
-    });
+  ): Promise<{ deductedCount: number; transactions: InventoryTransaction[] }> {
+    // Idempotency: skip if this order/KOT has already deducted stock
+    const existingDeductions = await inventoryTransactionModel.countUsageForReference(
+      tenantId,
+      { orderId, kotId },
+      tx
+    );
 
     if (existingDeductions > 0) {
       return { deductedCount: 0, transactions: [] };
     }
 
-    // 2. Fetch order items
-    const orderItems = await tx.orderItem.findMany({
-      where: { orderId },
-      include: {
-        menuItem: {
-          include: {
-            recipe: {
-              include: {
-                ingredients: {
-                  include: {
-                    inventoryItem: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
+    const orderItems = await recipeModel.findOrderItemsWithRecipes(orderId, tx);
+    const recordedTransactions: InventoryTransaction[] = [];
 
-    const recordedTransactions: any[] = [];
-
-    // 3. Process each item's BOM
     for (const orderItem of orderItems) {
       const recipe = orderItem.menuItem?.recipe;
-      if (!recipe || !recipe.isActive || recipe.ingredients.length === 0) {
-        // No BOM defined for this menu item; skip
-        continue;
-      }
+      if (!recipe || !recipe.isActive || recipe.ingredients.length === 0) continue;
 
       for (const ingredient of recipe.ingredients) {
         const item = ingredient.inventoryItem;
         if (!item || !item.isActive) continue;
 
-        // Concurrency lock on inventory item row
-        await tx.$queryRaw`
-          SELECT id, current_stock, minimum_threshold FROM inventory_items
-          WHERE id = ${item.id}::uuid AND tenant_id = ${tenantId}::uuid
-          FOR UPDATE
-        `;
+        await inventoryItemModel.lockForDeduction(item.id, tenantId, tx);
 
-        const freshItem = await tx.inventoryItem.findUnique({
-          where: { id: item.id },
-        });
+        const freshItem = await inventoryItemModel.findById(item.id, tx);
         if (!freshItem) continue;
 
-        // Calculate quantity in recipe unit, then convert to inventory item's base unit
+        // Recipe quantity is in the recipe's unit; convert to the stock item's unit
         const totalRecipeQuantity = new Prisma.Decimal(ingredient.quantityRequired).mul(
           orderItem.quantity
         );
@@ -714,20 +511,12 @@ export class InventoryService {
           freshItem.unit
         );
 
-        const currentStock = freshItem.currentStock;
-        const newStock = currentStock.sub(deductionInBaseUnit);
+        const newStock = freshItem.currentStock.sub(deductionInBaseUnit);
 
-        // Update current stock
-        await tx.inventoryItem.update({
-          where: { id: freshItem.id },
-          data: {
-            currentStock: newStock,
-          },
-        });
+        await inventoryItemModel.update(freshItem.id, { currentStock: newStock }, tx);
 
-        // Record usage transaction
-        const invTx = await tx.inventoryTransaction.create({
-          data: {
+        const invTx = await inventoryTransactionModel.create(
+          {
             tenantId,
             inventoryItemId: freshItem.id,
             type: InventoryTransactionType.USAGE,
@@ -738,11 +527,11 @@ export class InventoryService {
             referenceKotId: kotId || null,
             performedByName: "Kitchen KDS Dispatcher",
           },
-        });
+          tx
+        );
 
         recordedTransactions.push(invTx);
 
-        // Low stock alert
         if (newStock.lte(freshItem.minimumThreshold)) {
           await outboxService.createEvent(tx, {
             tenantId,
@@ -759,12 +548,9 @@ export class InventoryService {
           });
         }
 
-        // Auto-86 policy: if ingredient drops to 0 or below, mark linked menu item unavailable
+        // Auto-86: an ingredient at or below zero makes the menu item unavailable
         if (newStock.lte(0) && orderItem.menuItemId) {
-          await tx.menuItem.update({
-            where: { id: orderItem.menuItemId },
-            data: { isAvailable: false },
-          });
+          await menuItemModel.update(orderItem.menuItemId, { isAvailable: false }, tx);
 
           await outboxService.createEvent(tx, {
             tenantId,

@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
-import { prisma, disconnectPrisma } from "../src/lib/prisma.js";
+import { prisma, disconnectPrisma } from "../src/database/prisma.js";
 import { hashPassword } from "../src/lib/password.js";
-import { seedDemoUsers, DEFAULT_DEMO_TENANT_ID } from "../src/lib/seed.js";
+import { seedDemoUsers, DEFAULT_DEMO_TENANT_ID } from "../src/database/seeds/demo-users.seed.js";
 
 describe("SCULPX E-Billing — Phase 2 Authentication & Authorization Tests", { timeout: 20000 }, () => {
   let app: FastifyInstance;

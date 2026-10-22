@@ -16,5 +16,5 @@
       "@/*": ["../../frontend/src/*"]
     }
   },
-  "include": ["./**/*"]
+  "include": ["./**/*", "../src/types/**/*.d.ts"]
 }

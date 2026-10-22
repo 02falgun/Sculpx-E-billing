@@ -1,5 +1,6 @@
 import { logger } from "../lib/logger.js";
 import { printJobService } from "./print-job.service.js";
+import type { PrintJobWithPrinter } from "../types/print-job.types.js";
 
 export class PrintWorkerService {
   private workerTimer: NodeJS.Timeout | null = null;
@@ -9,7 +10,7 @@ export class PrintWorkerService {
    * Process a batch of pending print jobs.
    */
   async processPendingJobs(batchSize = 10): Promise<{ processed: number; succeeded: number }> {
-    let claimedJobs: any[] = [];
+    let claimedJobs: PrintJobWithPrinter[] = [];
 
     try {
       claimedJobs = await printJobService.claimPendingBatch(batchSize);

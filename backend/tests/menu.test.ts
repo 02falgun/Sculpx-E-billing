@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
-import { prisma, disconnectPrisma } from "../src/lib/prisma.js";
-import { seedDemoUsers, DEFAULT_DEMO_TENANT_ID } from "../src/lib/seed.js";
+import { prisma, disconnectPrisma } from "../src/database/prisma.js";
+import { seedDemoUsers, DEFAULT_DEMO_TENANT_ID } from "../src/database/seeds/demo-users.seed.js";
 import { hashPassword } from "../src/lib/password.js";
 
 describe("SCULPX E-Billing — Phase 3A Menu Catalog Tests", { timeout: 30000 }, () => {

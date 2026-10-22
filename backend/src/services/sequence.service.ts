@@ -1,5 +1,6 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
+import type { DbClient } from "../database/prisma.js";
+import { sequenceModel } from "../models/sequence.model.js";
+import type { CounterType } from "../types/order.types.js";
 
 export class SequenceService {
   /**
@@ -31,23 +32,12 @@ export class SequenceService {
    */
   async getNextCounter(
     tenantId: string,
-    counterType: "ORDER" | "KOT" | "INVOICE",
-    tx?: Prisma.TransactionClient | PrismaClient,
+    counterType: CounterType,
+    tx?: DbClient,
     targetDate?: string
   ): Promise<{ dateStr: string; counter: number }> {
-    const db = tx || prisma;
     const dateStr = targetDate || this.getFormattedDate();
-
-    // Use atomic upsert with RETURNING in raw PostgreSQL
-    const rows = await db.$queryRaw<Array<{ counter: number }>>(
-      Prisma.sql`
-        INSERT INTO "daily_counters" ("id", "tenant_id", "date", "counter_type", "counter", "created_at", "updated_at")
-        VALUES (gen_random_uuid(), ${tenantId}::uuid, ${dateStr}, ${counterType}, 1, now(), now())
-        ON CONFLICT ("tenant_id", "date", "counter_type")
-        DO UPDATE SET "counter" = "daily_counters"."counter" + 1, "updated_at" = now()
-        RETURNING "counter";
-      `
-    );
+    const rows = await sequenceModel.incrementDailyCounter(tenantId, dateStr, counterType, tx);
 
     const counter = Number(rows[0]?.counter ?? 1);
     return { dateStr, counter };
@@ -58,7 +48,7 @@ export class SequenceService {
    */
   async allocateOrderNumber(
     tenantId: string,
-    tx?: Prisma.TransactionClient | PrismaClient
+    tx?: DbClient
   ): Promise<string> {
     const { dateStr, counter } = await this.getNextCounter(tenantId, "ORDER", tx);
     const padded = String(counter).padStart(4, "0");
@@ -70,7 +60,7 @@ export class SequenceService {
    */
   async allocateKotNumber(
     tenantId: string,
-    tx?: Prisma.TransactionClient | PrismaClient
+    tx?: DbClient
   ): Promise<string> {
     const { dateStr, counter } = await this.getNextCounter(tenantId, "KOT", tx);
     const padded = String(counter).padStart(4, "0");
@@ -82,7 +72,7 @@ export class SequenceService {
    */
   async allocateInvoiceNumber(
     tenantId: string,
-    tx?: Prisma.TransactionClient | PrismaClient
+    tx?: DbClient
   ): Promise<string> {
     const { dateStr, counter } = await this.getNextCounter(tenantId, "INVOICE", tx);
     const padded = String(counter).padStart(4, "0");

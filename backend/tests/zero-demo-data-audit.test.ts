@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { prisma } from "../src/lib/prisma.js";
+import { prisma } from "../src/database/prisma.js";
 import { buildApp } from "../src/app.js";
 import type { FastifyInstance } from "fastify";
 import { hashPassword } from "../src/lib/password.js";

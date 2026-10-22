@@ -1,6 +1,6 @@
 import { outboxService } from "../services/outbox.service.js";
 import { logger } from "../lib/logger.js";
-import { disconnectPrisma } from "../lib/prisma.js";
+import { disconnectPrisma } from "../database/prisma.js";
 
 async function runWorker(): Promise<void> {
   logger.info("Starting standalone SCULPX E-Billing Outbox Worker...");

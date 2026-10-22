@@ -1,32 +1,26 @@
 import crypto from "node:crypto";
 import type { FastifyRequest } from "fastify";
-import type { WebSocket } from "ws";
-import type { Printer } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
-import { AppError } from "../lib/errors.js";
+import type { RawData, WebSocket } from "ws";
+import type { Prisma, PrintAgent, Printer } from "@prisma/client";
+import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors.js";
+import { ErrorCode } from "../constants/error-codes.js";
+import { printAgentModel } from "../models/print-agent.model.js";
+import { printerModel } from "../models/printer.model.js";
 import { logger } from "../lib/logger.js";
 import { websocketService } from "./websocket.service.js";
 import {
   MAX_PRINT_JOB_FRAME_BYTES,
-  MAX_CONTROL_FRAME_BYTES,
   agentInboundFrameSchema,
   type AgentAckPayload,
   type AgentHealthCheckResultPayload,
-} from "../schemas/print-agent.schema.js";
-import type { PrinterAdapterResult, PrinterHealthResult } from "./printer-adapters/types.js";
-
-export interface ConnectedAgentDevice {
-  agentId: string;
-  deviceId: string;
-  tenantId: string;
-  name: string;
-  socket: WebSocket;
-  remoteAddress: string;
-  connectedAt: Date;
-  lastHeartbeatAt: Date;
-  version?: string;
-  permittedPrinterIds: Set<string>;
-}
+} from "../validations/print-agent.validation.js";
+import type { PrintContext, PrinterAdapterResult, PrinterHealthResult } from "../types/printer.types.js";
+import type {
+  AgentOutboundFrame,
+  ConnectedAgentDevice,
+  PrintRequestFrame,
+  RegisterPrintAgentInput,
+} from "../types/print-agent.types.js";
 
 interface PendingJobRequest {
   requestId: string;
@@ -46,76 +40,74 @@ interface PendingHealthRequest {
   resolve: (result: PrinterHealthResult) => void;
 }
 
+function hashApiKey(apiKey: string): string {
+  return crypto.createHash("sha256").update(apiKey).digest("hex");
+}
+
+function generateApiKey(): { plainApiKey: string; apiKeyHash: string } {
+  const plainApiKey = `sculpx_ag_${crypto.randomBytes(24).toString("hex")}`;
+  return { plainApiKey, apiKeyHash: hashApiKey(plainApiKey) };
+}
+
+/** Close a socket, ignoring errors from an already-closed or broken connection. */
+function closeQuietly(socket: WebSocket, code: number, reason: string): void {
+  try {
+    socket.close(code, reason);
+  } catch {}
+}
+
+function rawDataToBuffer(raw: RawData): Buffer {
+  if (Buffer.isBuffer(raw)) return raw;
+  return Array.isArray(raw) ? Buffer.concat(raw) : Buffer.from(raw);
+}
+
 export class PrintAgentGatewayService {
-  private connectedAgents = new Map<string, ConnectedAgentDevice>(); // Key: agentId
-  private pendingJobRequests = new Map<string, PendingJobRequest>(); // Key: requestId
-  private pendingHealthRequests = new Map<string, PendingHealthRequest>(); // Key: requestId
+  /** Keyed by agentId. */
+  private connectedAgents = new Map<string, ConnectedAgentDevice>();
+  /** Keyed by requestId. */
+  private pendingJobRequests = new Map<string, PendingJobRequest>();
+  /** Keyed by requestId. */
+  private pendingHealthRequests = new Map<string, PendingHealthRequest>();
 
   /**
    * Register a new print agent device for a tenant.
-   * Generates a cryptographically secure API key and stores its SHA-256 hash.
-   * Returns the plain API key ONLY once during registration.
+   * Only the SHA-256 hash of the generated API key is stored; the plain key is returned once.
    */
   async registerAgent(
     tenantId: string,
-    input: {
-      name: string;
-      deviceId: string;
-      permittedPrinterIds?: string[];
-      metadata?: Record<string, unknown>;
-    }
-  ): Promise<{ agent: any; apiKey: string }> {
-    const existing = await prisma.printAgent.findUnique({
-      where: { deviceId: input.deviceId },
-    });
+    input: RegisterPrintAgentInput
+  ): Promise<{ agent: PrintAgent; apiKey: string }> {
+    const existing = await printAgentModel.findByDeviceId(input.deviceId);
 
     if (existing) {
-      throw new AppError(
-        `Device ID '${input.deviceId}' is already registered`,
-        409,
-        "DEVICE_ALREADY_EXISTS"
-      );
+      throw new ConflictError(`Device ID '${input.deviceId}' is already registered`, ErrorCode.DEVICE_ALREADY_EXISTS);
     }
 
-    // Verify permittedPrinterIds belong to tenant if supplied
     if (input.permittedPrinterIds && input.permittedPrinterIds.length > 0) {
-      const printers = await prisma.printer.findMany({
-        where: {
-          tenantId,
-          id: { in: input.permittedPrinterIds },
-        },
-      });
+      const printers = await printerModel.findManyByIdsInTenant(tenantId, input.permittedPrinterIds);
 
       if (printers.length !== input.permittedPrinterIds.length) {
-        throw new AppError(
-          "One or more permitted printers do not exist or belong to another tenant",
-          400,
-          "INVALID_PRINTER_ASSIGNMENT"
-        );
+        throw new BadRequestError("One or more permitted printers do not exist or belong to another tenant", ErrorCode.INVALID_PRINTER_ASSIGNMENT);
       }
     }
 
-    // Generate random API key with secure prefix
-    const plainApiKey = `sculpx_ag_${crypto.randomBytes(24).toString("hex")}`;
-    const apiKeyHash = crypto.createHash("sha256").update(plainApiKey).digest("hex");
+    const { plainApiKey, apiKeyHash } = generateApiKey();
 
-    const agent = await prisma.printAgent.create({
-      data: {
-        tenantId,
-        name: input.name.trim(),
-        deviceId: input.deviceId.trim(),
-        apiKeyHash,
-        status: "ACTIVE",
-        permittedPrinterIds: input.permittedPrinterIds || [],
-        metadata: input.metadata as any,
-      },
+    const agent = await printAgentModel.create({
+      tenantId,
+      name: input.name.trim(),
+      deviceId: input.deviceId.trim(),
+      apiKeyHash,
+      status: "ACTIVE",
+      permittedPrinterIds: input.permittedPrinterIds || [],
+      // Validated as z.record(z.unknown()) from a JSON body, so it is JSON-serialisable.
+      metadata: input.metadata as Prisma.InputJsonObject | undefined,
     });
 
-    // If printers assigned, link agentId on Printer records
     if (input.permittedPrinterIds && input.permittedPrinterIds.length > 0) {
-      await prisma.printer.updateMany({
-        where: { id: { in: input.permittedPrinterIds } },
-        data: { agentId: agent.id, connectionType: "LOCAL_AGENT" },
+      await printerModel.updateManyByIds(input.permittedPrinterIds, {
+        agentId: agent.id,
+        connectionType: "LOCAL_AGENT",
       });
     }
 
@@ -133,21 +125,7 @@ export class PrintAgentGatewayService {
    * List all registered agents for tenant with live connection status.
    */
   async listAgents(tenantId: string) {
-    const agents = await prisma.printAgent.findMany({
-      where: { tenantId },
-      include: {
-        printers: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            station: true,
-            isOnline: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const agents = await printAgentModel.findManyForTenant(tenantId);
 
     return agents.map((a) => ({
       ...a,
@@ -160,15 +138,10 @@ export class PrintAgentGatewayService {
    * Get agent by ID with tenant scoping.
    */
   async getAgentById(tenantId: string, agentId: string) {
-    const agent = await prisma.printAgent.findUnique({
-      where: { id: agentId },
-      include: {
-        printers: true,
-      },
-    });
+    const agent = await printAgentModel.findById(agentId);
 
     if (!agent || agent.tenantId !== tenantId) {
-      throw new AppError("Print agent not found", 404, "AGENT_NOT_FOUND");
+      throw new NotFoundError("Print agent not found", ErrorCode.AGENT_NOT_FOUND);
     }
 
     return {
@@ -185,21 +158,14 @@ export class PrintAgentGatewayService {
   async rotateApiKey(tenantId: string, agentId: string): Promise<{ apiKey: string }> {
     const agent = await this.getAgentById(tenantId, agentId);
 
-    const plainApiKey = `sculpx_ag_${crypto.randomBytes(24).toString("hex")}`;
-    const apiKeyHash = crypto.createHash("sha256").update(plainApiKey).digest("hex");
+    const { plainApiKey, apiKeyHash } = generateApiKey();
 
-    await prisma.printAgent.update({
-      where: { id: agent.id },
-      data: { apiKeyHash },
-    });
+    await printAgentModel.update(agent.id, { apiKeyHash });
 
-    // Disconnect active socket if connected
     const active = this.connectedAgents.get(agent.id);
     if (active) {
-      try {
-        active.socket.close(4001, "API_KEY_ROTATED: Please reconnect with new credential");
-      } catch {}
-      this.handleAgentDisconnect(agent.id, 4001, "API_KEY_ROTATED");
+      closeQuietly(active.socket, 4001, "API_KEY_ROTATED: Please reconnect with new credential");
+      void this.handleAgentDisconnect(agent.id, 4001, "API_KEY_ROTATED");
     }
 
     logger.info({
@@ -218,29 +184,19 @@ export class PrintAgentGatewayService {
   async revokeAgent(tenantId: string, agentId: string): Promise<void> {
     const agent = await this.getAgentById(tenantId, agentId);
 
-    await prisma.printAgent.update({
-      where: { id: agent.id },
-      data: {
-        status: "REVOKED",
-        isOnline: false,
-        lastDisconnectedAt: new Date(),
-      },
+    await printAgentModel.update(agent.id, {
+      status: "REVOKED",
+      isOnline: false,
+      lastDisconnectedAt: new Date(),
     });
 
-    // Disconnect active socket
     const active = this.connectedAgents.get(agent.id);
     if (active) {
-      try {
-        active.socket.close(4003, "AGENT_REVOKED: Device authorization has been revoked");
-      } catch {}
-      this.handleAgentDisconnect(agent.id, 4003, "AGENT_REVOKED");
+      closeQuietly(active.socket, 4003, "AGENT_REVOKED: Device authorization has been revoked");
+      void this.handleAgentDisconnect(agent.id, 4003, "AGENT_REVOKED");
     }
 
-    // Mark assigned printers offline
-    await prisma.printer.updateMany({
-      where: { agentId: agent.id },
-      data: { isOnline: false },
-    });
+    await printerModel.updateManyByAgent(agent.id, { isOnline: false });
 
     logger.warn({
       event: "print_agent_revoked",
@@ -250,46 +206,26 @@ export class PrintAgentGatewayService {
   }
 
   /**
-   * Bind or unbind permitted printer IDs for an agent.
+   * Replace the set of printers an agent is permitted to service.
    */
-  async bindPrinters(tenantId: string, agentId: string, printerIds: string[]): Promise<any> {
+  async bindPrinters(tenantId: string, agentId: string, printerIds: string[]) {
     const agent = await this.getAgentById(tenantId, agentId);
 
-    // Verify all printers belong to tenant
     if (printerIds.length > 0) {
-      const count = await prisma.printer.count({
-        where: { tenantId, id: { in: printerIds } },
-      });
+      const count = await printerModel.countByIdsInTenant(tenantId, printerIds);
       if (count !== printerIds.length) {
-        throw new AppError(
-          "One or more printer IDs do not belong to tenant",
-          400,
-          "INVALID_PRINTERS"
-        );
+        throw new BadRequestError("One or more printer IDs do not belong to tenant", ErrorCode.INVALID_PRINTERS);
       }
     }
 
-    // Clear previous agentId associations for this agent
-    await prisma.printer.updateMany({
-      where: { agentId: agent.id },
-      data: { agentId: null },
-    });
+    await printerModel.updateManyByAgent(agent.id, { agentId: null });
 
-    // Set agentId on newly bound printers
     if (printerIds.length > 0) {
-      await prisma.printer.updateMany({
-        where: { id: { in: printerIds } },
-        data: { agentId: agent.id, connectionType: "LOCAL_AGENT" },
-      });
+      await printerModel.updateManyByIds(printerIds, { agentId: agent.id, connectionType: "LOCAL_AGENT" });
     }
 
-    const updated = await prisma.printAgent.update({
-      where: { id: agent.id },
-      data: { permittedPrinterIds: printerIds },
-      include: { printers: true },
-    });
+    const updated = await printAgentModel.updateWithPrinters(agent.id, { permittedPrinterIds: printerIds });
 
-    // Update in-memory connected agent cache if active
     const active = this.connectedAgents.get(agent.id);
     if (active) {
       active.permittedPrinterIds = new Set(printerIds);
@@ -302,24 +238,20 @@ export class PrintAgentGatewayService {
   }
 
   /**
-   * Handle incoming WebSocket connection from Local Print Agent.
-   * Path: /ws/print-agent
+   * Handle incoming WebSocket connection from Local Print Agent (/ws/print-agent).
+   * Credentials come either from upgrade headers or an in-band AGENT_HELLO frame.
    */
   async handleConnection(socket: WebSocket, req: FastifyRequest): Promise<void> {
     const remoteAddress = req.ip || "unknown";
     let authenticatedAgent: ConnectedAgentDevice | null = null;
     let handshakeTimeoutTimer: NodeJS.Timeout | null = null;
 
-    // Check if credentials provided via HTTP upgrade headers
     const headerDeviceId = (req.headers["x-agent-id"] || req.headers["x-device-id"]) as string | undefined;
     const headerApiKey = (req.headers["x-agent-key"] || req.headers["x-api-key"]) as string | undefined;
 
     const performAuth = async (deviceId: string, apiKey: string): Promise<boolean> => {
       try {
-        const agent = await prisma.printAgent.findUnique({
-          where: { deviceId },
-          include: { printers: true },
-        });
+        const agent = await printAgentModel.findByDeviceIdWithPrinters(deviceId);
 
         if (!agent) {
           logger.warn({ event: "agent_auth_failed", reason: "DEVICE_NOT_FOUND", deviceId });
@@ -331,8 +263,7 @@ export class PrintAgentGatewayService {
           return false;
         }
 
-        // Verify API key hash with constant-time equality
-        const incomingHash = crypto.createHash("sha256").update(apiKey).digest("hex");
+        const incomingHash = hashApiKey(apiKey);
         const storedHash = agent.apiKeyHash;
 
         if (
@@ -343,16 +274,14 @@ export class PrintAgentGatewayService {
           return false;
         }
 
-        // Close any existing connected socket for this agent (split-brain protection)
+        // Split-brain protection: a new connection replaces any existing one for this agent.
         const existing = this.connectedAgents.get(agent.id);
         if (existing && existing.socket !== socket) {
-          try {
-            existing.socket.close(4009, "NEW_CONNECTION_REPLACED");
-          } catch {}
+          closeQuietly(existing.socket, 4009, "NEW_CONNECTION_REPLACED");
           this.connectedAgents.delete(agent.id);
         }
 
-        // Construct permitted printers set (include explicitly bound printers and array IDs)
+        // Permitted = explicit ID list plus printers bound via agentId.
         const permitted = new Set<string>(agent.permittedPrinterIds);
         agent.printers.forEach((p) => permitted.add(p.id));
 
@@ -370,32 +299,22 @@ export class PrintAgentGatewayService {
 
         this.connectedAgents.set(agent.id, authenticatedAgent);
 
-        // Update DB agent status
-        await prisma.printAgent.update({
-          where: { id: agent.id },
-          data: {
-            isOnline: true,
-            lastConnectedAt: new Date(),
-            lastHeartbeatAt: new Date(),
-            ipAddress: remoteAddress,
-          },
+        await printAgentModel.update(agent.id, {
+          isOnline: true,
+          lastConnectedAt: new Date(),
+          lastHeartbeatAt: new Date(),
+          ipAddress: remoteAddress,
         });
 
-        // Mark assigned printers as online
         if (permitted.size > 0) {
-          await prisma.printer.updateMany({
-            where: { id: { in: Array.from(permitted) } },
-            data: { isOnline: true },
-          });
+          await printerModel.updateManyByIds(Array.from(permitted), { isOnline: true });
         }
 
-        // Clear handshake timeout
         if (handshakeTimeoutTimer) {
           clearTimeout(handshakeTimeoutTimer);
           handshakeTimeoutTimer = null;
         }
 
-        // Send AGENT_WELCOME frame
         this.sendFrame(socket, {
           type: "AGENT_WELCOME",
           agentId: agent.id,
@@ -405,7 +324,6 @@ export class PrintAgentGatewayService {
           permittedPrinterIds: Array.from(permitted),
         });
 
-        // Broadcast status update to staff WebSocket topic
         this.broadcastAgentStatus(authenticatedAgent, "CONNECTED");
 
         logger.info({
@@ -427,26 +345,23 @@ export class PrintAgentGatewayService {
       }
     };
 
-    // Attempt immediate header auth if present
     if (headerDeviceId && headerApiKey) {
       await performAuth(headerDeviceId, headerApiKey);
     } else {
-      // Allow 5000ms window for in-band AGENT_HELLO frame
+      // Allow a 5s window for the in-band AGENT_HELLO frame.
       handshakeTimeoutTimer = setTimeout(() => {
         if (!authenticatedAgent) {
           logger.warn({ event: "agent_handshake_timeout", remoteAddress });
-          try {
-            socket.close(4008, "HANDSHAKE_TIMEOUT");
-          } catch {}
+          closeQuietly(socket, 4008, "HANDSHAKE_TIMEOUT");
         }
       }, 5000);
     }
 
-    socket.on("message", async (raw: Buffer | string) => {
+    socket.on("message", async (raw: RawData) => {
       try {
-        const byteLength = Buffer.isBuffer(raw) ? raw.length : Buffer.byteLength(raw, "utf8");
+        const data = rawDataToBuffer(raw);
+        const byteLength = data.length;
 
-        // Enforce maximum frame size: max 64 KB for any frame
         if (byteLength > MAX_PRINT_JOB_FRAME_BYTES) {
           logger.warn({
             event: "agent_frame_oversized",
@@ -461,12 +376,14 @@ export class PrintAgentGatewayService {
           return;
         }
 
-        const parsed = JSON.parse(raw.toString("utf8"));
+        const parsed: unknown = JSON.parse(data.toString("utf8"));
 
-        // If unauthenticated, only AGENT_HELLO is accepted
+        // Before authentication only AGENT_HELLO is accepted. This is a loose check (the schema runs
+        // after auth); a `null` frame throws here and is reported as MALFORMED_JSON below.
         if (!authenticatedAgent) {
-          if (parsed.type === "AGENT_HELLO" && parsed.deviceId && parsed.apiKey) {
-            const ok = await performAuth(parsed.deviceId, parsed.apiKey);
+          const hello = parsed as { type?: unknown; deviceId?: unknown; apiKey?: unknown };
+          if (hello.type === "AGENT_HELLO" && hello.deviceId && hello.apiKey) {
+            const ok = await performAuth(String(hello.deviceId), String(hello.apiKey));
             if (!ok) {
               this.sendFrame(socket, {
                 type: "AGENT_ERROR",
@@ -486,7 +403,6 @@ export class PrintAgentGatewayService {
           return;
         }
 
-        // Validate message with Zod schema
         const validation = agentInboundFrameSchema.safeParse(parsed);
         if (!validation.success) {
           this.sendFrame(socket, {
@@ -498,29 +414,16 @@ export class PrintAgentGatewayService {
         }
 
         const frame = validation.data;
-
-        // Process validated frame
         switch (frame.type) {
-          case "AGENT_PING": {
+          case "AGENT_PING":
             authenticatedAgent.lastHeartbeatAt = new Date();
-            this.sendFrame(socket, {
-              type: "AGENT_PONG",
-              timestamp: new Date().toISOString(),
-            });
+            this.sendFrame(socket, { type: "AGENT_PONG", timestamp: new Date().toISOString() });
             break;
-          }
-
-          case "AGENT_ACK": {
+          case "AGENT_ACK":
             this.handleAgentAck(authenticatedAgent, frame);
             break;
-          }
-
-          case "HEALTH_CHECK_RESULT": {
+          case "HEALTH_CHECK_RESULT":
             this.handleHealthCheckResult(authenticatedAgent, frame);
-            break;
-          }
-
-          default:
             break;
         }
       } catch (err: unknown) {
@@ -541,7 +444,7 @@ export class PrintAgentGatewayService {
         clearTimeout(handshakeTimeoutTimer);
       }
       if (authenticatedAgent) {
-        this.handleAgentDisconnect(authenticatedAgent.agentId, code, reason.toString("utf8"));
+        void this.handleAgentDisconnect(authenticatedAgent.agentId, code, reason.toString("utf8"));
       }
     });
 
@@ -555,78 +458,67 @@ export class PrintAgentGatewayService {
   }
 
   /**
-   * Handle agent disconnect: clean up memory state, fail in-flight requests, and update DB.
+   * Handle agent disconnect: clean up memory state, settle in-flight requests, and update DB.
    */
   private async handleAgentDisconnect(agentId: string, code: number, reason: string): Promise<void> {
     const agent = this.connectedAgents.get(agentId);
     this.connectedAgents.delete(agentId);
+    if (!agent) return;
 
-    if (agent) {
-      logger.info({
-        event: "print_agent_disconnected",
-        agentId,
-        deviceId: agent.deviceId,
-        code,
-        reason,
+    logger.info({
+      event: "print_agent_disconnected",
+      agentId,
+      deviceId: agent.deviceId,
+      code,
+      reason,
+    });
+
+    this.broadcastAgentStatus(agent, "DISCONNECTED");
+
+    try {
+      await printAgentModel.update(agentId, {
+        isOnline: false,
+        lastDisconnectedAt: new Date(),
       });
 
-      this.broadcastAgentStatus(agent, "DISCONNECTED");
+      if (agent.permittedPrinterIds.size > 0) {
+        await printerModel.updateManyByIds(Array.from(agent.permittedPrinterIds), { isOnline: false });
+      }
+    } catch (err) {
+      logger.warn({ msg: "Failed to persist agent offline status", err });
+    }
 
-      // Mark agent offline in DB
-      try {
-        await prisma.printAgent.update({
-          where: { id: agentId },
-          data: {
-            isOnline: false,
-            lastDisconnectedAt: new Date(),
-          },
+    // A job the agent already RECEIVED may have printed, so it settles as UNCERTAIN.
+    for (const [requestId, req] of this.pendingJobRequests.entries()) {
+      if (!agent.permittedPrinterIds.has(req.printerId)) continue;
+
+      clearTimeout(req.timeoutTimer);
+      this.pendingJobRequests.delete(requestId);
+
+      if (req.stage === "RECEIVED") {
+        req.resolve({
+          success: false,
+          uncertain: true,
+          error: "UNCERTAIN_DELIVERY: Local agent disconnected after receiving print job payload",
         });
-
-        // Mark bound printers offline
-        if (agent.permittedPrinterIds.size > 0) {
-          await prisma.printer.updateMany({
-            where: { id: { in: Array.from(agent.permittedPrinterIds) } },
-            data: { isOnline: false },
-          });
-        }
-      } catch (err) {
-        logger.warn({ msg: "Failed to persist agent offline status", err });
+      } else {
+        req.resolve({
+          success: false,
+          uncertain: false,
+          error: `AGENT_DISCONNECTED: Connection dropped before job processing (${reason})`,
+        });
       }
+    }
 
-      // Reject all pending job requests for this agent with appropriate uncertainty
-      for (const [requestId, req] of this.pendingJobRequests.entries()) {
-        if (agent.permittedPrinterIds.has(req.printerId)) {
-          clearTimeout(req.timeoutTimer);
-          this.pendingJobRequests.delete(requestId);
+    for (const [requestId, req] of this.pendingHealthRequests.entries()) {
+      if (!agent.permittedPrinterIds.has(req.printerId)) continue;
 
-          if (req.stage === "RECEIVED") {
-            // Agent already received bytes; disconnecting during write is UNCERTAIN
-            req.resolve({
-              success: false,
-              uncertain: true,
-              error: "UNCERTAIN_DELIVERY: Local agent disconnected after receiving print job payload",
-            });
-          } else {
-            req.resolve({
-              success: false,
-              uncertain: false,
-              error: `AGENT_DISCONNECTED: Connection dropped before job processing (${reason})`,
-            });
-          }
-        }
-      }
-
-      // Reject pending health checks
-      for (const [requestId, req] of this.pendingHealthRequests.entries()) {
-        if (agent.permittedPrinterIds.has(req.printerId)) {
-          clearTimeout(req.timeoutTimer);
-          this.pendingHealthRequests.delete(requestId);
-          req.resolve({
-            isOnline: false,
-            error: "Local print agent disconnected during probe",
-          });
-        }
-      }
+      clearTimeout(req.timeoutTimer);
+      this.pendingHealthRequests.delete(requestId);
+      req.resolve({
+        isOnline: false,
+        error: "Local print agent disconnected during probe",
+      });
     }
   }
 
@@ -645,7 +537,7 @@ export class PrintAgentGatewayService {
       return;
     }
 
-    // Authorization verification: only the exact agent dispatched to can acknowledge
+    // Only the agent the job was dispatched to may acknowledge it.
     if (pending.agentId !== agent.agentId) {
       logger.warn({
         event: "unauthorized_agent_ack_rejected",
@@ -657,45 +549,37 @@ export class PrintAgentGatewayService {
       return;
     }
 
-    switch (ack.stage) {
-      case "RECEIVED": {
-        // Agent safely queued job into local memory; mark stage to guard against disconnect
-        pending.stage = "RECEIVED";
-        break;
-      }
+    if (ack.stage === "RECEIVED") {
+      // The agent queued the job locally; from now on a disconnect means UNCERTAIN, not FAILED.
+      pending.stage = "RECEIVED";
+      return;
+    }
 
-      case "PRINTED": {
-        clearTimeout(pending.timeoutTimer);
-        this.pendingJobRequests.delete(ack.requestId);
+    clearTimeout(pending.timeoutTimer);
+    this.pendingJobRequests.delete(ack.requestId);
+
+    switch (ack.stage) {
+      case "PRINTED":
         pending.resolve({
           success: true,
           uncertain: false,
           bytesWritten: ack.bytesWritten || 0,
         });
         break;
-      }
-
-      case "FAILED": {
-        clearTimeout(pending.timeoutTimer);
-        this.pendingJobRequests.delete(ack.requestId);
+      case "FAILED":
         pending.resolve({
           success: false,
           uncertain: false,
           error: ack.error || "Local printer socket write failed",
         });
         break;
-      }
-
-      case "UNCERTAIN": {
-        clearTimeout(pending.timeoutTimer);
-        this.pendingJobRequests.delete(ack.requestId);
+      case "UNCERTAIN":
         pending.resolve({
           success: false,
           uncertain: true,
           error: ack.error || "UNCERTAIN_DELIVERY: Ambiguous hardware socket outcome reported by local agent",
         });
         break;
-      }
     }
   }
 
@@ -733,25 +617,36 @@ export class PrintAgentGatewayService {
     if (printer.agentId) {
       return this.connectedAgents.has(printer.agentId);
     }
+    return this.findPermittingAgent(printer) !== undefined;
+  }
 
-    // Check if any agent for this tenant has permitted this printer
+  /** A connected agent in the printer's tenant that permits it (an empty permitted set allows all). */
+  private findPermittingAgent(printer: Printer): ConnectedAgentDevice | undefined {
     for (const agent of this.connectedAgents.values()) {
-      if (agent.tenantId === printer.tenantId && (agent.permittedPrinterIds.has(printer.id) || agent.permittedPrinterIds.size === 0)) {
-        return true;
+      if (
+        agent.tenantId === printer.tenantId &&
+        (agent.permittedPrinterIds.has(printer.id) || agent.permittedPrinterIds.size === 0)
+      ) {
+        return agent;
       }
     }
+    return undefined;
+  }
 
-    return false;
+  /** The printer's assigned agent if it is connected, otherwise any permitting agent. */
+  private resolveAgentForPrinter(printer: Printer): ConnectedAgentDevice | undefined {
+    const assigned = printer.agentId ? this.connectedAgents.get(printer.agentId) : undefined;
+    return assigned ?? this.findPermittingAgent(printer);
   }
 
   /**
    * Dispatch a print job frame to the local agent servicing this printer.
-   * Enforces 64 KB max payload size and non-blocking promise resolution.
+   * Resolves (never rejects) once the agent acknowledges, disconnects or times out.
    */
   async dispatchPrint(
     printer: Printer,
     data: Buffer | string,
-    context?: { jobId?: string; jobType?: string; isReprint?: boolean }
+    context?: PrintContext
   ): Promise<PrinterAdapterResult> {
     const rawBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data, "utf8");
 
@@ -763,23 +658,7 @@ export class PrintAgentGatewayService {
       };
     }
 
-    // Find active agent for this printer
-    let targetAgent: ConnectedAgentDevice | undefined;
-
-    if (printer.agentId) {
-      targetAgent = this.connectedAgents.get(printer.agentId);
-    }
-
-    if (!targetAgent) {
-      // Find active agent in same tenant with printer in permitted set or default
-      for (const agent of this.connectedAgents.values()) {
-        if (agent.tenantId === printer.tenantId && (agent.permittedPrinterIds.has(printer.id) || agent.permittedPrinterIds.size === 0)) {
-          targetAgent = agent;
-          break;
-        }
-      }
-    }
-
+    const targetAgent = this.resolveAgentForPrinter(printer);
     if (!targetAgent) {
       return {
         success: false,
@@ -788,7 +667,7 @@ export class PrintAgentGatewayService {
       };
     }
 
-    // Verify tenant boundary
+    // An assigned agentId may point at another tenant's agent.
     if (targetAgent.tenantId !== printer.tenantId) {
       return {
         success: false,
@@ -801,24 +680,23 @@ export class PrintAgentGatewayService {
     const jobId = context?.jobId || requestId;
 
     return new Promise<PrinterAdapterResult>((resolve) => {
-      // 10-second timeout for agent response
       const timeoutTimer = setTimeout(() => {
         const pending = this.pendingJobRequests.get(requestId);
-        if (pending) {
-          this.pendingJobRequests.delete(requestId);
-          if (pending.stage === "RECEIVED") {
-            resolve({
-              success: false,
-              uncertain: true,
-              error: `UNCERTAIN_DELIVERY: Local agent received job ${jobId} but printer write confirmation timed out`,
-            });
-          } else {
-            resolve({
-              success: false,
-              uncertain: false,
-              error: `AGENT_TIMEOUT: Local agent did not acknowledge print request within 10000ms`,
-            });
-          }
+        if (!pending) return;
+
+        this.pendingJobRequests.delete(requestId);
+        if (pending.stage === "RECEIVED") {
+          resolve({
+            success: false,
+            uncertain: true,
+            error: `UNCERTAIN_DELIVERY: Local agent received job ${jobId} but printer write confirmation timed out`,
+          });
+        } else {
+          resolve({
+            success: false,
+            uncertain: false,
+            error: `AGENT_TIMEOUT: Local agent did not acknowledge print request within 10000ms`,
+          });
         }
       }, 10000);
 
@@ -832,8 +710,7 @@ export class PrintAgentGatewayService {
         resolve,
       });
 
-      // Transmit PRINT_REQUEST frame
-      const frame = {
+      const frame: PrintRequestFrame = {
         type: "PRINT_REQUEST",
         requestId,
         jobId,
@@ -857,21 +734,7 @@ export class PrintAgentGatewayService {
    * Dispatch a health check ping via the local agent.
    */
   async dispatchHealthCheck(printer: Printer): Promise<PrinterHealthResult> {
-    let targetAgent: ConnectedAgentDevice | undefined;
-
-    if (printer.agentId) {
-      targetAgent = this.connectedAgents.get(printer.agentId);
-    }
-
-    if (!targetAgent) {
-      for (const agent of this.connectedAgents.values()) {
-        if (agent.tenantId === printer.tenantId && (agent.permittedPrinterIds.has(printer.id) || agent.permittedPrinterIds.size === 0)) {
-          targetAgent = agent;
-          break;
-        }
-      }
-    }
-
+    const targetAgent = this.resolveAgentForPrinter(printer);
     if (!targetAgent) {
       return {
         isOnline: false,
@@ -908,13 +771,11 @@ export class PrintAgentGatewayService {
     });
   }
 
-  /**
-   * Helper to serialize and write JSON frame to agent socket.
-   */
-  private sendFrame(socket: WebSocket, data: Record<string, unknown>): void {
+  /** Serialize and write a JSON frame if the socket is open. */
+  private sendFrame(socket: WebSocket, frame: AgentOutboundFrame): void {
     try {
-      if (socket.readyState === 1 /* OPEN */) {
-        socket.send(JSON.stringify(data));
+      if (socket.readyState === socket.OPEN) {
+        socket.send(JSON.stringify(frame));
       }
     } catch (err) {
       logger.warn({ msg: "Failed to send frame to agent socket", err });
@@ -946,10 +807,8 @@ export class PrintAgentGatewayService {
    * Graceful shutdown of gateway.
    */
   shutdown(): void {
-    for (const [agentId, agent] of this.connectedAgents.entries()) {
-      try {
-        agent.socket.close(1001, "SERVER_SHUTDOWN");
-      } catch {}
+    for (const agent of this.connectedAgents.values()) {
+      closeQuietly(agent.socket, 1001, "SERVER_SHUTDOWN");
     }
     this.connectedAgents.clear();
 

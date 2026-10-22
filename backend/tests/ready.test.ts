@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
-import * as prismaLib from "../src/lib/prisma.js";
+import * as prismaLib from "../src/database/prisma.js";
 
 describe("GET /api/ready & Readiness Probes", () => {
   let app: FastifyInstance;

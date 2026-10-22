@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
+  resolveBackendUrl,
   resolveApiBaseUrl,
   resolveWsBaseUrl,
   resolveUseMockApi,
@@ -20,6 +21,11 @@ describe("SCULPX E-Billing — API, Realtime & Environment Security Configuratio
   });
 
   describe("1. URL Resolution & Mixed Content Protection", () => {
+    it("resolves backend origin from a single base URL and trims trailing slashes", () => {
+      expect(resolveBackendUrl(undefined)).toBe("http://localhost:8000");
+      expect(resolveBackendUrl("https://api.ebilling.com//")).toBe("https://api.ebilling.com");
+    });
+
     it("resolves default localhost API URL when unconfigured in local development", () => {
       const url = resolveApiBaseUrl(undefined, "http://localhost:3000");
       expect(url).toBe("http://localhost:8000/api/v1");

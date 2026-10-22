@@ -1,44 +1,20 @@
 import { KotStatus, OrderStatus, OutboxStatus, Prisma } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
-import { AppError } from "../lib/errors.js";
+import { withTransaction } from "../database/prisma.js";
+import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors.js";
+import { ErrorCode } from "../constants/error-codes.js";
 import { logger } from "../lib/logger.js";
+import { kotModel } from "../models/kot.model.js";
+import { orderModel } from "../models/order.model.js";
+import { outboxModel } from "../models/outbox.model.js";
 import { outboxService } from "./outbox.service.js";
-
-export interface FormattedKotItem {
-  id: string;
-  orderItemId: string;
-  menuItemId: string;
-  name: string;
-  quantity: number;
-  modifiers: Array<{ name: string; price?: number }>;
-  modifiersSummary?: string | null;
-  specialInstructions?: string | null;
-  status: string;
-}
-
-export interface FormattedKOT {
-  id: string;
-  kotNumber: string;
-  orderId: string;
-  orderNumber: string;
-  status: KotStatus;
-  station: string;
-  urgency: "NORMAL" | "HIGH" | "URGENT";
-  specialNotes?: string | null;
-  acceptedAt?: string | null;
-  readyAt?: string | null;
-  preparedAt?: string | null;
-  servedAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  qrContext: {
-    type: "TABLE" | "ROOM";
-    identifier: string;
-    displayName: string;
-    roomOrTableId?: string;
-  };
-  items: FormattedKotItem[];
-}
+import type {
+  FormattedKOT,
+  FormattedKotItem,
+  KotModifier,
+  KotQrContext,
+  KotUrgency,
+  KotWithDetails,
+} from "../types/kitchen.types.js";
 
 /**
  * Valid state transitions for the documented KOT lifecycle:
@@ -53,130 +29,131 @@ const VALID_TRANSITIONS: Record<KotStatus, KotStatus[]> = {
   [KotStatus.CANCELLED]: [],
 };
 
-export class KitchenService {
-  /**
-   * Helper to format Prisma KOT records into consistent API responses.
-   */
-  public formatKot(kot: any): FormattedKOT {
-    const elapsedMinutes = (Date.now() - new Date(kot.createdAt).getTime()) / 60000;
-    const urgency = elapsedMinutes > 20 ? "URGENT" : elapsedMinutes >= 15 ? "HIGH" : "NORMAL";
+/** OrderItem preparation status mirrored from the KOT status. */
+const ORDER_ITEM_STATUS_FOR_KOT: Partial<Record<KotStatus, string>> = {
+  [KotStatus.PREPARING]: "PREPARING",
+  [KotStatus.READY]: "READY",
+  [KotStatus.SERVED]: "SERVED",
+};
 
-    let qrContext: FormattedKOT["qrContext"] = {
+function kotNotFound(): NotFoundError {
+  return new NotFoundError("Kitchen order ticket not found", ErrorCode.KOT_NOT_FOUND);
+}
+
+function isKotStatus(value: string): value is KotStatus {
+  return (Object.values(KotStatus) as string[]).includes(value);
+}
+
+function urgencyFor(createdAt: Date): KotUrgency {
+  const elapsedMinutes = (Date.now() - createdAt.getTime()) / 60000;
+  if (elapsedMinutes > 20) return "URGENT";
+  if (elapsedMinutes >= 15) return "HIGH";
+  return "NORMAL";
+}
+
+function qrContextFor(order: KotWithDetails["order"]): KotQrContext {
+  if (order.table) {
+    return {
       type: "TABLE",
-      identifier: "Takeaway",
-      displayName: "Counter / Takeaway",
+      identifier: order.table.tableNumber,
+      displayName: order.table.displayName || `Table ${order.table.tableNumber}`,
+      roomOrTableId: order.table.id,
     };
+  }
+  if (order.room) {
+    return {
+      type: "ROOM",
+      identifier: order.room.roomNumber,
+      displayName: `Room ${order.room.roomNumber}`,
+      roomOrTableId: order.room.id,
+    };
+  }
+  return { type: "TABLE", identifier: "Takeaway", displayName: "Counter / Takeaway" };
+}
 
-    if (kot.order?.table) {
-      qrContext = {
-        type: "TABLE",
-        identifier: kot.order.table.tableNumber,
-        displayName: kot.order.table.displayName || `Table ${kot.order.table.tableNumber}`,
-        roomOrTableId: kot.order.table.id,
-      };
-    } else if (kot.order?.room) {
-      qrContext = {
-        type: "ROOM",
-        identifier: kot.order.room.roomNumber,
-        displayName: `Room ${kot.order.room.roomNumber}`,
-        roomOrTableId: kot.order.room.id,
-      };
-    }
+function formatKotItem(ki: KotWithDetails["items"][number]): FormattedKotItem {
+  const { orderItem } = ki;
+  // selectedModifiers is free-form JSON written at order time; trust its stored shape
+  const modifiers = Array.isArray(orderItem.selectedModifiers)
+    ? (orderItem.selectedModifiers as unknown as KotModifier[])
+    : [];
 
-    const items: FormattedKotItem[] = (kot.items || []).map((ki: any) => {
-      let modifiers: Array<{ name: string; price?: number }> = [];
-      if (Array.isArray(ki.orderItem?.selectedModifiers)) {
-        modifiers = ki.orderItem.selectedModifiers;
-      }
+  return {
+    id: ki.id,
+    orderItemId: ki.orderItemId,
+    menuItemId: orderItem.menuItemId || "",
+    name: orderItem.itemName || "Item",
+    quantity: ki.quantity,
+    modifiers,
+    modifiersSummary: ki.modifiersSummary,
+    specialInstructions: ki.specialInstructions || orderItem.specialInstructions || null,
+    status: orderItem.status || "PLACED",
+  };
+}
 
-      return {
-        id: ki.id,
-        orderItemId: ki.orderItemId,
-        menuItemId: ki.orderItem?.menuItemId || "",
-        name: ki.orderItem?.itemName || "Item",
-        quantity: ki.quantity,
-        modifiers,
-        modifiersSummary: ki.modifiersSummary,
-        specialInstructions: ki.specialInstructions || ki.orderItem?.specialInstructions || null,
-        status: ki.orderItem?.status || "PLACED",
-      };
-    });
+/** Parent order status implied by the statuses of all its KOTs. */
+function deriveOrderStatus(current: OrderStatus, kotStatuses: KotStatus[]): OrderStatus {
+  if (kotStatuses.every((s) => s === KotStatus.SERVED)) {
+    return OrderStatus.SERVED;
+  }
+  if (kotStatuses.every((s) => s === KotStatus.READY || s === KotStatus.SERVED)) {
+    return OrderStatus.READY;
+  }
+  const anyCookingOrAbove = kotStatuses.some(
+    (s) => s === KotStatus.PREPARING || s === KotStatus.READY || s === KotStatus.SERVED
+  );
+  if (anyCookingOrAbove && (current === OrderStatus.CONFIRMED || current === OrderStatus.PLACED)) {
+    return OrderStatus.PREPARING;
+  }
+  return current;
+}
+
+/** Fire-and-forget dispatch after commit; WebSocket failures never invalidate the transaction. */
+function dispatchAfterCommit(outboxId: string | null, failureMessage: string): void {
+  if (!outboxId) return;
+  outboxService.dispatchEvent(outboxId).catch((err) => {
+    logger.warn({ msg: failureMessage, err });
+  });
+}
+
+export class KitchenService {
+  /** Format a KOT record into the API response shape. */
+  public formatKot(kot: KotWithDetails): FormattedKOT {
+    const readyAt = kot.readyAt ? kot.readyAt.toISOString() : null;
 
     return {
       id: kot.id,
       kotNumber: kot.kotNumber,
       orderId: kot.orderId,
-      orderNumber: kot.order?.orderNumber || "",
+      orderNumber: kot.order.orderNumber || "",
       status: kot.status,
       station: kot.station || "Main Kitchen",
-      urgency,
-      specialNotes: kot.order?.specialInstructions || null,
-      acceptedAt: kot.acceptedAt ? new Date(kot.acceptedAt).toISOString() : null,
-      readyAt: kot.readyAt ? new Date(kot.readyAt).toISOString() : null,
-      preparedAt: kot.readyAt ? new Date(kot.readyAt).toISOString() : null,
-      servedAt: kot.servedAt ? new Date(kot.servedAt).toISOString() : null,
-      createdAt: new Date(kot.createdAt).toISOString(),
-      updatedAt: new Date(kot.updatedAt || kot.createdAt).toISOString(),
-      qrContext,
-      items,
+      urgency: urgencyFor(kot.createdAt),
+      specialNotes: kot.order.specialInstructions || null,
+      acceptedAt: kot.acceptedAt ? kot.acceptedAt.toISOString() : null,
+      readyAt,
+      preparedAt: readyAt,
+      servedAt: kot.servedAt ? kot.servedAt.toISOString() : null,
+      createdAt: kot.createdAt.toISOString(),
+      // KOTs have no updatedAt column
+      updatedAt: kot.createdAt.toISOString(),
+      qrContext: qrContextFor(kot.order),
+      items: kot.items.map(formatKotItem),
     };
   }
 
-  /**
-   * Retrieve active KOTs for a specific tenant.
-   * Returns tickets not yet SERVED or CANCELLED.
-   */
+  /** Active KOTs (not yet SERVED or CANCELLED) for a tenant. */
   async getActiveKots(tenantId: string, station?: string): Promise<FormattedKOT[]> {
-    const kots = await prisma.kot.findMany({
-      where: {
-        order: { tenantId },
-        status: {
-          notIn: [KotStatus.SERVED, KotStatus.CANCELLED],
-        },
-        ...(station ? { station } : {}),
-      },
-      include: {
-        order: {
-          include: {
-            table: true,
-            room: true,
-          },
-        },
-        items: {
-          include: {
-            orderItem: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "asc" },
-    });
-
+    const kots = await kotModel.findActiveForTenant(tenantId, station);
     return kots.map((k) => this.formatKot(k));
   }
 
-  /**
-   * Retrieve a single KOT by ID scoped to the authenticated tenant.
-   */
+  /** A single KOT, scoped to the tenant. */
   async getKotById(tenantId: string, kotId: string): Promise<FormattedKOT> {
-    const kot = await prisma.kot.findUnique({
-      where: { id: kotId },
-      include: {
-        order: {
-          include: {
-            table: true,
-            room: true,
-          },
-        },
-        items: {
-          include: {
-            orderItem: true,
-          },
-        },
-      },
-    });
+    const kot = await kotModel.findByIdWithDetails(kotId);
 
     if (!kot || kot.order.tenantId !== tenantId) {
-      throw new AppError("Kitchen order ticket not found", 404, "KOT_NOT_FOUND");
+      throw kotNotFound();
     }
 
     return this.formatKot(kot);
@@ -184,7 +161,7 @@ export class KitchenService {
 
   /**
    * Atomically progress KOT status, synchronize linked OrderItems & parent Order,
-   * record transactional outbox events, and guarantee post-commit event dispatching.
+   * record transactional outbox events, and dispatch them after commit.
    */
   async updateKotStatus(
     tenantId: string,
@@ -192,59 +169,26 @@ export class KitchenService {
     rawRequestedStatus: string,
     note?: string
   ): Promise<FormattedKOT> {
-    // Normalize PENDING -> NEW
+    // PENDING is accepted as an alias for NEW
     const normalizedInput = rawRequestedStatus.toUpperCase().trim();
-    const requestedStatus =
-      normalizedInput === "PENDING"
-        ? KotStatus.NEW
-        : (normalizedInput as KotStatus);
+    const requestedStatus = normalizedInput === "PENDING" ? KotStatus.NEW : normalizedInput;
 
-    if (!Object.values(KotStatus).includes(requestedStatus)) {
-      throw new AppError(
-        `Invalid KOT status '${rawRequestedStatus}'. Permitted values: NEW, ACCEPTED, PREPARING, READY, SERVED`,
-        400,
-        "VALIDATION_FAILED"
-      );
+    if (!isKotStatus(requestedStatus)) {
+      throw new BadRequestError(`Invalid KOT status '${rawRequestedStatus}'. Permitted values: NEW, ACCEPTED, PREPARING, READY, SERVED`);
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Concurrency-safe row locking: lock the target KOT record
-      const [lockedKot] = await tx.$queryRaw<Array<{ id: string; status: KotStatus }>>`
-        SELECT id, status FROM kots WHERE id = ${kotId}::uuid FOR UPDATE
-      `;
-
-      if (!lockedKot) {
-        throw new AppError("Kitchen order ticket not found", 404, "KOT_NOT_FOUND");
+    const result = await withTransaction(async (tx) => {
+      // Row-lock the KOT before reading it so concurrent transitions serialize
+      if (!(await kotModel.lockById(kotId, tx))) {
+        throw kotNotFound();
       }
 
-      // 2. Load full KOT entity with Order and OrderItems within the transaction
-      const kot = await tx.kot.findUnique({
-        where: { id: kotId },
-        include: {
-          order: {
-            include: {
-              table: true,
-              room: true,
-            },
-          },
-          items: {
-            include: {
-              orderItem: true,
-            },
-          },
-        },
-      });
-
-      if (!kot) {
-        throw new AppError("Kitchen order ticket not found", 404, "KOT_NOT_FOUND");
+      const kot = await kotModel.findByIdWithDetails(kotId, tx);
+      if (!kot || kot.order.tenantId !== tenantId) {
+        throw kotNotFound();
       }
 
-      // 3. Strict multi-tenant isolation guard
-      if (kot.order.tenantId !== tenantId) {
-        throw new AppError("Kitchen order ticket not found", 404, "KOT_NOT_FOUND");
-      }
-
-      // 4. Repeated request tolerance: if ticket is already in the requested state, return safely
+      // Repeated request: already in the requested state
       if (kot.status === requestedStatus) {
         logger.info({
           msg: "KOT status transition is idempotent replay; no state change required",
@@ -261,22 +205,16 @@ export class KitchenService {
         };
       }
 
-      // 5. Enforce valid state transitions
-      const allowedNextStatuses = VALID_TRANSITIONS[kot.status] || [];
+      const allowedNextStatuses = VALID_TRANSITIONS[kot.status];
       if (!allowedNextStatuses.includes(requestedStatus)) {
-        throw new AppError(
-          `Illegal status transition: cannot transition KOT from '${kot.status}' to '${requestedStatus}'. Valid next states: [${allowedNextStatuses.join(", ")}]`,
-          409,
-          "INVALID_STATUS_TRANSITION",
-          {
+        throw new ConflictError(`Illegal status transition: cannot transition KOT from '${kot.status}' to '${requestedStatus}'. Valid next states: [${allowedNextStatuses.join(", ")}]`, ErrorCode.INVALID_STATUS_TRANSITION, {
             currentStatus: kot.status,
             requestedStatus,
             allowedNextStatuses,
-          }
-        );
+          });
       }
 
-      // 6. Update KOT record and relevant timestamps
+      // Update the KOT and stamp its lifecycle timestamp (first time only)
       const now = new Date();
       const updateData: Prisma.KotUpdateInput = {
         status: requestedStatus,
@@ -290,82 +228,28 @@ export class KitchenService {
         updateData.servedAt = now;
       }
 
-      const updatedKot = await tx.kot.update({
-        where: { id: kotId },
-        data: updateData,
-        include: {
-          order: {
-            include: {
-              table: true,
-              room: true,
-            },
-          },
-          items: {
-            include: {
-              orderItem: true,
-            },
-          },
-        },
-      });
+      const updatedKot = await kotModel.updateWithDetails(kotId, updateData, tx);
 
-      // 7. Update linked OrderItem preparation status
-      const orderItemStatusMap: Partial<Record<KotStatus, string>> = {
-        [KotStatus.PREPARING]: "PREPARING",
-        [KotStatus.READY]: "READY",
-        [KotStatus.SERVED]: "SERVED",
-      };
-
-      const newOrderItemStatus = orderItemStatusMap[requestedStatus];
+      // Mirror the status onto the linked order items
+      const newOrderItemStatus = ORDER_ITEM_STATUS_FOR_KOT[requestedStatus];
       if (newOrderItemStatus) {
         const orderItemIds = kot.items.map((ki) => ki.orderItemId);
         if (orderItemIds.length > 0) {
-          await tx.orderItem.updateMany({
-            where: { id: { in: orderItemIds } },
-            data: { status: newOrderItemStatus },
-          });
+          await orderModel.updateItemStatuses(orderItemIds, newOrderItemStatus, tx);
         }
       }
 
-      // 8. Calculate parent Order progress across all associated KOTs
-      const allOrderKots = await tx.kot.findMany({
-        where: { orderId: kot.orderId },
-        select: { id: true, status: true },
-      });
-
-      const allStatuses = allOrderKots.map((k) =>
-        k.id === kotId ? requestedStatus : k.status
-      );
-
-      let targetOrderStatus: OrderStatus = kot.order.status;
-
-      const allServed = allStatuses.every((s) => s === KotStatus.SERVED);
-      const allReadyOrServed = allStatuses.every(
-        (s) => s === KotStatus.READY || s === KotStatus.SERVED
-      );
-      const anyCookingOrAbove = allStatuses.some(
-        (s) => s === KotStatus.PREPARING || s === KotStatus.READY || s === KotStatus.SERVED
-      );
-
-      if (allServed) {
-        targetOrderStatus = OrderStatus.SERVED;
-      } else if (allReadyOrServed) {
-        targetOrderStatus = OrderStatus.READY;
-      } else if (
-        anyCookingOrAbove &&
-        (kot.order.status === OrderStatus.CONFIRMED || kot.order.status === OrderStatus.PLACED)
-      ) {
-        targetOrderStatus = OrderStatus.PREPARING;
-      }
+      // Recompute the parent order's status across all of its KOTs
+      const allOrderKots = await kotModel.findStatusesForOrder(kot.orderId, tx);
+      const allStatuses = allOrderKots.map((k) => (k.id === kotId ? requestedStatus : k.status));
+      const targetOrderStatus = deriveOrderStatus(kot.order.status, allStatuses);
 
       let orderOutboxId: string | null = null;
       if (targetOrderStatus !== kot.order.status) {
-        await tx.order.update({
-          where: { id: kot.orderId },
-          data: { status: targetOrderStatus },
-        });
+        await orderModel.setStatus(kot.orderId, targetOrderStatus, tx);
 
-        const orderEvent = await tx.outboxEvent.create({
-          data: {
+        const orderEvent = await outboxModel.create(
+          {
             tenantId,
             eventType: "order.updated",
             topic: "orders:all",
@@ -378,15 +262,16 @@ export class KitchenService {
             },
             status: OutboxStatus.PENDING,
           },
-        });
+          tx
+        );
         orderOutboxId = orderEvent.id;
       }
 
-      // 9. Emit dedicated kot.ready notification on orders:all if food is ready to pick up
+      // Food is ready for pickup: notify front-of-house
       let readyOutboxId: string | null = null;
       if (requestedStatus === KotStatus.READY) {
-        const readyEvent = await tx.outboxEvent.create({
-          data: {
+        const readyEvent = await outboxModel.create(
+          {
             tenantId,
             eventType: "kot.ready",
             topic: "orders:all",
@@ -402,13 +287,13 @@ export class KitchenService {
             },
             status: OutboxStatus.PENDING,
           },
-        });
+          tx
+        );
         readyOutboxId = readyEvent.id;
       }
 
-      // 10. Record primary kot.status_updated outbox event
-      const kotEvent = await tx.outboxEvent.create({
-        data: {
+      const kotEvent = await outboxModel.create(
+        {
           tenantId,
           eventType: "kot.status_updated",
           topic: "kitchen:kots",
@@ -428,7 +313,8 @@ export class KitchenService {
           },
           status: OutboxStatus.PENDING,
         },
-      });
+        tx
+      );
 
       return {
         kot: updatedKot,
@@ -443,24 +329,9 @@ export class KitchenService {
       timeout: 20000,
     });
 
-    // 11. Post-commit event dispatching: WebSocket failures never invalidate the transaction
-    if (result.kotOutboxId) {
-      outboxService.dispatchEvent(result.kotOutboxId).catch((err) => {
-        logger.warn({ msg: "Post-commit dispatch of KOT outbox event failed", err });
-      });
-    }
-
-    if (result.orderOutboxId) {
-      outboxService.dispatchEvent(result.orderOutboxId).catch((err) => {
-        logger.warn({ msg: "Post-commit dispatch of Order outbox event failed", err });
-      });
-    }
-
-    if (result.readyOutboxId) {
-      outboxService.dispatchEvent(result.readyOutboxId).catch((err) => {
-        logger.warn({ msg: "Post-commit dispatch of KOT Ready outbox event failed", err });
-      });
-    }
+    dispatchAfterCommit(result.kotOutboxId, "Post-commit dispatch of KOT outbox event failed");
+    dispatchAfterCommit(result.orderOutboxId, "Post-commit dispatch of Order outbox event failed");
+    dispatchAfterCommit(result.readyOutboxId, "Post-commit dispatch of KOT Ready outbox event failed");
 
     return this.formatKot(result.kot);
   }

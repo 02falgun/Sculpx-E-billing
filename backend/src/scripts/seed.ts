@@ -1,5 +1,5 @@
-import { seedDemoUsers } from "../lib/seed.js";
-import { disconnectPrisma } from "../lib/prisma.js";
+import { seedDemoUsers } from "../database/seeds/demo-users.seed.js";
+import { disconnectPrisma } from "../database/prisma.js";
 
 async function main() {
   try {

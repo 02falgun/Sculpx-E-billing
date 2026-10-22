@@ -1,9 +1,20 @@
 import { Prisma, type OutboxEvent, OutboxStatus } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
+import { withTransaction } from "../database/prisma.js";
 import { logger } from "../lib/logger.js";
+import { outboxModel } from "../models/outbox.model.js";
 import { websocketService } from "./websocket.service.js";
+import type { OutboxDispatcher, OutboxEventInput, OutboxStats } from "../types/outbox.types.js";
 
-export type OutboxDispatcher = (event: OutboxEvent) => Promise<void>;
+function toPendingEvent(params: OutboxEventInput) {
+  return {
+    tenantId: params.tenantId,
+    eventType: params.eventType,
+    topic: params.topic,
+    // Event payloads are plain JSON-serializable objects.
+    payload: params.payload as Prisma.InputJsonObject,
+    status: OutboxStatus.PENDING,
+  };
+}
 
 export class OutboxService {
   private customDispatcher: OutboxDispatcher | null = null;
@@ -34,24 +45,15 @@ export class OutboxService {
    * Record a transactional outbox event inside a database transaction.
    * Guarantees event is persisted atomically with the business data.
    */
-  async createEvent(
-    tx: Prisma.TransactionClient,
-    params: {
-      tenantId: string;
-      eventType: string;
-      topic: string;
-      payload: Record<string, unknown>;
-    }
-  ): Promise<OutboxEvent> {
-    return tx.outboxEvent.create({
-      data: {
-        tenantId: params.tenantId,
-        eventType: params.eventType,
-        topic: params.topic,
-        payload: params.payload as any,
-        status: OutboxStatus.PENDING,
-      },
-    });
+  async createEvent(tx: Prisma.TransactionClient, params: OutboxEventInput): Promise<OutboxEvent> {
+    return outboxModel.create(toPendingEvent(params), tx);
+  }
+
+  /**
+   * Record an outbox event outside of any transaction.
+   */
+  async recordEvent(params: OutboxEventInput): Promise<OutboxEvent> {
+    return outboxModel.create(toPendingEvent(params));
   }
 
   /**
@@ -63,9 +65,7 @@ export class OutboxService {
    * because this runs post-commit.
    */
   async dispatchEvent(eventId: string): Promise<boolean> {
-    const event = await prisma.outboxEvent.findUnique({
-      where: { id: eventId },
-    });
+    const event = await outboxModel.findById(eventId);
 
     if (!event || event.status === OutboxStatus.PUBLISHED) {
       return true;
@@ -92,13 +92,10 @@ export class OutboxService {
         });
       }
 
-      await prisma.outboxEvent.update({
-        where: { id: eventId },
-        data: {
-          status: OutboxStatus.PUBLISHED,
-          publishedAt: new Date(),
-          lastError: null,
-        },
+      await outboxModel.update(eventId, {
+        status: OutboxStatus.PUBLISHED,
+        publishedAt: new Date(),
+        lastError: null,
       });
 
       return true;
@@ -115,13 +112,10 @@ export class OutboxService {
         status: isExhausted ? "FAILED" : "PENDING",
       });
 
-      await prisma.outboxEvent.update({
-        where: { id: eventId },
-        data: {
-          status: isExhausted ? OutboxStatus.FAILED : OutboxStatus.PENDING,
-          retryCount: nextRetry,
-          lastError: errMsg,
-        },
+      await outboxModel.update(eventId, {
+        status: isExhausted ? OutboxStatus.FAILED : OutboxStatus.PENDING,
+        retryCount: nextRetry,
+        lastError: errMsg,
       });
 
       return false;
@@ -134,28 +128,13 @@ export class OutboxService {
    * running concurrently never claim the same pending records.
    */
   async claimPendingBatch(batchSize = 20): Promise<OutboxEvent[]> {
-    return prisma.$transaction(
+    return withTransaction(
       async (tx) => {
         // 1. Recover stale processing records older than 60 seconds (in case a worker crashed)
-        const staleThreshold = new Date(Date.now() - 60000);
-        await tx.outboxEvent.updateMany({
-          where: {
-            status: OutboxStatus.PROCESSING,
-            updatedAt: { lt: staleThreshold },
-          },
-          data: {
-            status: OutboxStatus.PENDING,
-          },
-        });
+        await outboxModel.resetStaleProcessing(new Date(Date.now() - 60000), tx);
 
         // 2. Select pending event IDs with FOR UPDATE SKIP LOCKED
-        const claimed = await tx.$queryRaw<{ id: string }[]>`
-          SELECT id FROM outbox_events
-          WHERE status = 'PENDING'
-          ORDER BY created_at ASC
-          LIMIT ${batchSize}
-          FOR UPDATE SKIP LOCKED
-        `;
+        const claimed = await outboxModel.lockPendingIds(batchSize, tx);
 
         if (!claimed || claimed.length === 0) {
           return [];
@@ -164,16 +143,10 @@ export class OutboxService {
         const ids = claimed.map((r) => r.id);
 
         // 3. Atomically transition claimed events to PROCESSING status
-        await tx.outboxEvent.updateMany({
-          where: { id: { in: ids } },
-          data: { status: OutboxStatus.PROCESSING },
-        });
+        await outboxModel.setStatusForIds(ids, OutboxStatus.PROCESSING, tx);
 
         // 4. Return the claimed event records
-        return tx.outboxEvent.findMany({
-          where: { id: { in: ids } },
-          orderBy: { createdAt: "asc" },
-        });
+        return outboxModel.findManyByIds(ids, tx);
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
@@ -198,11 +171,7 @@ export class OutboxService {
         error: err instanceof Error ? err.message : String(err),
       });
 
-      claimedEvents = await prisma.outboxEvent.findMany({
-        where: { status: OutboxStatus.PENDING },
-        orderBy: { createdAt: "asc" },
-        take: batchSize,
-      });
+      claimedEvents = await outboxModel.findPending(batchSize);
     }
 
     let succeeded = 0;
@@ -215,10 +184,7 @@ export class OutboxService {
         const elapsed = now - ev.updatedAt.getTime();
         if (elapsed < requiredDelay) {
           // Delay hasn't elapsed; revert to PENDING and skip this sweep
-          await prisma.outboxEvent.update({
-            where: { id: ev.id },
-            data: { status: OutboxStatus.PENDING },
-          });
+          await outboxModel.update(ev.id, { status: OutboxStatus.PENDING });
           continue;
         }
       }
@@ -234,35 +200,23 @@ export class OutboxService {
    * Retrieve failed events for failure visibility and administrator alerting.
    */
   async getFailedEvents(tenantId?: string, take = 50): Promise<OutboxEvent[]> {
-    return prisma.outboxEvent.findMany({
-      where: {
-        status: OutboxStatus.FAILED,
-        ...(tenantId ? { tenantId } : {}),
-      },
-      orderBy: { updatedAt: "desc" },
-      take,
-    });
+    return outboxModel.findFailed(tenantId, take);
   }
 
   /**
    * Re-queue a failed event for retry.
    */
   async retryFailedEvent(eventId: string): Promise<boolean> {
-    const event = await prisma.outboxEvent.findUnique({
-      where: { id: eventId },
-    });
+    const event = await outboxModel.findById(eventId);
 
     if (!event || event.status !== OutboxStatus.FAILED) {
       return false;
     }
 
-    await prisma.outboxEvent.update({
-      where: { id: eventId },
-      data: {
-        status: OutboxStatus.PENDING,
-        retryCount: 0,
-        lastError: null,
-      },
+    await outboxModel.update(eventId, {
+      status: OutboxStatus.PENDING,
+      retryCount: 0,
+      lastError: null,
     });
 
     return this.dispatchEvent(eventId);
@@ -286,19 +240,12 @@ export class OutboxService {
   /**
    * Aggregate outbox statistics for health checks and observability.
    */
-  async getOutboxStats(tenantId?: string): Promise<{
-    pending: number;
-    processing: number;
-    published: number;
-    failed: number;
-  }> {
-    const where = tenantId ? { tenantId } : {};
-
+  async getOutboxStats(tenantId?: string): Promise<OutboxStats> {
     const [pending, processing, published, failed] = await Promise.all([
-      prisma.outboxEvent.count({ where: { ...where, status: OutboxStatus.PENDING } }),
-      prisma.outboxEvent.count({ where: { ...where, status: OutboxStatus.PROCESSING } }),
-      prisma.outboxEvent.count({ where: { ...where, status: OutboxStatus.PUBLISHED } }),
-      prisma.outboxEvent.count({ where: { ...where, status: OutboxStatus.FAILED } }),
+      outboxModel.countByStatus(tenantId, OutboxStatus.PENDING),
+      outboxModel.countByStatus(tenantId, OutboxStatus.PROCESSING),
+      outboxModel.countByStatus(tenantId, OutboxStatus.PUBLISHED),
+      outboxModel.countByStatus(tenantId, OutboxStatus.FAILED),
     ]);
 
     return { pending, processing, published, failed };

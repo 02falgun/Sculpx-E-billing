@@ -1,4 +1,4 @@
-import { prisma } from "../src/lib/prisma.js";
+import { prisma } from "../src/database/prisma.js";
 
 async function main() {
   const tenantId = "e1b1d1f0-0000-4000-8000-000000000001";

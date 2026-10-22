@@ -1,16 +1,23 @@
-import { prisma } from "../lib/prisma.js";
+import type { Prisma } from "@prisma/client";
+import { auditModel } from "../models/audit.model.js";
 import { logger } from "../lib/logger.js";
+import type { ActorContext } from "../types/auth.types.js";
+import type {
+  AuditActionEntry,
+  AuditListOptions,
+  AuditListQuery,
+  CreateAuditLogParams,
+} from "../types/audit.types.js";
 
-export interface CreateAuditLogParams {
-  tenantId?: string | null;
-  actorId?: string | null;
-  actorEmail?: string | null;
-  actorRole?: string | null;
-  action: string;
-  resource: string;
-  resourceId?: string | null;
-  details?: Record<string, unknown> | null;
-  ipAddress?: string | null;
+const SENSITIVE_KEY_FRAGMENTS = ["password", "secret", "token", "hash", "apikey"];
+
+function isSensitiveKey(key: string): boolean {
+  const lower = key.toLowerCase();
+  return SENSITIVE_KEY_FRAGMENTS.some((fragment) => lower.includes(fragment));
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export class AuditService {
@@ -22,22 +29,42 @@ export class AuditService {
     try {
       const sanitizedDetails = this.sanitizeDetails(params.details);
 
-      await prisma.auditLog.create({
-        data: {
-          tenantId: params.tenantId || null,
-          actorId: params.actorId || null,
-          actorEmail: params.actorEmail || null,
-          actorRole: params.actorRole || null,
-          action: params.action,
-          resource: params.resource,
-          resourceId: params.resourceId || null,
-          details: (sanitizedDetails as any) || {},
-          ipAddress: params.ipAddress || null,
-        },
+      await auditModel.create({
+        tenantId: params.tenantId || null,
+        actorId: params.actorId || null,
+        actorEmail: params.actorEmail || null,
+        actorRole: params.actorRole || null,
+        action: params.action,
+        resource: params.resource,
+        resourceId: params.resourceId || null,
+        // Details come from JSON-serialisable request/entity data
+        details: sanitizedDetails as Prisma.InputJsonObject,
+        ipAddress: params.ipAddress || null,
       });
     } catch (err) {
       logger.error({ err, action: params.action }, "Failed to write audit log entry");
     }
+  }
+
+  /**
+   * Record an action performed by an authenticated actor. Fills actorId, actorEmail,
+   * actorRole and ipAddress from the actor; tenantId defaults to the actor's tenant.
+   */
+  async recordAction(
+    actor: ActorContext,
+    entry: AuditActionEntry
+  ): Promise<void> {
+    return this.record({
+      tenantId: entry.tenantId === undefined ? actor.user.tenantId : entry.tenantId,
+      actorId: actor.user.id,
+      actorEmail: actor.user.email,
+      actorRole: actor.user.role,
+      ipAddress: actor.ipAddress,
+      action: entry.action,
+      resource: entry.resource,
+      resourceId: entry.resourceId,
+      details: entry.details,
+    });
   }
 
   /**
@@ -52,33 +79,34 @@ export class AuditService {
    */
   async listLogs(
     tenantId: string | null,
-    options: { limit?: number; offset?: number; action?: string; resource?: string } = {}
+    options: AuditListOptions = {}
   ) {
     const limit = Math.min(Math.max(options.limit || 50, 1), 200);
     const offset = Math.max(options.offset || 0, 0);
 
-    const where: Record<string, unknown> = {};
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-    if (options.action) {
-      where.action = options.action;
-    }
-    if (options.resource) {
-      where.resource = options.resource;
-    }
-
-    const [logs, total] = await Promise.all([
-      prisma.auditLog.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.auditLog.count({ where }),
-    ]);
+    const { logs, total } = await auditModel.findPage(
+      { tenantId, action: options.action, resource: options.resource },
+      limit,
+      offset
+    );
 
     return { logs, total, limit, offset };
+  }
+
+  /**
+   * Lists audit logs scoped to the actor: Super Admins see all tenants (or one via tenantId).
+   */
+  async listLogsForActor(actor: ActorContext, query: AuditListQuery) {
+    const { user } = actor;
+    const targetTenantId =
+      user.role === "SUPER_ADMIN" ? query.tenantId || null : user.tenantId;
+
+    return this.listLogs(targetTenantId, {
+      limit: query.limit ? parseInt(query.limit, 10) : 50,
+      offset: query.offset ? parseInt(query.offset, 10) : 0,
+      action: query.action,
+      resource: query.resource,
+    });
   }
 
   private sanitizeDetails(details?: Record<string, unknown> | null): Record<string, unknown> {
@@ -86,17 +114,10 @@ export class AuditService {
     const sanitized: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(details)) {
-      const lower = key.toLowerCase();
-      if (
-        lower.includes("password") ||
-        lower.includes("secret") ||
-        lower.includes("token") ||
-        lower.includes("hash") ||
-        lower.includes("apikey")
-      ) {
+      if (isSensitiveKey(key)) {
         sanitized[key] = "[REDACTED]";
-      } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-        sanitized[key] = this.sanitizeDetails(value as Record<string, unknown>);
+      } else if (isPlainObject(value)) {
+        sanitized[key] = this.sanitizeDetails(value);
       } else {
         sanitized[key] = value;
       }

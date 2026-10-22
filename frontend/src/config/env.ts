@@ -1,8 +1,19 @@
 /**
+ * Resolves the backend server origin (e.g. http://localhost:8000) from NEXT_PUBLIC_BACKEND_URL.
+ * The REST (/api/v1) and WebSocket (/ws) paths are appended by the resolvers below.
+ */
+export function resolveBackendUrl(
+  configuredUrl: string | undefined = process.env.NEXT_PUBLIC_BACKEND_URL
+): string {
+  const url = (configuredUrl || "").trim() || "http://localhost:8000";
+  return url.replace(/\/+$/, "");
+}
+
+/**
  * Resolves the backend REST API base URL with Mixed Content protection.
  */
 export function resolveApiBaseUrl(
-  configuredUrl: string | undefined = process.env.NEXT_PUBLIC_API_URL,
+  configuredUrl: string | undefined = `${resolveBackendUrl()}/api/v1`,
   clientOrigin?: string
 ): string {
   let url = (configuredUrl || "").trim();
@@ -33,13 +44,13 @@ export function resolveApiBaseUrl(
  * Resolves the WebSocket endpoint URL with automatic protocol & Mixed Content protection.
  */
 export function resolveWsBaseUrl(
-  configuredWsUrl: string | undefined = process.env.NEXT_PUBLIC_WS_URL,
+  configuredWsUrl: string | undefined = undefined,
   apiBaseUrl: string = resolveApiBaseUrl(),
   clientOrigin?: string
 ): string {
   let url = (configuredWsUrl || "").trim();
 
-  // If no explicit WS_URL is provided, derive from API_URL
+  // If no explicit WS URL is provided, derive from the backend API host
   if (!url) {
     try {
       const parsedApi = new URL(apiBaseUrl);

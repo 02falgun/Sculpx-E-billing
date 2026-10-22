@@ -3,37 +3,12 @@ import type { WebSocket } from "ws";
 import crypto from "node:crypto";
 import { logger } from "../lib/logger.js";
 import { qrService } from "./qr.service.js";
-
-export type JwtVerifier = (token: string) => Promise<any> | any;
-
-export interface ConnectedClient {
-  id: string;
-  socket: WebSocket;
-  tenantId?: string;
-  userId?: string;
-  role?: string;
-  permissions: string[];
-  isGuest: boolean;
-  topics: Set<string>;
-  connectedAt: Date;
-  orderIds: Set<string>;
-  remoteAddress?: string;
-  jwtVerifier?: (token: string) => Promise<any> | any;
-}
-
-export interface WsMessageEnvelope<T = unknown> {
-  id: string;
-  type: string;
-  topic?: string;
-  payload?: T;
-  version?: string;
-  timestamp: string;
-  error?: {
-    code: string;
-    message: string;
-    details?: unknown;
-  };
-}
+import type {
+  ActiveClientSummary,
+  BroadcastEvent,
+  ConnectedClient,
+  WsMessageEnvelope,
+} from "../types/websocket.types.js";
 
 export class WebSocketService {
   private clients = new Map<string, ConnectedClient>();
@@ -48,14 +23,7 @@ export class WebSocketService {
   /**
    * Return list of active clients (for diagnostics/monitoring).
    */
-  getActiveClients(): Array<{
-    id: string;
-    tenantId?: string;
-    role?: string;
-    isGuest: boolean;
-    topics: string[];
-    connectedAt: string;
-  }> {
+  getActiveClients(): ActiveClientSummary[] {
     return Array.from(this.clients.values()).map((c) => ({
       id: c.id,
       tenantId: c.tenantId,
@@ -83,7 +51,7 @@ export class WebSocketService {
       connectedAt: new Date(),
       orderIds: new Set<string>(),
       remoteAddress,
-      jwtVerifier: (token: string) => (req.server as any).jwt.verify(token),
+      jwtVerifier: (token: string) => req.server.jwt.verify(token),
     };
 
     this.clients.set(clientId, client);
@@ -114,7 +82,7 @@ export class WebSocketService {
     socket.on("message", async (data: Buffer | string) => {
       try {
         const raw = data.toString("utf-8");
-        const parsed = JSON.parse(raw);
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
         await this.handleClientFrame(client, parsed);
       } catch (err: unknown) {
         logger.warn({
@@ -457,12 +425,7 @@ export class WebSocketService {
    * Broadcast an event to all authorized subscribers of the matching tenant and topic.
    * Strict cross-tenant isolation: Never emit frames across tenants.
    */
-  broadcastEvent(event: {
-    tenantId: string;
-    eventType: string;
-    topic: string;
-    payload: Record<string, unknown>;
-  }): { delivered: number; totalClients: number } {
+  broadcastEvent(event: BroadcastEvent): { delivered: number; totalClients: number } {
     let delivered = 0;
     const totalClients = this.clients.size;
 

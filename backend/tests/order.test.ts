@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import crypto from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
-import { prisma } from "../src/lib/prisma.js";
+import { prisma } from "../src/database/prisma.js";
 import { sequenceService } from "../src/services/sequence.service.js";
 import { outboxService } from "../src/services/outbox.service.js";
 

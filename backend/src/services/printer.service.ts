@@ -1,46 +1,17 @@
-import { Prisma, PrinterType, PrintJobStatus, type Printer } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
-import { AppError } from "../lib/errors.js";
+import { PrinterType, type Printer } from "@prisma/client";
+import { NotFoundError } from "../lib/errors.js";
+import { ErrorCode } from "../constants/error-codes.js";
 import { logger } from "../lib/logger.js";
-import type { IPrinterAdapter, PrinterHealthResult } from "./printer-adapters/types.js";
-import { NetworkEscPosAdapter } from "./printer-adapters/network-escpos.adapter.js";
-import { HybridPrinterAdapter } from "./printer-adapters/agent.adapter.js";
-
-export interface CreatePrinterInput {
-  name: string;
-  type: PrinterType;
-  ipAddress: string;
-  port?: number;
-  macAddress?: string | null;
-  station?: string | null;
-  location?: string | null;
-  paperWidthMm?: number;
-  isActive?: boolean;
-  isDefault?: boolean;
-  connectionType?: string;
-  agentId?: string | null;
-}
-
-export interface UpdatePrinterInput {
-  name?: string;
-  type?: PrinterType;
-  ipAddress?: string;
-  port?: number;
-  macAddress?: string | null;
-  station?: string | null;
-  location?: string | null;
-  paperWidthMm?: number;
-  isActive?: boolean;
-  isDefault?: boolean;
-  connectionType?: string;
-  agentId?: string | null;
-}
-
-export interface ListPrintersFilter {
-  type?: PrinterType;
-  station?: string;
-  isActive?: boolean;
-}
+import { printerModel } from "../models/printer.model.js";
+import { printJobModel } from "../models/print-job.model.js";
+import type {
+  CreatePrinterInput,
+  IPrinterAdapter,
+  ListPrintersFilter,
+  PrinterHealthResult,
+  UpdatePrinterInput,
+} from "../types/printer.types.js";
+import { HybridPrinterAdapter } from "../integrations/printer/adapters/agent.adapter.js";
 
 export class PrinterService {
   private adapter: IPrinterAdapter;
@@ -68,29 +39,17 @@ export class PrinterService {
    * Scoped strictly by tenantId.
    */
   async listPrinters(tenantId: string, filters: ListPrintersFilter = {}): Promise<Printer[]> {
-    const where: Prisma.PrinterWhereInput = {
-      tenantId,
-      ...(filters.type ? { type: filters.type } : {}),
-      ...(filters.station ? { station: filters.station } : {}),
-      ...(filters.isActive !== undefined ? { isActive: filters.isActive } : {}),
-    };
-
-    return prisma.printer.findMany({
-      where,
-      orderBy: [{ isDefault: "desc" }, { name: "asc" }],
-    });
+    return printerModel.findManyForTenant(tenantId, filters);
   }
 
   /**
    * Get a printer by ID, strictly verifying tenant ownership.
    */
   async getPrinterById(tenantId: string, printerId: string): Promise<Printer> {
-    const printer = await prisma.printer.findUnique({
-      where: { id: printerId },
-    });
+    const printer = await printerModel.findById(printerId);
 
     if (!printer || printer.tenantId !== tenantId) {
-      throw new AppError("Printer not found", 404, "PRINTER_NOT_FOUND");
+      throw new NotFoundError("Printer not found", ErrorCode.PRINTER_NOT_FOUND);
     }
 
     return printer;
@@ -102,33 +61,24 @@ export class PrinterService {
   async createPrinter(tenantId: string, input: CreatePrinterInput): Promise<Printer> {
     // If marked as default, unset other defaults for same tenant and type
     if (input.isDefault) {
-      await prisma.printer.updateMany({
-        where: {
-          tenantId,
-          type: input.type,
-          isDefault: true,
-        },
-        data: { isDefault: false },
-      });
+      await printerModel.clearDefaults(tenantId, input.type);
     }
 
-    const created = await prisma.printer.create({
-      data: {
-        tenantId,
-        name: input.name.trim(),
-        type: input.type,
-        ipAddress: input.ipAddress.trim(),
-        port: input.port || 9100,
-        macAddress: input.macAddress?.trim() || null,
-        station: input.station?.trim() || null,
-        location: input.location?.trim() || null,
-        paperWidthMm: input.paperWidthMm || 80,
-        isActive: input.isActive !== undefined ? input.isActive : true,
-        isDefault: Boolean(input.isDefault),
-        connectionType: input.connectionType || "NETWORK_TCP",
-        agentId: input.agentId || null,
-        isOnline: true,
-      },
+    const created = await printerModel.create({
+      tenantId,
+      name: input.name.trim(),
+      type: input.type,
+      ipAddress: input.ipAddress.trim(),
+      port: input.port || 9100,
+      macAddress: input.macAddress?.trim() || null,
+      station: input.station?.trim() || null,
+      location: input.location?.trim() || null,
+      paperWidthMm: input.paperWidthMm || 80,
+      isActive: input.isActive !== undefined ? input.isActive : true,
+      isDefault: Boolean(input.isDefault),
+      connectionType: input.connectionType || "NETWORK_TCP",
+      agentId: input.agentId || null,
+      isOnline: true,
     });
 
     logger.info({
@@ -151,33 +101,22 @@ export class PrinterService {
 
     // If making this printer the default, unset other defaults for the same type
     if (input.isDefault && input.type) {
-      await prisma.printer.updateMany({
-        where: {
-          tenantId,
-          type: input.type,
-          isDefault: true,
-          id: { not: printerId },
-        },
-        data: { isDefault: false },
-      });
+      await printerModel.clearDefaults(tenantId, input.type, printerId);
     }
 
-    const updated = await prisma.printer.update({
-      where: { id: printerId },
-      data: {
-        ...(input.name !== undefined ? { name: input.name.trim() } : {}),
-        ...(input.type !== undefined ? { type: input.type } : {}),
-        ...(input.ipAddress !== undefined ? { ipAddress: input.ipAddress.trim() } : {}),
-        ...(input.port !== undefined ? { port: input.port } : {}),
-        ...(input.macAddress !== undefined ? { macAddress: input.macAddress?.trim() || null } : {}),
-        ...(input.station !== undefined ? { station: input.station?.trim() || null } : {}),
-        ...(input.location !== undefined ? { location: input.location?.trim() || null } : {}),
-        ...(input.paperWidthMm !== undefined ? { paperWidthMm: input.paperWidthMm } : {}),
-        ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
-        ...(input.isDefault !== undefined ? { isDefault: input.isDefault } : {}),
-        ...(input.connectionType !== undefined ? { connectionType: input.connectionType } : {}),
-        ...(input.agentId !== undefined ? { agentId: input.agentId } : {}),
-      },
+    const updated = await printerModel.update(printerId, {
+      ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+      ...(input.type !== undefined ? { type: input.type } : {}),
+      ...(input.ipAddress !== undefined ? { ipAddress: input.ipAddress.trim() } : {}),
+      ...(input.port !== undefined ? { port: input.port } : {}),
+      ...(input.macAddress !== undefined ? { macAddress: input.macAddress?.trim() || null } : {}),
+      ...(input.station !== undefined ? { station: input.station?.trim() || null } : {}),
+      ...(input.location !== undefined ? { location: input.location?.trim() || null } : {}),
+      ...(input.paperWidthMm !== undefined ? { paperWidthMm: input.paperWidthMm } : {}),
+      ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+      ...(input.isDefault !== undefined ? { isDefault: input.isDefault } : {}),
+      ...(input.connectionType !== undefined ? { connectionType: input.connectionType } : {}),
+      ...(input.agentId !== undefined ? { agentId: input.agentId } : {}),
     });
 
     logger.info({
@@ -194,23 +133,16 @@ export class PrinterService {
    * If the printer has historical print jobs, soft-deactivate to preserve audit trail.
    */
   async deletePrinter(tenantId: string, printerId: string): Promise<{ deleted: boolean; deactivated: boolean }> {
-    const printer = await this.getPrinterById(tenantId, printerId);
+    await this.getPrinterById(tenantId, printerId);
 
-    const jobsCount = await prisma.printJob.count({
-      where: { printerId },
-    });
+    const jobsCount = await printJobModel.countByPrinter(printerId);
 
     if (jobsCount > 0) {
-      await prisma.printer.update({
-        where: { id: printerId },
-        data: { isActive: false, isOnline: false },
-      });
+      await printerModel.update(printerId, { isActive: false, isOnline: false });
       return { deleted: false, deactivated: true };
     }
 
-    await prisma.printer.delete({
-      where: { id: printerId },
-    });
+    await printerModel.delete(printerId);
 
     return { deleted: true, deactivated: false };
   }
@@ -223,12 +155,9 @@ export class PrinterService {
 
     const health = await this.adapter.checkHealth(printer);
 
-    const updated = await prisma.printer.update({
-      where: { id: printerId },
-      data: {
-        isOnline: health.isOnline,
-        lastPingAt: new Date(),
-      },
+    const updated = await printerModel.update(printerId, {
+      isOnline: health.isOnline,
+      lastPingAt: new Date(),
     });
 
     return {
@@ -247,13 +176,7 @@ export class PrinterService {
   ): Promise<Printer | null> {
     // 1. If station is explicitly provided, look for an active printer assigned to that station
     if (station) {
-      const stationMatch = await prisma.printer.findFirst({
-        where: {
-          tenantId,
-          isActive: true,
-          station: { equals: station, mode: "insensitive" },
-        },
-      });
+      const stationMatch = await printerModel.findActiveByStation(tenantId, station);
       if (stationMatch) return stationMatch;
     }
 
@@ -275,33 +198,15 @@ export class PrinterService {
     }
 
     // 3. Look for default printer of that type
-    const defaultPrinter = await prisma.printer.findFirst({
-      where: {
-        tenantId,
-        type: targetType,
-        isActive: true,
-        isDefault: true,
-      },
-    });
+    const defaultPrinter = await printerModel.findActiveDefaultOfType(tenantId, targetType);
     if (defaultPrinter) return defaultPrinter;
 
     // 4. Look for any active printer of that type
-    const anyOfType = await prisma.printer.findFirst({
-      where: {
-        tenantId,
-        type: targetType,
-        isActive: true,
-      },
-    });
+    const anyOfType = await printerModel.findActiveOfType(tenantId, targetType);
     if (anyOfType) return anyOfType;
 
     // 5. Fallback: Any active printer in the tenant
-    return prisma.printer.findFirst({
-      where: {
-        tenantId,
-        isActive: true,
-      },
-    });
+    return printerModel.findAnyActive(tenantId);
   }
 
   /**
@@ -309,14 +214,10 @@ export class PrinterService {
    */
   async getOperationalSummary(tenantId: string) {
     const [totalPrinters, onlinePrinters, offlinePrinters, queueStats] = await Promise.all([
-      prisma.printer.count({ where: { tenantId, isActive: true } }),
-      prisma.printer.count({ where: { tenantId, isActive: true, isOnline: true } }),
-      prisma.printer.count({ where: { tenantId, isActive: true, isOnline: false } }),
-      prisma.printJob.groupBy({
-        by: ["status"],
-        where: { tenantId },
-        _count: { id: true },
-      }),
+      printerModel.countActive(tenantId),
+      printerModel.countActive(tenantId, true),
+      printerModel.countActive(tenantId, false),
+      printJobModel.countByStatus(tenantId),
     ]);
 
     const counts: Record<string, number> = {

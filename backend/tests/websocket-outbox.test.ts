@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { prisma } from "../src/lib/prisma.js";
+import { prisma } from "../src/database/prisma.js";
 import { outboxService } from "../src/services/outbox.service.js";
-import { websocketService, type ConnectedClient } from "../src/services/websocket.service.js";
+import { websocketService } from "../src/services/websocket.service.js";
+import type { ConnectedClient } from "../src/types/websocket.types.js";
 import { OutboxStatus } from "@prisma/client";
 import crypto from "node:crypto";
 import type { WebSocket } from "ws";

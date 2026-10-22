@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
-import { prisma } from "../src/lib/prisma.js";
+import { prisma } from "../src/database/prisma.js";
 
 const TEST_TENANT_A = "e1b1d1f0-0000-4000-8000-000000000001";
 const TEST_TENANT_B = "00000000-0000-4000-8000-000000000099";
